@@ -1,4 +1,4 @@
-# Unified-Solar-Cell-Simulation for diverse solar cells
+# A collaborative framework for unifying typical multidimensional solar cell simulations
 Typical solar cell simulations follow the same procedures, which can be well
     delineated by several variables. This project is designed to verify these
     variable values and pass the formatted results to Sentaurus TCAD, where a
