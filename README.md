@@ -1,5 +1,4 @@
-# Unified-Solar-Cell-Simulation
-Unified typical multidimensional simulations for diverse solar cells
+# Unified-Solar-Cell-Simulation for diverse solar cells
 Typical solar cell simulations follow the same procedures, which can be well
     delineated by several variables. This project is designed to verify these
     variable values and pass the formatted results to Sentaurus TCAD, where a
