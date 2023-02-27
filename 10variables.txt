@@ -1,0 +1,435 @@
+<HEAD>This plain text file contains essential variables to construct a 1/2/3D
+    homo-/hetero-/single-/multi-junction solar cell and to optimise cell
+    performance by simulating typical optical and electrical behaviours such
+    as JV, Suns-Voc, QE, QSSPC, etc. via varying one or more parameters.
+
+            Design of experiments (DOE) using WinSCP
+1. Login to a server hosting the desired simulator and find this text file
+2. Open this text file and edit variable values following the examples
+3. Add desired comments and save this text file to finalize DOE
+4. Right click 11ctrlsim.tcl and select execute to start batch running
+5. Check 11ctrlsim.out or job scheduler output file for job progress
+6. Execute 11ctrlsim.tcl again to stop the running batch if necessary
+7. Download numbered results under 06out directory for further analysis
+8. Execute 12savetpl.tcl to save key files in 07tpl for future reference
+9. Execute loadtpl.tcl to load key files back from a template in 07tpl
+
+Note 1: A variable takes a list (anything enclosed by braces. Braces can be
+    omitted for a one-element list) as its value. Assigning lists to a
+    variable to enable multiple runs with spaces as the separator. i.e.
+    Multiple lists: 1 {2 3} {4 5 6} {7 8 9 10} ...
+Note 2: Case insensitiveness do NOT apply to grammar rules. Only savvy users
+    are supposed to modify grammar rules.
+Note 3: Problem or issue? Email Dr. Fa-Jun MA (mfjamao@yahoo.com) (Thanks!)
+
+<COMMENT>--- Simulation environment variable
+Example (after semicolon):
+   0 Select a simulator: Sentaurus
+   1 Choose a simulator_version: L-2016.03
+   2 Enable/disable cylindrical coordinate at Y = 0: (!)Cylindrical
+   3 Optical only? OptOnly | !OptOnly
+   4 Job scheduler: Local | PBS | SLURM
+   5 For PBS and SLURM, max_walltime [hr]: 12
+   6 Max_memory [GB]: 100
+
+<GRAMMAR>{a = Sentaurus | s Sentaurus}
+{a = U-2022.12 | s E<-2010.12> F<-2011.09> G<-2012.06> H<-2013.03> I<-2013.12>
+    J<-2014.09> K<-2015.06> L<-2016.03> M<-2016.12> N<-2017.09> O<-2018.06>
+    P<-2019.03> Q<-2019.12> R<-2020.09> S<-2021.06> T<-2022.03> U<-2022.12>}
+{a = !Cylindrical | s C<ylindrical> !Cylindrical}
+{a = !OptOnly | s O<ptOnly> !OptOnly}
+{a = Local | s P<BS> Local}
+{== v-1 Local & `a | a = 12 | `i & `>= 1}
+{== v-2 Local & `a | a = 100 | `i & `>= 1}
+
+<VAR>SimEnv      {Sentaurus T-2022.03 !Cylindrical !OptOnly Local}
+
+<TOOL>ST settings: Tool_label = sde Tool_name = sde
+
+<COMMENT>--- Region generation variable
+Follow the Cartesian coordinate system setting:
+    X top -> bottom, Y left -> right, Z far -> near
+
+Regions of a block shape (rectangle or cuboid) are described sequentially from
+    the top to bottom, left to right, far to near. Additionally, if one region
+    shares one layer with the leftmost section in 2D, omit its thickness. If one
+    region shares one section with the furthest subsection in 3D, omit its
+    thickness and width. These regions determines the size of the simulation
+    domain and indexed from 1 to N.
+
+Beyond the simulation domain, there are additional gas regions added by default
+	to easily reference the domain surfaces. The top layer is indexed as 0, the
+	bottom layer N+1, the left layer N+2, the right N+3, the far N+4, the near
+	N+5. In case of 2D cylindrical, the left is not added so the right is N+2.
+	Additionally, only the top layer is added in case performing only raytrace.
+
+Regions of special shapes (Block, Ellipse, VList, Pyramid, Cone, etc.)
+    should be specified in advance. Each region labeled as "Remove" will be
+    removed in the end so it is not within the final region list. Each region
+    labeled as "Merge" will be merged into the previous region. Additionally,
+    if part of a special shape lies outside of the domain, it will be trimmed.
+
+Block: specify its diagonal vertices; Vertex: specify its vertices (>= 3);
+    Ellipse: specify its center to its major radius followed by an optional
+    MinR/MaxR; Cone and pyramid: specify its base center to its top
+    center/vertex followed by the major base radius and optional parameters.
+
+Examples:
+    Block (2D/3D): mat B K px1_y1/x2_y2
+    Vertex (2D polygon): mat V K px1_y1 px2_y2 px3_y3 ...
+    Ellipse (2D/3D): mat E K px1_y1/x2_y2 [MinR/MaxR]
+    Cone (3D): mat C K px1_y1_z1/x2_y2_z2 BaseR [TopR MinR/MaxR]
+    Pyramid (3D): mat P K px1_y1_z1/x2_y2_z2 BaseR [TopR NSides MinR/MaxR]
+    1D: {Mat1 x1 Mat2 x2 Mat3 x3 ...}
+    2D: {Mat1 x1 y1 Mat2 x2 y21 Mat3 y22 Mat4 x3 y3 ...}
+    3D: {Mat1 x1 y1 z1 Mat2 x2 y21 z211 Mat3 z212 Mat4 y22 z221 Mat5 z222
+        Mat6 x3 y3 z3 ...}
+
+<GRAMMAR>m
+{`!a & n & `> 0 | s E<llipse> V<ertex> P<yramid> C<one> Block}
+{n v1 & (a | `n & `> 0) | `!a & s K<eep>  M<erge> Remove}
+{n v1 & (a | `n & `> 0) | `!a & (== v1 Vertex & `p | `pp)}
+{(n v1 | == v1 Block) & `a | == v1 Ellipse & (a = 1 | `n & `> 0 & `<= 1)
+    | `!a & (== v1 {[CP]\w+} & `n & `> 0 | `p)}
+{(n v1 | == v1 {[BE]\w+} ) & `a | == v1 {[CP]\w+} & (a = 0 | `n & `>= 0)
+    | `!a & `p}
+{(n v1 | == v1 {[BE]\w+} ) & `a | == v1 Cone & (a = 1 | `n & `> 0
+    & `<= 1) | == v1 Pyramid & (a = 4 | `i & `> 2) | a | `p}
+{(n v1 | == v1 {[BCE]\w+} ) & `a | == v1 Pyramid & (a = 1 | `n & `> 0
+    & `<= 1) | a | `p}
+{(n v1 | == v1 {[BCEP]\w+} ) & `a | a | `p} ...
+
+<VAR>RegGen      {{Silicon 0.2} {Silicon 0.5}}
+
+<COMMENT>--- Region and interface fields variable
+Suppose i,j,k are region indices, regions can be referred as follows:
+    ri,j,k (Regions i, j and k), ri,j:k (Region i and regions from j to k)
+    rMat (All regions made of Mat)
+Supported constant region fields: B(Boron) P(Phosphorus) Al(Aluminum)
+    x|y(MoleFraction) PD(PhotonDensity)
+A region interface takes the form of ri/j and its direction is from i to j.
+
+Example:
+    0 Region or interface: ri | ri/j | px11_y11/x12_y12
+    1 Region field or field file: B | 03exp/B40.plx
+    2 Field concentration [cm^-3] or optional lateral decay factor: 8e14 | 0.8
+
+<GRAMMAR>{r | rr | pp}
+{`!a & r v0 & (!= g0 {S\w+} & `a | `s B P Al x y PD) | `f}
+{r v0 & (== v-1 {[xy]} & (`!a & `n & `>= 0 & `<= 1) | == v-1 (B|P|Al|PD)
+    & (`!a & `n & `>= 0) | a | `s B P Al x y PD) | f v-1 & a | n & `>= 0
+    & `<= 1 | `f}
+...
+
+<VAR>FldAttr     {{r1 B 1e+18} {r2 P 2e+17}}
+
+<COMMENT>--- Interface attributes variable
+Specify three types of region interfaces - SRH, metal contact and tunnelling
+SRH example:
+    0 Region interface: ri/j
+    1 Fixed charge density [q/cm2]: 0
+    2 Electron SRV [cm/s] or a trap file: 1e4 | 03exp/IntfTrap.txt
+    3 Electron SRV [cm/s] or optional hole SRV: 1e4
+    4 Optional hole SRV or nothing: 1e4
+Contact example:
+    0 Region interface: ri/j
+    1 Contact name: c[0-9]
+    2 Contact type: O<hmic> | E<qOhmic> | S<chottky> | Cu<rrent> | Ch<arge>
+    3 Contact value ([V] | [A] | [C]): 0
+    4 Distributed resistance for voltage contact [ohmcm^2]: 0
+    5 MS barrier for voltage contact [eV]: 0.5
+    6 Electron recombination velocity for voltage contact [cm/s]: 1e6
+    7 Hole recombination velocity for voltage contact [cm/s]: 1e6
+Tunnelling example:
+    0 Region interface: ri/j
+    1 Tunnelling attributes: eT | hT | cT | TAT
+    2 Tunnel setting file or trap file: 03exp/TnlSetting.txt | 03exp/TnlTrap.txt
+    3 Length of nonlocal mesh lines [um]: 5e-3
+    4 Permeation or trap density for TAT: 0 | 1e18
+    5 B2B for WKB calculation or barrier tunneling type for TAT: N<one> | F<ull>
+        | S<imple> | U<psideDown>  | e | h | c
+
+<GRAMMAR>rr
+{`!a & n | `s c0 c1 c2 c3 c4 c5 c6 c7 c8 c9 eT hT cT TAT}
+{n v1 & (a | n & `> 0 | `f) | == v1 {c\d} & (a = Ohmic | s S<chottky>
+    E<qOhmic> Cu<rrent> Ch<arge> Ohmic) | `!a & `f}
+{n v1 & (a | `n & `> 0) | == v1 {c\d} & (a = 0 | `n) | `!a & `n & `> 0}
+{n v1 & f v2 & (a | `n & `> 0) | (n v1 & n v2 | == v2 {C\w+} )
+    & `a | == v1 {c\d} & (a = 0 | `n) | == v1 {[ceh]T} & (a = 0 | `n & `>= 0)
+    | == v1 TAT & `!a & `n & `> 0}
+{(n v1 | == v2 {C\w+} ) & `a | == v1 {c\d} & (a = 0 | `n) | == v1 TAT
+    & `!a & `s c e h | a = None | s F<ull> S<imple> U<psideDown> None}
+{== v1 {c\d} & (a = 1e7 | `n | `> 0) | a}
+{== v1 {c\d} & (a | `n | `> 0) | a}
+
+<VAR>IntfAttr    {{r0/1 c0 Ohmic 0 0 0 10000000} {r2/3 c1 Ohmic 0 0 0 10000000}}
+
+<COMMENT>--- Optical generation attributes variable
+Specify four types of optical solver E(External), O(OBAM), T(TMM), R(Raytrace).
+For Raytrace, ARC and BC(boundary condition) needs to be specified.
+External optical spectral profile example:
+    0 Optical window: ri/j | px11_y11/x12_y12
+    1 Optical solver: External
+    2 Spectral photogeneration file: 02opt/Spectral_OG1D_Upright_170um.plx
+Optical beam absorption method example:
+    0 Optical window: ri/j | px11_y11/x12_y12
+    1 Optical solver: OBAM
+Transfer matrix method example:
+    0 Optical window: ri/j | px11_y11/x12_y12
+    1 Optical solver: TMM
+    2 Refractive index n or material file for TMM bottom medium: 2.3
+    3 Extinction coefficient k for TMM: 0
+Raytrace example:
+    0 Optical window: ri/j | px11_y11/x12_y12
+    1 Optical solver: Raytrace
+    2 Number of rays: 1000
+    3 Deterministic or MonteCarlo: MonteCarlo | Deterministic
+    4 Minimum fraction of Istop: 1e-4
+    5 Maximum number of interfaces to pass: 80000
+Antireflective coating example:
+    0 Optical window: ri/j
+    1 Optical attribute: ARC
+    2 Material 1 (from ri to rj)
+    3 Thickness [um]
+    4 Material file
+    5 Material 2 ...
+Boundary condition example:
+    0 Optical window: ri/j
+    1 Reflection value or based on Fresnel: n | Fresnel
+    2 Diffusive model: Phong | Gaussian | Random
+    3 Characteristic value for diffusive model
+
+<GRAMMAR>{pp | rr}
+{`!a & rr v0 & (n & `>= 0 & `<= 1 | `s A<RC> F<resnel> O<BAM> R<aytrace> T<MM>
+    E<xternal>) | `s O<BAM> R<aytrace> T<MM> E<xternal>}
+{== v1 ARC & (`!a & `m) | (n v1 | == v1 {F\w+} ) & (a | s R<andom>
+    G<aussian> Phong) | == v1 TMM & (a = 1 | n & `>= 1 | `m)
+    | == v1 OBAM & `a | == v1 {E\w+} & `!a & `f | `!a & `i & `> 0}
+{== v1 ARC & (`!a & `n & `> 0) | ( n v1 | == v1 {F\w+} ) & ((== v2 Phong
+    & a = 1 | `i & `> 0) | (== v2 {G\w+} & a = 0.1 | `n & `> 0) | a = 0
+    | `i & `>= 0 & `<= 1000) | == v1 TMM & (n v2 & (a = 0 | `n & `>= 0)
+    | `a) | == v1 {[E|O]\w+} & `a
+    | a = MonteCarlo | s D<eterministic> MonteCarlo}
+{== v1 ARC & (`!a & `f) | == v1 {R\w+} & (a = 1e-4 | `n & `> 0 & `< 1)
+    | `a}
+{== v1 ARC & (a | `m) | == v1 {R\w+} & (a = 100000 | `i & `> 0) | `a}
+{== v1 ARC & (m v-1 & `!a & `n & `> 0 | n v-1 & `!a & `f | f v-1 & (a | `m))
+    | `a}
+...
+
+<VAR>GopAttr     {{r0/1 TMM 1 0}}
+
+<COMMENT>--- Mesh attributes variable
+Mesh example:
+    0 Maximum element size for region refinement [um]: 10
+    1 Minimum element size for region refinement [um]: 0.05
+    2 Minimum spaces for a region: 8
+    3 Minimum layer thickness for interface refinement [um]: 0.01
+    4 Maximum number of interface layers: 8
+    5 Expansion ratio for interface refinement: 1.5
+    6 Minimum layer size for optical refinement [um]: 0.005
+    7 Expansion ratio for optical refinement: 1.1
+
+<GRAMMAR>{a = 10 | `n & `> 0}
+{a = 0.05 | `n & `> 0}
+{a = 8 | `i & `> 1}
+{a = 0.01 | `n & `> 0}
+{a = 8 | `i & `> 1}
+{a = 1.5 | `n & `> 1}
+{a = 0.005 | `n & `> 0}
+{a = 1.1 | `n & `> 1}
+
+<VAR>MeshAttr    {10 0.05 8 0.01 8 1.5 0.005 1.1}
+
+<TOOL>ST settings: Tool_label = sdevice Tool_name = sdevice
+
+<COMMENT>--- Models and parameters variable
+The default models for a semiconductor region: constant mobility, no bandgap
+narrowing, no Auger, no radiative with SRH recombination.
+The default models for a silicon region: Philips mobility, Schenk BGN,
+Richter Auger, radiative and SRH recombination
+Models and parameters for regions example:
+    0 Materal or region: ri | mat
+    1 Material model parameter file: 01mdb/silicon.par
+    2 Individual model: EA0 | Eg0 | NC300 | NV300 | DC | mt | mu | BGN
+        | Aug | Rad | SRH
+    3 Model parameter for EA0, Eg0, NC300, NV300, DC, mt: 3
+      Models for mu or parameter for constant mu: A<rora>, M<asetti>
+      Models for BGN: B<enettWilson>, d<elAlamo>, J<ainRoulston>, S<lotboom>,
+        T<ableBGN>
+      Parameter for Aug, Rad, SRH (a trap file can be assigned): value or !
+    4 Same as index 4
+SRH example:
+    0 Materal or region: ri | mat
+    1 Material model parameter file: 01mdb/silicon.par
+    2 Individual model: SRH
+    3 Trap file, or electron lifetime or !
+    4 If the previous is a trap file, electron lifetime or !; If it is electron
+        lifetime, enter hole lifetime or nothing if lifetimes are the same
+    5 If the previous is electron lifetime, enter hole lifetime or nothing if
+        lifetimes are the same
+
+<GRAMMAR>{m | r} {`!a & `f}
+{a | r v0 & (== g0 {I\w+} & `s EA0 Eg0 DC mt | == g0 {S\w+} & `s EA0 Eg0
+    NC300 NV300 DC mt mu BGN SRH Aug Rad)}
+{e v-1 & `a | == v-1 (EA0|Eg0|NC300|NV300|DC|mt) & `!a & `n & `> 0
+    | == v-1 mu & (`!a & n & `> 0 | `s A<rora> M<asetti>)
+    | == v-1 BGN & `!a & `s B<enettWilson> d<elAlamo> J<ainRoulston> S<lotboom>
+        T<ableBGN>
+    | (== v-1 (Aug|Rad) | (f v-1 & == v-2 SRH)) & (a | n & `> 0 | `s EA0
+        Eg0 NC300 NV300 DC mt mu BGN SRH Aug Rad !)
+    | == v-1 SRH & (a | n & `> 0 | f | `s EA0 Eg0 NC300 NV300 DC mt mu SRH
+        BGN Aug Rad !)
+    | n v-1 & (f v-2 | == v-2 (mu|mt|Aug|SRH) ) & (a | n & `> 0
+        | `s EA0 Eg0 NC300 NV300 DC mt mu BGN SRH Aug Rad)
+    | (n v-1 & (n v-2 & (f v-3 & == v-4 SRH | == v-3 (mt|mu|Aug|SRH) )
+        | == v-2 (EA0|Eg0|NC300|NV300|DC|Rad) ) | == v-1 ! | == v-1
+        {(Ar|Ma|Be|de|Ja|Sl|Ta)\w+} ) & (a | `s EA0 Eg0 NC300 NV300
+        DC mt mu BGN SRH Aug Rad)}
+...
+
+<VAR>ModPar      {{Silicon 01mdb/Silicon.par}}
+
+<COMMENT>--- Miscellaneous attributes variable
+Example:
+    0 Spectrum file for OBAM/TMM/Raytrace: 02opt/am15g_IEC60904-3-2008.txt
+    1 Beginning or monochromatic light wavelength for OBAM/TMM [um]: 0.3
+    2 Ending wavelength for OBAM/TMM/Raytrace [um]: 1.2
+    3 Step size for OBAM/TMM/Raytrace [um]: 0.01
+    4 fraction of shading: 0.03
+    5 Intensity of monochromatic light for OBAM/TMM/Raytrace [Wcm^-2]: 1e-3
+    6 Incident angle (Theta): 0
+    7 Incident angle (Phi): 0
+    8 Initial device temperature [oC]: 25
+    9 Bit length for a number: 64 | 80 | 128 | 256
+   10 Solver: I<LS> | S<uper> | ParDiSo
+
+<GRAMMAR>{a = 02opt/am15g_IEC60904-3-2008.txt | `f}
+{a = 0.3 | `n & `> 0}
+{a = 1.2 | `n & `> v-1}
+{a = 0.01 | `n & `> 0 & `< v-1}
+{a = 0 | `n & `>= 0}
+{a = 1e-3 | `n & `> 0}
+{a = 0 | `n & `>= 0 & `<= 90}
+{a = 0 | `n & `>= 0 & `<= 90}
+{a = 25 | `n & `>= -273.15}
+{a = 64 | s 80 128 256 64}
+{a = ParDiSo | s I<LS> S<uper> ParDiSo}
+
+<VAR>MiscAttr    {02opt/am15g_IEC60904-3-2008.txt 0.3 1.2 0.01 0 0.001 0 0 25 64
+    ParDiSo}
+
+<COMMENT>--- Variable vary settings
+Specify the following variables for varying - c# contact property (IntfAttr),
+    SpecScaling spectrum intensity scaling, MonoScaling monochromatic light
+    intensity scaling, Wavelength, etc. By varying one or more variables to
+    mimic typical chacterization like DJV, LJV, QE, Suns-Voc, QSSPC, CV, etc.
+Contact varying example:
+    0 Contact name defined in 'IntfAttr' c#: c1
+    1 Contact attribute or goal: Voltage | Current | Charge | Frequency | 1
+    2 # of intervals (0 -> no data are saved): 10 (on the linear scale)
+  >=3 Value for taking snapshots: 0.5
+Spectrum and monochromatic light intensity varying example:
+    0 Illumination type: S<pecScaling> or M<onoScaling>
+    1 Intensity scaling goal: 1
+    2 # of intervals from 1e-4: 10 (on the logarithmic scale)
+  >=3 Value for taking snapshots: 0.3
+Wavelength varying example:
+    0 Variable identifier: W<avelength>
+    1 Wavelength [um] goal: 1.2
+    2 # of intervals: 10 (linear)
+  >=3 Value for taking snapshots: 0.6
+Other variables for varying (sdevice --parameter-names):
+    0 Variable format: (Region or interface)/model/parameter(/initial value)
+    1 Goal: 1
+    2 # of intervals: 10 (linear)
+  >=3 Value for taking snapshots: 0.3
+
+<GRAMMAR>b
+{`!a & == v0 {c\d} & (n | `s Cu<rrent> Ch<arge> F<requency> V<oltage>) | `n}
+{a = 0 | `i & `>= 0}
+{a | `n & `< v1}
+...
+
+<VAR>VarVary     {{MonoScaling 1 0} {c0 0.6 20}}
+
+<COMMENT>--- Extract field during variable varying
+Supported fields: (Dn = excess minority carrier density)
+n(eDensity) p(hDensity) UA(AugerRecombination) UB(RadiativeRecombination)
+US(SRHRecombination) UP(PMIRecombination) UD(eGapStatesRecombination)
+Gop(OpticalGeneration) Eg(BandGap) BGN(BandgapNarrowing) ni(IntrinsicDensity)
+EA(ElectronAffinity) EC(ConductionBandEnergy) EV(ValenceBandEnergy)
+EFe(eQuasiFermiEnergy) EFh(hQuasiFermiEnergy) NA(AcceptorConcentration)
+ND(DonorConcentration) PD(AbsorbedPhotonDensity)
+x(xMoleFraction) Eg_eff(EffectiveBandGap) ni_eff(EffectiveIntrinsicDensity)
+V(ElectrostaticPotential) q(SpaceCharge) UT(TotalRecombination)
+eBT(eBarrierTunneling) hBT(hBarrierTunneling) eQt(eTrappedCharge)
+hQt(hTrappedCharge) E(Abs(ElectricField-V)) mue(eMobility) muh(hMobility)
+Point extraction example:
+    0 Point: p0_0_0
+  >=1 Supported field: n
+Other extraction example:
+    0 Window, region, interface: p0_0_0/1_1_1
+    1 A<verage> | I<ntegrate> | M<axmum> | L<east>
+    2 Supported field: n
+  >=3 Optional coordinate printing (CP) for A|M|L or supported field
+
+<GRAMMAR>{p | pp | r | rr}
+{`!a & p v0 & `s Dn n p UA UB US UP UD Gop PD Eg EA EC EV EFe EFh BGN ni NA ND x
+    V Eg_eff ni_eff q UT eBT hBT eQt hQt E mue muh | `s A<verage> I<ntegrate>
+    M<axmum> L<east>}
+{p v0 & (a | `s Dn n p UA UB US UP UD Gop PD Eg EA EC EV EFe EFh BGN ni NA ND x
+    V Eg_eff ni_eff q UT eBT hBT eQt hQt E mue muh) | `!a & `s Dn n p UA UB US
+    UP UD Gop PD Eg EA EC EV EFe EFh BGN ni NA ND x V Eg_eff ni_eff q UT eBT
+    hBT eQt hQt E mue muh}
+{p v0 & (a | `s Dn n p UA UB US UP UD Gop PD Eg EA EC EV EFe EFh BGN ni NA ND x
+    V Eg_eff ni_eff q UT eBT hBT eQt hQt E mue muh) | == v-1 CP & (a | `s
+    Dn n p UA UB US UP UD Gop PD Eg EA EC EV EFe EFh BGN ni NA ND x V Eg_eff
+    ni_eff q UT eBT hBT eQt hQt E mue muh A<verage> I<ntegrate> M<axmum>
+    L<east>) | == v-1 {(Ave|Int|Max|Lea)\w+} & `!a & `s Dn n p UA UB US UP UD
+    Gop PD Eg EA EC EV EFe EFh BGN ni NA ND x V Eg_eff ni_eff q UT eBT hBT eQt
+    hQt E mue muh | a | `s CP Dn n p UA UB US UP UD Gop PD Eg EA EC EV EFe EFh
+    BGN ni NA ND x V Eg_eff ni_eff q UT eBT hBT eQt hQt E mue muh A<verage>
+    I<ntegrate> M<axmum> L<east>}
+...
+
+<VAR>VV2Fld      {}
+
+<TOOL>ST settings: Tool_label = svisual Tool_name = svisual
+
+<COMMENT>--- Extract top-bottom fields from snapshots
+Specify a point pX_Y_Z [um] for extracting 1D structural fields from saved
+snapshots from top to bottom. Y or Z cut is performed to get 1D fields.
+Axis aligned cut example: (Band = "EA EC EV EFe EFh")
+    0 Point: p-1_250
+    1 # of the front dummy layers: 1
+    2 # of the back dummy layers: 1
+  >=3 Supported field: Ec
+Field integration example:
+    0 Region or a window: r1 | p0_0/1_1
+  >=1 Supported field: Ec
+
+<GRAMMAR>{p | r | pp}
+{`!a & p v0 & `i & `>= 0 | `s n p UA UB US UP UD Gop E Eg EA EC EV EFe EFh BGN
+    ni N V x V Eg_eff ni_eff q UT eBT hBT eQt hQt E mue muh}
+{p v0 & `!a & `i & `>= 0 | a | `s n p UA UB US UP UD Gop E Eg EA EC EV EFe EFh
+    BGN ni N V x V Eg_eff ni_eff q UT eBT hBT eQt hQt E mue muh}
+{p v0 & `!a & `s Band n p UA UB US UP UD Gop E Eg BGN ni N V x V Eg_eff ni_eff
+    q UT eBT hBT eQt hQt E mue muh}
+{a | `s Band n p UA UB US UP UD Gop E Eg BGN ni N V x V Eg_eff ni_eff q UT
+    eBT hBT eQt hQt E mue muh}
+...
+
+<VAR>SS2Fld      {}
+
+<COMMENT>--- Data extraction and analysis for variable varying 'VarVary'
+Extract data from 'VarVary', prepare XY plots and make further analysis
+
+<GRAMMAR>v
+{a | `s JV QE S<unsVoc> Q<SSPC> R<AT>}
+
+<VAR>PPAttr      {{v1 JV}}
+
+<TAIL>--- No variables afterwards
+Put down any notes
+

@@ -1,0 +1,25 @@
+SimEnv      {Sentaurus T-2022.03 !Cylindrical !OptOnly Local}
+
+RegGen      {{Silicon 0.2} {Silicon 0.5}}
+
+FldAttr     {{r1 B 1e+18} {r2 P 2e+17}}
+
+IntfAttr    {{r0/1 c0 Ohmic 0 0 0 10000000} {r2/3 c1 Ohmic 0 0 0 10000000}}
+
+GopAttr     {{r0/1 TMM 1 0}}
+
+MeshAttr    {10 0.05 8 0.01 8 1.5 0.005 1.1}
+
+ModPar      {{Silicon 01mdb/Silicon.par}}
+
+MiscAttr    {02opt/am15g_IEC60904-3-2008.txt 0.3 1.2 0.01 0 0.001 0 0 25 64
+    ParDiSo}
+
+VarVary     {{MonoScaling 1 0} {c0 0.6 20}}
+
+VV2Fld      {}
+
+SS2Fld      {}
+
+PPAttr      {{v1 JV}}
+

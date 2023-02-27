@@ -1,0 +1,12 @@
+# Define mole fraction relationship between two materials
+# Cd(x)Zn(1-x)S
+CdZnS (x=0) = ZnS
+CdZnS (x=1) = CdS
+
+# C(x)Z(1-x)TS
+CZTS (x=0) = ZTS
+CZTS (x=1) = CTS
+
+# C(x)Z(1-x)TSe
+CZTSe (x=0) = ZTSe
+CZTSe (x=1) = CTSe

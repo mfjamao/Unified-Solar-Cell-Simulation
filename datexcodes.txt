@@ -1,0 +1,153 @@
+DATEX2.1
+Datacode
+"$Author: Fajun Ma $ $DateTime: 2009/11/19 10:15:17 $"
+"Data codes for semiconductor process and device simulation"
+
+Materials {
+    iaSi {
+        label= "iaSi"
+        group= Semiconductor
+        color= #a6d6d6, #b36b6b
+    }
+    paSi {
+        label= "paSi"
+        group= Semiconductor
+        color= #a6d6d6, #b36b6b
+    }
+    naSi {
+        label= "naSi"
+        group= Semiconductor
+        color= #a6d6d6, #b36b6b
+    }
+    ITO {
+        label= "ITO"
+        group= Semiconductor
+        color= #a6d6d6, #b36b6b
+    }
+    IZO {
+        label= "IZO"
+        group= Conductor
+        color= #a6d6d6, #b36b6b
+    }
+    ZnO {
+        label= "ZnO"
+        group= Semiconductor
+        color= #ef79ff
+    }
+    CdS {
+        label= "CdS"
+        group= Semiconductor
+        color= #f399ff
+    }
+    ZnS {
+        label= "ZnS"
+        group= Semiconductor
+        color= #f399ff
+    }
+    ZnSe {
+        label= "ZnSe"
+        group= Semiconductor
+        color= #f399ff
+    }
+    CdZnS {
+        label= "CdZnS"
+        group= Semiconductor
+        color= #f399ff
+    }
+    ZTS {
+        label= "ZTS"
+        group= Semiconductor
+        color= #f399ff
+    }
+    CTS {
+        label= "CTS"
+        group= Semiconductor
+        color= #f399ff
+    }
+    CZTS {
+        label= "CZTS"
+        group= Semiconductor
+        color= #f399ff
+    }
+    CTSe {
+        label= "CTSe"
+        group= Semiconductor
+        color= #f399ff
+    }
+    ZTSe {
+        label= "ZTSe"
+        group= Semiconductor
+        color= #f399ff
+    }
+    CZTSe {
+        label= "CZTSe"
+        group= Semiconductor
+        color= #f399ff
+    }
+    AZO {
+        label= "AZO"
+        group= Conductor
+        color= #0f5ea8, #ff1919
+    }
+    TCO {
+        label= "TCO"
+        group= Conductor
+        color= #817699, #ff5959
+    }
+    MgF2 {
+        label= "MgF2"
+        group= Insulator
+        color= #eeee00, #d9b64c
+    }
+    Glass {
+        label= "Glass"
+        group= Insulator
+        color= #eeee00, #d9b64b
+    }
+    EVA {
+        label= "EVA"
+        group= Insulator
+        color= #eeee00, #d9b64c
+    }
+    SiNx {
+        label= "SiNx"
+        group= Insulator
+        color= #555500, #ffc619
+    }
+    AlOx {
+        label= "AlOx"
+        group= Insulator
+        color= #555500, #ffc619
+    }
+    Graphene {
+        label= "Graphene"
+        group= Semiconductor
+        color= #a6d6d6, #b36b6b
+    }
+    TiO2 {
+        label= "TiO2"
+        group= Semiconductor
+        color= #a6d6d6, #b36b6b
+    }
+    ETL {
+        label= "ETL"
+        group= Semiconductor
+        color= #a6d6d6, #b36b6b
+    }
+    SpiroMeOTAD {
+        label= "SpiroMeOTAD"
+        group= Semiconductor
+        color= #a6d6d6, #b36b6b
+    }
+    HTL {
+        label= "HTL"
+        group= Semiconductor
+        color= #a6d6d6, #b36b6b
+    }
+    CH3NH3PbI3 {
+        label= "CH3NH3PbI3"
+        group= Semiconductor
+        color= #a6d6d6, #b36b6b
+    }
+
+}
