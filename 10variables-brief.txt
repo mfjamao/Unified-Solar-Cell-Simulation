@@ -1,6 +1,6 @@
-SimEnv      {Sentaurus T-2022.03 !Cylindrical !OptOnly Local}
+SimEnv      {Sentaurus t !Cylindrical !OptOnly pbs 1 100}
 
-RegGen      {{Silicon 0.2} {Silicon 0.5}}
+RegGen      {{GaAs 0.2} {GaAs 0.5}}
 
 FldAttr     {{r1 B 1e+18} {r2 P 2e+17}}
 
@@ -10,16 +10,16 @@ GopAttr     {{r0/1 TMM 1 0}}
 
 MeshAttr    {10 0.05 8 0.01 8 1.5 0.005 1.1}
 
-ModPar      {{Silicon 01mdb/Silicon.par}}
+ModPar      {{r1,2 01mdb/GaAs.par mu Arora SRH 1e-09}}
 
-MiscAttr    {02opt/am15g_IEC60904-3-2008.txt 0.3 1.2 0.01 0 0.001 0 0 25 64
+MiscAttr    {02opt/am15g_IEC60904-3-2008.txt 0.853 1.2 0.01 0 0.001 0 0 25 64
     ParDiSo}
 
 VarVary     {{MonoScaling 1 0} {c0 0.6 20}}
 
 VV2Fld      {}
 
-SS2Fld      {}
+SS2Fld      {{p0 1 1 band}}
 
 PPAttr      {{v1 JV}}
 

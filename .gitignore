@@ -84,4 +84,4 @@ v[0-9]*
 .status
 g*.*
 11ctrlsim.mfj
-
+cmlog.txt

@@ -27,12 +27,12 @@ namespace eval mfjProc {
         Dn ExcessCarrierDensity|cm^-3 n eDensity|cm^-3 p hDensity|cm^-3
         UA AugerRecombination|cm^-3*s^-1 UB RadiativeRecombination|cm^-3*s^-1
         US SRHRecombination|cm^-3*s^-1 UP PMIRecombination|cm^-3*s^-1
-        UT eGapStatesRecombination|cm^-3*s^-1 Gop OpticalGeneration|cm^-3*s^-1
+        UT TotalRecombination|cm^-3*s^-1 Gop OpticalGeneration|cm^-3*s^-1
         Eg BandGap|eV BGN BandgapNarrowing|eV ni IntrinsicDensity|cm^-3
         EA ElectronAffinity|eV EC ConductionBandEnergy|eV
         EV ValenceBandEnergy|eV EFe eQuasiFermiEnergy|eV
         EFh hQuasiFermiEnergy|eV NA AcceptorConcentration|cm^-3
-        ND DonorConcentration|cm^-3 UD eGapStatesRecombination|cm^-3*s^-1
+        ND DonorConcentration|cm^-3 UD eAmorphousRecombination|cm^-3*s^-1
         x xMoleFraction|1 Eg_eff EffectiveBandGap|eV
         ni_eff EffectiveIntrinsicDensity|cm^-3
         V ElectrostaticPotential|V q SpaceCharge|cm^-3
@@ -1411,8 +1411,8 @@ proc mfjProc::valSplit {VarName VarVal GrpID LvlIdx LvlLen} {
     # Set regular exppression strings for a material or regions
     # Use {} here to preserve a string as it is
     set RE_m {[\w.]+}
-    set RE_r {(-?[\w.]+[:,])*-?[\w.]+}
-    set RE_v {(-?[\d]+[:,])*-?[\d]+}
+    set RE_r {(-?\d+[:,])*-?\d+}
+    set RE_v {(-?\d+[:,])*-?\d+}
 
     # RE for integers and real numbers (including scientific notation)
     set RE_n {[+-]?(\.\d+|\d+(\.\d*)?)([eE][+-]?\d+)?}

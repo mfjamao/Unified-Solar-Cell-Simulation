@@ -543,7 +543,7 @@ namespace eval mfjGrm {
                             }
                             set Len [llength $RegInfo]
                             incr Len -1
-                            set RE_r {(-?[\w.]+[:,])*-?[\w.]+}
+                            set RE_r {(-?\d+[:,])*-?\d+}
                             if {[regexp -nocase ^r($RE_r)$ $Val -> RStr]} {
 
                                 # Read an index string and verify region indices

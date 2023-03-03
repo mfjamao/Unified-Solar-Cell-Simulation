@@ -332,18 +332,18 @@ Plot {
     *-- Carrier Densities
     eDensity hDensity IntrinsicDensity EffectiveIntrinsicDensity
     *-- Traps
-    eTrappedCharge hTrappedCharge eInterfaceTrappedCharge
+    eAmorphousTrappedCharge hAmorphousTrappedCharge eInterfaceTrappedCharge
     hInterfaceTrappedCharge
     *-- Fields, Potentials and Charge distributions
     SpaceCharge ElectricField/Vector Potential
     *-- Currents and current components
     eCurrent/vector hCurrent/vector TotalCurrentDensity/vector
     current/vector CurrentPotential
-    eMobility hMobility eBarrierTunneling hBarrierTunneling
+    eMobility hMobility 
     *-- Generation/Recombination
     SRHRecombination RadiativeRecombination PMIRecombination
     AugerRecombination SurfaceRecombination TotalRecombination
-    eGapStatesRecombination eLifeTime hLifeTime
+    eAmorphousRecombination hAmorphousRecombination eLifeTime hLifeTime
     *-- Optics
     DielectricConstant RefractiveIndex OpticalGeneration OpticalIntensity
     AbsorbedPhotonDensity ComplexRefractiveIndex
@@ -352,7 +352,7 @@ Plot {
     eJouleHeat hJouleHeat ThomsonHeat PeltierHeat
     RecombinationHeat OpticalAbsorptionHeat TotalHeat
     *-- Nonlocal meshes
-    NonLocal
+    NonLocal eNLLTunnelingGeneration hNLLTunnelingGeneration
 }
 
 *--- Refer to Appendix F: Tables 162, 163, 297

@@ -1352,7 +1352,7 @@ proc mfjST::updatePP_Bat {} {
             if {$Elm eq "FSTPP"} {
                 if {[llength $arr(BatCMILst)]} {
                     puts $Ouf "GCCVer=`\$STROOT/bin/cmi -a\
-                        | awk '\{if(NR==4) print \$3\}'`"
+                        | awk '\{if(NR==4) print \$4\}'`"
                     puts $Ouf "GCCInt=`echo \$GCCVer\
                         | awk -F. '\{print \$1\$2\$3\}'`"
                     puts $Ouf "CMIVer=`\$STROOT/bin/cmi -a\

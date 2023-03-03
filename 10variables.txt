@@ -99,12 +99,11 @@ Examples:
     & `<= 1) | a | `p}
 {(n v1 | == v1 {[BCEP]\w+} ) & `a | a | `p} ...
 
-<VAR>RegGen      {{Silicon 0.2} {Silicon 0.5}}
+<VAR>RegGen      {{GaAs 0.2} {GaAs 0.5}}
 
 <COMMENT>--- Region and interface fields variable
 Suppose i,j,k are region indices, regions can be referred as follows:
     ri,j,k (Regions i, j and k), ri,j:k (Region i and regions from j to k)
-    rMat (All regions made of Mat)
 Supported constant region fields: B(Boron) P(Phosphorus) Al(Aluminum)
     x|y(MoleFraction) PD(PhotonDensity)
 A region interface takes the form of ri/j and its direction is from i to j.
@@ -288,7 +287,8 @@ SRH example:
         DC mt mu BGN SRH Aug Rad)}
 ...
 
-<VAR>ModPar      {{Silicon 01mdb/Silicon.par}}
+<VAR>ModPar      {{r1 01mdb/GaAs.par mu Arora SRH 1e-09} {r2 01mdb/GaAs.par mu
+    Arora SRH 1e-09}}
 
 <COMMENT>--- Miscellaneous attributes variable
 Example:
@@ -316,8 +316,8 @@ Example:
 {a = 64 | s 80 128 256 64}
 {a = ParDiSo | s I<LS> S<uper> ParDiSo}
 
-<VAR>MiscAttr    {02opt/am15g_IEC60904-3-2008.txt 0.3 1.2 0.01 0 0.001 0 0 25 64
-    ParDiSo}
+<VAR>MiscAttr    {02opt/am15g_IEC60904-3-2008.txt 0.853 1.2 0.01 0 0.001 0 0 25
+    64 ParDiSo}
 
 <COMMENT>--- Variable vary settings
 Specify the following variables for varying - c# contact property (IntfAttr),
@@ -420,7 +420,7 @@ Field integration example:
     eBT hBT eQt hQt E mue muh}
 ...
 
-<VAR>SS2Fld      {}
+<VAR>SS2Fld      {{p0 1 1 Band}}
 
 <COMMENT>--- Data extraction and analysis for variable varying 'VarVary'
 Extract data from 'VarVary', prepare XY plots and make further analysis

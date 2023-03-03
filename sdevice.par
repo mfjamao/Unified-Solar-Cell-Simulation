@@ -152,6 +152,16 @@ foreach grp $ModPar {
                     ConstantMobility \{
                         mumax= $str * cm^2/(Vs)
                     \}"
+            } elseif {[lindex $lst 1] eq "Masetti"} {
+                vputs -n -i-4 "
+                    DopingDependence \{
+                        formula= 1, 1
+                    \}"
+            } elseif {[lindex $lst 1] eq "Arora"} {
+                vputs -n -i-4 "
+                    DopingDependence \{
+                        formula= 2, 2
+                    \}"
             }
         } elseif {[lindex $lst 0] eq "Aug"} {
             if {[string is double -strict [lindex $lst 1]]} {
