@@ -42,7 +42,7 @@ Example (after semicolon):
 {== v-1 Local & `a | a = 12 | `i & `>= 1}
 {== v-2 Local & `a | a = 100 | `i & `>= 1}
 
-<VAR>SimEnv      {Sentaurus T-2022.03 !Cylindrical !OptOnly Local}
+<VAR>SimEnv      {Sentaurus T-2022.03 !Cylindrical OptOnly PBS 12 100}
 
 <TOOL>ST settings: Tool_label = sde Tool_name = sde
 
@@ -99,7 +99,24 @@ Examples:
     & `<= 1) | a | `p}
 {(n v1 | == v1 {[BCEP]\w+} ) & `a | a | `p} ...
 
-<VAR>RegGen      {{GaAs 0.2} {GaAs 0.5}}
+<VAR>RegGen      {{Gas Pyramid Remove p3.53610857633_0_0/0_0_0 3.53553390593 0 4
+    1} {Gas Block Keep p0_0_0/3.53610857633_2.5_2.5} {Silicon 180 2.5 2.5} {iaSi
+    0.001 2.5 2.5} {PolySi 0.27 2.5 2.5} {Aluminum 1 2.5 2.5}} {{Gas Pyramid
+    Remove p3.53610857633_0_0/0_0_0 3.53553390593 0 4 1} {Gas Block Keep
+    p0_0_0/3.53610857633_2.5_2.5} {Silicon 180 2.5 2.5} {iaSi 0.001 2.5 2.5}
+    {PolySi 0.27 2.5 2.5} {Aluminum 1 2.5 2.5}} {{Gas Pyramid Remove
+    p3.53610857633_0_0/0_0_0 3.53553390593 0 4 1} {Gas Block Keep
+    p0_0_0/3.53610857633_2.5_2.5} {Silicon 180 2.5 2.5} {iaSi 0.001 2.5 2.5}
+    {PolySi 0.14 2.5 2.5} {Aluminum 1 2.5 2.5}} {{Gas Pyramid Remove
+    p3.53610857633_0_0/0_0_0 3.53553390593 0 4 1} {Gas Block Keep
+    p0_0_0/3.53610857633_2.5_2.5} {Silicon 180 2.5 2.5} {iaSi 0.001 2.5 2.5}
+    {PolySi 0.14 2.5 2.5} {Aluminum 1 2.5 2.5}} {{Gas Pyramid Remove
+    p3.53610857633_0_0/0_0_0 3.53553390593 0 4 1} {Gas Block Keep
+    p0_0_0/3.53610857633_2.5_2.5} {Silicon 180 2.5 2.5} {iaSi 0.001 2.5 2.5}
+    {PolySi 0.07 2.5 2.5} {Aluminum 1 2.5 2.5}} {{Gas Pyramid Remove
+    p3.53610857633_0_0/0_0_0 3.53553390593 0 4 1} {Gas Block Keep
+    p0_0_0/3.53610857633_2.5_2.5} {Silicon 180 2.5 2.5} {iaSi 0.001 2.5 2.5}
+    {PolySi 0.07 2.5 2.5} {Aluminum 1 2.5 2.5}}
 
 <COMMENT>--- Region and interface fields variable
 Suppose i,j,k are region indices, regions can be referred as follows:
@@ -120,7 +137,7 @@ Example:
     & `<= 1 | `f}
 ...
 
-<VAR>FldAttr     {{r1 B 1e+18} {r2 P 2e+17}}
+<VAR>FldAttr     {{r2 B 1.654e+14} {r5/4 03exp/TopConB.plx}}
 
 <COMMENT>--- Interface attributes variable
 Specify three types of region interfaces - SRH, metal contact and tunnelling
@@ -161,7 +178,7 @@ Tunnelling example:
 {== v1 {c\d} & (a = 1e7 | `n | `> 0) | a}
 {== v1 {c\d} & (a | `n | `> 0) | a}
 
-<VAR>IntfAttr    {{r0/1 c0 Ohmic 0 0 0 10000000} {r2/3 c1 Ohmic 0 0 0 10000000}}
+<VAR>IntfAttr    {}
 
 <COMMENT>--- Optical generation attributes variable
 Specify four types of optical solver E(External), O(OBAM), T(TMM), R(Raytrace).
@@ -216,7 +233,21 @@ Boundary condition example:
     | `a}
 ...
 
-<VAR>GopAttr     {{r0/1 TMM 1 0}}
+<VAR>GopAttr     {{r0/1 Raytrace 10000 MonteCarlo 1e-4 100000} {r1/2 ARC SiNx
+    0.07 01mdb/SiNx_SERIS_2.03.par PolySi 0.27 01mdb/Silicon.par iaSi 0.001
+    01mdb/SiO2.par} {r5/4 0.65 Phong 4}} {{r0/1 Raytrace 10000 MonteCarlo 1e-4
+    100000} {r1/2 ARC SiNx 0.07 01mdb/SiNx_SERIS_2.03.par PolySi 0.27
+    01mdb/Silicon-5e19.par iaSi 0.001 01mdb/SiO2.par} {r5/4 0.65 Phong 4}}
+    {{r0/1 Raytrace 10000 MonteCarlo 1e-4 100000} {r1/2 ARC SiNx 0.07
+    01mdb/SiNx_SERIS_2.03.par PolySi 0.14 01mdb/Silicon.par iaSi 0.001
+    01mdb/SiO2.par} {r5/4 0.65 Phong 4}} {{r0/1 Raytrace 10000 MonteCarlo 1e-4
+    100000} {r1/2 ARC SiNx 0.07 01mdb/SiNx_SERIS_2.03.par PolySi 0.14
+    01mdb/Silicon-5e19.par iaSi 0.001 01mdb/SiO2.par} {r5/4 0.65 Phong 4}}
+    {{r0/1 Raytrace 10000 MonteCarlo 1e-4 100000} {r1/2 ARC SiNx 0.07
+    01mdb/SiNx_SERIS_2.03.par PolySi 0.07 01mdb/Silicon.par iaSi 0.001
+    01mdb/SiO2.par} {r5/4 0.65 Phong 4}} {{r0/1 Raytrace 10000 MonteCarlo 1e-4
+    100000} {r1/2 ARC SiNx 0.07 01mdb/SiNx_SERIS_2.03.par PolySi 0.07
+    01mdb/Silicon-5e19.par iaSi 0.001 01mdb/SiO2.par} {r5/4 0.65 Phong 4}}
 
 <COMMENT>--- Mesh attributes variable
 Mesh example:
@@ -287,8 +318,15 @@ SRH example:
         DC mt mu BGN SRH Aug Rad)}
 ...
 
-<VAR>ModPar      {{r1 01mdb/GaAs.par mu Arora SRH 1e-09} {r2 01mdb/GaAs.par mu
-    Arora SRH 1e-09}}
+<VAR>ModPar      {{r2 01mdb/Silicon.par} {r3 01mdb/SiO2.par} {r4
+    01mdb/Silicon.par} {r5 01mdb/Al_Palik1985.par}} {{r2 01mdb/Silicon.par} {r3
+    01mdb/SiO2.par} {r4 01mdb/Silicon-5e19.par} {r5 01mdb/Al_Palik1985.par}}
+    {{r2 01mdb/Silicon.par} {r3 01mdb/SiO2.par} {r4 01mdb/Silicon.par} {r5
+    01mdb/Al_Palik1985.par}} {{r2 01mdb/Silicon.par} {r3 01mdb/SiO2.par} {r4
+    01mdb/Silicon-5e19.par} {r5 01mdb/Al_Palik1985.par}} {{r2 01mdb/Silicon.par}
+    {r3 01mdb/SiO2.par} {r4 01mdb/Silicon.par} {r5 01mdb/Al_Palik1985.par}} {{r2
+    01mdb/Silicon.par} {r3 01mdb/SiO2.par} {r4 01mdb/Silicon-5e19.par} {r5
+    01mdb/Al_Palik1985.par}}
 
 <COMMENT>--- Miscellaneous attributes variable
 Example:
@@ -316,8 +354,8 @@ Example:
 {a = 64 | s 80 128 256 64}
 {a = ParDiSo | s I<LS> S<uper> ParDiSo}
 
-<VAR>MiscAttr    {02opt/am15g_IEC60904-3-2008.txt 0.853 1.2 0.01 0 0.001 0 0 25
-    64 ParDiSo}
+<VAR>MiscAttr    {02opt/am15g_IEC60904-3-2008.txt 0.3 1.2 0.01 0 0.001 0 0 25 64
+    ParDiSo}
 
 <COMMENT>--- Variable vary settings
 Specify the following variables for varying - c# contact property (IntfAttr),
@@ -351,7 +389,7 @@ Other variables for varying (sdevice --parameter-names):
 {a | `n & `< v1}
 ...
 
-<VAR>VarVary     {{MonoScaling 1 0} {c0 0.6 20}}
+<VAR>VarVary     {{MonoScaling 1 0} {Wavelength 1.2 90}}
 
 <COMMENT>--- Extract field during variable varying
 Supported fields: (Dn = excess minority carrier density)
@@ -420,15 +458,16 @@ Field integration example:
     eBT hBT eQt hQt E mue muh}
 ...
 
-<VAR>SS2Fld      {{p0 1 1 Band}}
+<VAR>SS2Fld      {}
 
 <COMMENT>--- Data extraction and analysis for variable varying 'VarVary'
 Extract data from 'VarVary', prepare XY plots and make further analysis
 
 <GRAMMAR>v
-{a | `s JV QE S<unsVoc> Q<SSPC> R<AT>}
+{`!a & `s JV QE S<unsVoc> Q<SSPC> R<AT>}
+{== v-1 QSSPC & (a = 1e15 | `n & `> 0) | `a}
 
-<VAR>PPAttr      {{v1 JV}}
+<VAR>PPAttr      {{v1 RAT}}
 
 <TAIL>--- No variables afterwards
 Put down any notes

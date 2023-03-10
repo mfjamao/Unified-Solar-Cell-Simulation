@@ -909,11 +909,11 @@ proc mfjProc::readTT {TTArr TTFile} {
                 } else {
                     set ReadTbl true
                 }
-                if {[llength $Txt] == 2
-                    && [string is double -strict [lindex $Txt 0]]
-                    && [string is double -strict [lindex $Txt 1]]
-                    && [lindex $Txt 1] > 0} {
-                    set Tbl [lrange $Txt 0 1]
+                if {[llength $Line] == 2
+                    && [string is double -strict [lindex $Line 0]]
+                    && [string is double -strict [lindex $Line 1]]
+                    && [lindex $Line 1] > 0} {
+                    set Tbl [lrange $Line 0 1]
                 } else {
                     set Tbl ""
                 }
@@ -935,7 +935,8 @@ proc mfjProc::readTT {TTArr TTFile} {
             } else {
 
                 # Trap energetic distribution or spatial distribution
-                if {[string is double -strict [lindex $Line 0]]
+                if {[llength $Line] == 2
+                    && [string is double -strict [lindex $Line 0]]
                     && [string is double -strict [lindex $Line 1]]} {
                     if {$ReadTbl} {
                         if {[lindex $Line 1] > 0} {

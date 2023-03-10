@@ -776,11 +776,7 @@ if {!$OptOnly && [regexp {\s[ceh]T\s} $IntfTun]} {
                 eBarrierTunneling \"NLM$idx\" ($str)
                 hBarrierTunneling \"NLM$idx\" ($str)\n"
         }
-
-        # Include indices of TAT
-        if {[regexp {^(c|e|h|TA)T$} [lindex $grp 1]]} {
-            incr idx
-        }
+        incr idx
     }
 }
 
@@ -1065,7 +1061,7 @@ if {!$OptOnly} {
         set lst [list]
         set val 0
         foreach elm $IntfTun {
-            set idx [string map {r "" / " "} [lindex $grp 0]]
+            set idx [string map {r "" / " "} [lindex $elm 0]]
             if {![regexp {^TAT$} [lindex $elm 1]]
                 || [lindex $idx 1] != [lindex $grp 0 end]} {
                 incr val
@@ -1075,7 +1071,7 @@ if {!$OptOnly} {
             readTT arr [lindex $elm 2]
             set len [llength $arr(TrapNat)]
             for {set idx 0} {$idx < $len} {incr idx} {
-                lappend lst " ([lindex $arr(TrapNat) $idx]\
+                lappend lst "([lindex $arr(TrapNat) $idx]\
                     [lindex $arr(TrapRef) $idx]"
                 lappend lst "eXsection= [lindex $arr(eXsection) $idx]\
                     hXsection= [lindex $arr(hXsection) $idx]"
@@ -1372,8 +1368,11 @@ Math {
                 vputs -n -i-4 "
                     NonLocal \"NLM$idx\" (
                         RegionInterface= \"$var/$val\"
-                        Length= [expr [lindex $grp 3]*1e-4] * cm
+                        Length= [expr [lindex $grp 3]*1e-4] * cm"
+                if {[lindex $grp 1] ne "TAT"} {
+                    vputs -n -i-4 "
                         Permeation= [expr [lindex $grp 4]*1e-4] * cm"
+                }                        
                 array unset arr
                 readTT arr [lindex $grp 2]
                 foreach elm {Discretization Digits EnergyResolution

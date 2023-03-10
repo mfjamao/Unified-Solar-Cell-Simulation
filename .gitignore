@@ -66,6 +66,7 @@ Thumbs.db
 *.BAK
 *.bak
 tmp*
+pbs*
 *.prf
 n[0-9]*
 pp[0-9]*

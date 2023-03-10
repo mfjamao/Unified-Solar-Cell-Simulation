@@ -4,6 +4,16 @@ Datacode
 "Data codes for semiconductor process and device simulation"
 
 Materials {
+    MoOx {
+        label= "MoOx"
+        group= Semiconductor
+        color= #a6d6d6, #b36b6b
+    }
+    LiF {
+        label= "LiF"
+        group= Semiconductor
+        color= #a6d6d6, #b36b6b
+    }
     iaSi {
         label= "iaSi"
         group= Semiconductor

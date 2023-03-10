@@ -1439,15 +1439,22 @@ proc mfjST::miscTask {} {
         }
     }
 
-    vputs -i1 "Disabling interactive mode if necessary..."
+    vputs -i1 "Check command files and disable interactive mode if necessary..."
     foreach Lbl $arr(TCLSTLbl) Name $arr(TCLSTName) {
-
-        # No preference file for 'sdevice'
-        if {$Name eq "sdevice"} {
-            continue
-        }
         set Idx [lsearch -regexp $::SimArr(STTools) ^$Name$]
         set Suf [lindex $::SimArr(STSuffix) $Idx]
+        set CmdFile ${Lbl}$Suf
+        if {![file isfile $CmdFile]} {
+            error "command file $CmdFile missing!"
+        }
+
+        # Check sdevice.par and skip preference file check for 'sdevice'
+        if {$Name eq "sdevice"} {
+            if {![file isfile sdevice.par]} {
+                error "parameter file sdevice.par missing!"
+            }
+            continue
+        }
         set PrfFile $Lbl[file rootname $Suf].prf
         if {[file isfile $PrfFile]} {
             set Inf [open $PrfFile r]
