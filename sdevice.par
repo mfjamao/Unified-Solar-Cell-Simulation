@@ -14,10 +14,9 @@ if {$OptOnly && [regexp {\sRaytrace\s} $GopAttr]} {
 # From M-2016.12 onwards, it is necessary to set thermionic formula to 1
 # if thermionic model is enabled with Fermi statistics
 # Default formula 0 causes very high Jsc with OBAM
-set idx [llength $RegGen]
 if {!$OptOnly} {
-    for {set i 1} {$i < $idx} {incr i} {
-        for {set j [expr $i+1]} {$j < $idx} {incr j} {
+    for {set i 1} {$i <= $RegLen} {incr i} {
+        for {set j [expr $i+1]} {$j <= $RegLen} {incr j} {
             set flg false
             foreach grp $IntfSRH {
                 if {"r$i/$j" ne [lindex $grp 0]

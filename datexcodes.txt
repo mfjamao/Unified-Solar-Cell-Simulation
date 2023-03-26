@@ -159,5 +159,15 @@ Materials {
         group= Semiconductor
         color= #a6d6d6, #b36b6b
     }
+    MASnI3 {
+        label= "MASnI3"
+        group= Semiconductor
+        color= #a6d6d6, #b36b6b
+    }
+    CsSnGeI3 {
+        label= "CsSnGeI3"
+        group= Semiconductor
+        color= #a6d6d6, #b36b6b
+    }
 
 }

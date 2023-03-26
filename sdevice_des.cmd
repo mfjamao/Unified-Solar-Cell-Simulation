@@ -105,7 +105,7 @@ foreach grp $VV2Fld {
 regsub -all {Least} $lst Minimum VV2Fld
 vputs [wrapText "'VV2Fld': \{$VV2Fld\}" "* "]
 
-# Set up an array to track variable values
+# Set up a global array to store initial values of variables
 array set ValArr [list SpecScaling 0 MonoScaling 0\
     Wavelength [lindex $MiscAttr 1]]
 
@@ -125,9 +125,23 @@ vputs [wrapText "'IntfCon': \{$IntfCon\}" "* "]
 # Check whether 'AbsorbedPhotonDensity' is found in 'FldAttr', or more
 # precisely, 'RegFld' and 'RegIntfFld' and set 'LoadTDR'
 set LoadTDR false
-if {[regexp {\{AbsorbedPhotonDensity\s} $RegFld]
-    || [regexp {\{AbsorbedPhotonDensity\s} $RegIntfFld]} {
+if {[regexp {\{AbsorbedPhotonDensity\s+} $RegFld]
+    || [regexp {\{AbsorbedPhotonDensity\s+} $RegIntfFld]} {
     set LoadTDR true
+}
+
+# No distributed resistance for current contact
+# Check for current contacts
+foreach grp $VarVary {
+    if {[regexp {^(c\d) Current} $grp -> var]} {
+
+        # Check distributed resistance from IntfAttr
+        foreach elm $IntfCon {
+            if {[lindex $elm 1] eq $var && [lindex $elm 4] > 0} {
+                error "no distributed resistance for current contact '$var'!"
+            }
+        }
+    }
 }
 
 )!
@@ -135,7 +149,7 @@ if {[regexp {\{AbsorbedPhotonDensity\s} $RegFld]
 * set node dependence
 #setdep @previous@
 
-*--- Refer to Table 169 in sdevice manual
+*--- Refer to Table 207 in sdevice manual vT-2022.03
 File {
     ACExtract= "@acplot@"
     Current= "@plot@"
@@ -177,7 +191,7 @@ File {
 
 if {[llength $IntfCon]} {
     vputs -n -i-2 "
-        *--- Refer to Table 190
+        *--- Refer to Table 206 in T-2022.03
         Electrode \{"
 }
 foreach grp $IntfCon {
@@ -185,7 +199,9 @@ foreach grp $IntfCon {
             \{Name= \"[lindex $grp 1]\" "
 
     # Current or charge contact
-    if {[regexp {^C} [lindex $grp 2]]} {
+    if {[lindex $grp 2] eq "Current"} {
+        vputs -n -c "[lindex $grp 2]= [lindex $grp 3] Voltage= 0"
+    } elseif {[lindex $grp 2] eq "Charge"} {
         vputs -n -c "[lindex $grp 2]= [lindex $grp 3]"
     } else {
         if {[lindex $grp 2] eq "Ohmic"} {
@@ -320,7 +336,6 @@ if {[regexp {\sRaytrace\s} $GopAttr]} {
 
 )!
 
-*--- Refer to Tables 307, 162, 163, 164, 165
 Plot {
     *-- Doping and mole fraction profiles
     xMoleFraction
@@ -339,7 +354,7 @@ Plot {
     *-- Currents and current components
     eCurrent/vector hCurrent/vector TotalCurrentDensity/vector
     current/vector CurrentPotential
-    eMobility hMobility 
+    eMobility hMobility
     *-- Generation/Recombination
     SRHRecombination RadiativeRecombination PMIRecombination
     AugerRecombination SurfaceRecombination TotalRecombination
@@ -355,7 +370,7 @@ Plot {
     NonLocal eNLLTunnelingGeneration hNLLTunnelingGeneration
 }
 
-*--- Refer to Appendix F: Tables 162, 163, 297
+*--- Refer to Appendix F: Tables 195, 196, 197, 198 in T-2022.03
 CurrentPlot {
     !(
 
@@ -626,7 +641,7 @@ CurrentPlot {
                             set tmp "[lindex $var 0] (Window\[([lindex $tmp\
                                 0]) ([lindex $tmp 1])\]"
                         }
-                        if {[regexp $elm\\sCP $var]} {
+                        if {[regexp $elm\\s+CP $var]} {
                             append tmp " Coordinates)"
                         } else {
                             append tmp ")"
@@ -787,14 +802,22 @@ if {[llength $GopAttr] || $LoadTDR} {
         * 2D: Theta is the angle with the positive y-axis
         * 3D: Theta is the angle with the positive z-axis
         *     Phi is the angle with the positive x-axis in xy plane
+        * Refer to Table 321 in T-2022.03
         Optics ("
 
 
     # 'OpticalGeneration' subsection: three methods are supported
     # for AbsorbedPhotonDensity. QuantumYield determines final OG
+    # FCA calculation is enabled only for pure optical simulation
     vputs -n -i-1 "
-            OpticalGeneration (
+            OpticalGeneration ("
+    if {$OptOnly} {
+        vputs -n -i-1 "
                 QuantumYield (EffectiveAbsorption)"
+    } else {
+        vputs -n -i-1 "
+                QuantumYield (Unity)"
+    }
     if {[regexp {\s(OBAM|TMM|Raytrace|External)(\s|\})} $GopAttr]} {
         vputs -n -i-1 "
                 ComputeFromMonochromaticSource (Scaling= 0)"
@@ -946,11 +969,11 @@ if {[llength $GopAttr] || $LoadTDR} {
                     DatasetName= AbsorbedPhotonDensity
                     SpectralInterpolation= PiecewiseConstant
                 )"
-    } elseif {[regexp {\sRaytrace\s(\S+)\s(\S+)\s(\S+)\s(\S+)\}} $GopAttr\
+    } elseif {[regexp {\sRaytrace\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\}} $GopAttr\
         -> val str var tmp]} {
         vputs -n -i-1 "
 
-                *--- Refer to Table 233
+                *--- Refer to Table 259 in T-2022.03
                 RayTracing (
                     * NonSemiconductorAbsorption
                     * OmitReflectedRays
@@ -1105,7 +1128,7 @@ if {!$OptOnly} {
         set flg false
         foreach elm $ModPar {
             if {"r[lindex $grp 0 end]" ne [lindex $elm 0]} continue
-            if {[regexp {\{(mu(\s[^\}]+)+)\}} $elm -> tmp]} {
+            if {[regexp {\{(mu(\s+[^\}]+)+)\}} $elm -> tmp]} {
                 if {![string is double -strict [lindex $tmp 1]]} {
                     vputs -n -i-5 "
                         Mobility (DopingDependence ([lindex $tmp 1]))"
@@ -1116,7 +1139,7 @@ if {!$OptOnly} {
                         Mobility (PhuMob (Phosphorus) HighFieldSaturation)"
                 }
             }
-            if {[regexp {\{(BGN(\s[^\}]+)+)\}} $elm -> tmp]} {
+            if {[regexp {\{(BGN(\s+[^\}]+)+)\}} $elm -> tmp]} {
                 vputs -n -i-5 "
                         EffectiveIntrinsicDensity\
                             (BandGapNarrowing([lindex $tmp 1]))"
@@ -1132,7 +1155,7 @@ if {!$OptOnly} {
             set val [list]
             if {[regexp {\sAug} $elm]} {
                 lappend val Auger
-            } elseif {[regexp {\{(Aug(\s[^\}]+)+)\}} $elm -> tmp]} {
+            } elseif {[regexp {\{(Aug(\s+[^\}]+)+)\}} $elm -> tmp]} {
                 if {[lindex $tmp 1] ne "!"} {
                     lappend val Auger
                 }
@@ -1150,7 +1173,7 @@ if {!$OptOnly} {
             }
             if {[regexp {\sRad} $elm]} {
                 lappend val Radiative
-            } elseif {[regexp {\{(Rad(\s[^\}]+)+)\}} $elm -> tmp]} {
+            } elseif {[regexp {\{(Rad(\s+[^\}]+)+)\}} $elm -> tmp]} {
                 if {[lindex $tmp 1] ne "!"} {
                     lappend val Radiative
                 }
@@ -1161,7 +1184,7 @@ if {!$OptOnly} {
             }
             if {[regexp {\sSRH} $elm]} {
                 lappend val SRH
-            } elseif {[regexp {\{(SRH(\s[^\}]+)+)\}} $elm -> tmp]} {
+            } elseif {[regexp {\{(SRH(\s+[^\}]+)+)\}} $elm -> tmp]} {
                 if {[file isfile [lindex $tmp 1]]} {
                     set flg true
                     vputs -n -i-5 "
@@ -1299,7 +1322,7 @@ if {!$OptOnly} {
 
 )!
 
-*--- Refer to Table 193
+*--- Refer to Table 211 in T-2022.03
 Math {
     WallClock
     CoordinateSystem {AsIs}
@@ -1357,6 +1380,10 @@ Math {
         vputs -n -i-2 "
             Cylindrical (yAxis= 0)"
     }
+    if {[regexp {\sFrequency\s} $VarVary]} {
+        vputs -n -i-2 "
+            ImplicitACSystem"
+    }
 
     if {!$OptOnly && [regexp {\s(c|e|h|TA)T\s} $IntfTun]} {
         set idx 0
@@ -1372,7 +1399,7 @@ Math {
                 if {[lindex $grp 1] ne "TAT"} {
                     vputs -n -i-4 "
                         Permeation= [expr [lindex $grp 4]*1e-4] * cm"
-                }                        
+                }
                 array unset arr
                 readTT arr [lindex $grp 2]
                 foreach elm {Discretization Digits EnergyResolution
@@ -1428,7 +1455,7 @@ Math {
 !(
 
 vputs -n -i-1 "
-    *--- Refer to Table 170
+    *--- Refer to Table 337 in T-2022.03
     Solve \{"
 
 if {$OptOnly} {
@@ -1493,16 +1520,40 @@ foreach grp $VarVary {
                     ) \{$var
                         $str
                     \}\n"
+
+                # Remove ac analysis afterwards
+                if {[regexp {^ACCoupled} $var]} {
+                    set var "Coupled \{Poisson Electron Hole\}"
+                }
             }
         } else {
+            if {[lindex $grp 1] eq "Frequency"} {
 
-            # Update the contact type if required
-            if {[lindex $grp 1] ne [lindex $val 0]} {
-                set arr([lindex $grp 0])\
-                    [list [lindex $grp 1] [lindex $val 1]]
-                vputs -i-4 "
-                    set (\"[lindex $grp 0]\" mode\
-                    [lindex $grp 1])\n"
+                # C-V simulation based on small AC signals (Table 338)
+                set var "ACCoupled (StartFrequency= [lindex $grp 2]\
+                    EndFrequency= [lindex $grp 3]\
+                    NumberOfPoints= [lindex $grp 4] Decade)\
+                    \{Poisson Electron Hole\}"
+
+                # Make sure the next step is a voltage varying step
+                set tmp [lindex $VarVary [expr $idx+1]]
+                if {![regexp {^c\d$} [lindex $tmp 0]]
+                    || ![string is double -strict [lindex $tmp 1]]} {
+                    error "'$tmp' not a voltage varying step!"
+                }
+                set val $arr([lindex $tmp 0])
+                if {[lindex $val 0] ne "Voltage"} {
+                    error "'[lindex $tmp 0]' not a voltage contact!"
+                }
+            } else {
+
+                # Update the contact type if required. The initial value
+                # after type change depends on the previous step
+                if {[lindex $grp 1] ne [lindex $val 0]} {
+                    set arr([lindex $grp 0]) [lindex $grp 1]
+                    vputs -i-5 "
+                        Set (\"[lindex $grp 0]\" mode [lindex $grp 1])\n"
+                }
             }
         }
     } elseif {[regexp {^(Spec|Mono)Scaling$} [lindex $grp 0]]} {
@@ -1570,7 +1621,7 @@ foreach grp $VarVary {
                     \}\n"
         }
     } else {
-        if {[array name arr [lindex $grp 0]] eq [lindex $grp 0]} {
+        if {[array names arr [lindex $grp 0]] eq [lindex $grp 0]} {
 
             # Get the initial value from 'arr' and update
             set val $arr([lindex $grp 0])

@@ -1258,6 +1258,11 @@ proc mfjProc::iSwitch {Dflt Str Ptn args} {
     } else {
         set Dflt true
     }
+
+    # Validate 'Str'
+    if {$Str eq "" && !$Dflt} {
+        error "empty string specified!"
+    }
     set Tmp [string map {\{ "" \} ""} [concat $Ptn $args]]
     if {![llength $Tmp]} {
         error "no pattern specified for function 'iSwitch'!"
@@ -2098,9 +2103,14 @@ proc mfjProc::rr2pp {RegInfo Idx1 Idx2} {
     }
 
     # If two boxes collide, they collide at all axes
-    # An interface is oriented and follows 'right-hand rule':
+    # An interface is oriented and follows 'right-hand rule': Refer to 'intfVn'
     if {$Coll == $Dim} {
         if {$Touch} {
+
+            # Reject the case where two boxes share one vertex
+            if {$Dim > 1 && $MaxMin eq $MinMax} {
+                error "region '$Idx1' and '$Idx2' just share one vertex!"
+            }
             if {$Dim == 3} {
                 if {$Pos} {
                     return [list $MaxMin $MinMax]

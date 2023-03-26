@@ -1,34 +1,28 @@
 SimEnv      {Sentaurus T-2022.03 !Cylindrical OptOnly pbs}
 
-RegGen      {{Gas Pyramid Remove p3.53610857633_0_0/0_0_0 3.53553390593}
-    {Gas Block Keep p0_0_0/3.53610857633_2.5_2.5} {Silicon 180 2.5 2.5}
-	{iasi 0.001 2.5 2.5} {PolySi 0.27 2.5 2.5} {Aluminum 1 2.5 2.5}}
-	-1/1=0.27 -1/1=0.14 -1/1=0.14 -1/1=0.07 -1/1=0.07
+RegGen      {{iasi 0.003} {}
 
-FldAttr     {{r2 B 1.654e+14} {r5/4 03exp/TopconB.plx}}
+FldAttr     {{r2 B 1.654e+14} {r5/4 03exp/TopConB.plx}}
 
 IntfAttr    {}
 
-GopAttr     {{r0/1 Raytrace 10000 montecarlo} {r1/2 arc sinx 0.07 01mdb/SiNx_SERIS_2.03.par 
-	polysi 0.27 01mdb/silicon.par iasi 0.001 01mdb/sio2.par} {r5/4 0.65 Phong 4}}
-	1/7=01mdb/silicon-5e19.par 1/6=0.14 1/6,7=0.14,01mdb/silicon-5e19.par 1/6=0.07
-	1/6,7=0.07,01mdb/silicon-5e19.par
+GopAttr     {{r0/1 Raytrace 10000 MonteCarlo 1e-4 100000} {r1/2 ARC SiNx 0.07
+    01mdb/SiNx_SERIS_2.03.par PolySi 0.27 01mdb/Silicon.par iaSi 0.001
+    01mdb/SiO2.par} {r5/4 0.65 Phong 4}}
 
 MeshAttr    {10 0.05 8 0.01 8 1.5 0.005 1.1}
 
-ModPar      {{r2 01mdb/Silicon.par} {r3 01mdb/sio2.par} {r4 01mdb/silicon.par} {r5 01mdb/Al_Palik1985.par}}
-	2/1=01mdb/silicon-5e19.par 2/1=01mdb/silicon.par 
-	2/1=01mdb/silicon-5e19.par 2/1=01mdb/silicon.par 2/1=01mdb/silicon-5e19.par
+ModPar      {{r2 01mdb/Silicon.par} {r3 01mdb/SiO2.par} {r4 01mdb/Silicon.par}
+    {r5 01mdb/Al_Palik1985.par}}
 
-MiscAttr    {02opt/am15g_IEC60904-3-2008.txt 0.3 1.2 0.01 0 0.001 0 0 25 64
+MiscAttr    {02opt/am15g_IEC60904-3-2008.txt 1 1.2 0.01 0 0.001 0 0 25 64
     ParDiSo}
 
-VarVary     {{Monoscaling 1 0} {Wavelength 1.2 90}}
+VarVary     {{MonoScaling 1 0} {Wavelength 1.2 1}}
 
 VV2Fld      {}
 
 SS2Fld      {}
 
-PPAttr      {{v1 rat}}
-
+PPAttr      {{v1 RAT}}
 

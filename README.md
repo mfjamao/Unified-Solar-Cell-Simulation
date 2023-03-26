@@ -40,7 +40,7 @@ It can be much easier to learn from templates, which can be found in 07tpl.
     saved template will be loaded to the project directory.
 
 
-Version history
+# Version history
 
 2.0		31/07/2022
 	Enhancement: New framework to support arbitrary 2D/3D structures. Adopted

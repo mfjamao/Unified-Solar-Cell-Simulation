@@ -33,7 +33,7 @@ Example (after semicolon):
    6 Max_memory [GB]: 100
 
 <GRAMMAR>{a = Sentaurus | s Sentaurus}
-{a = U-2022.12 | s E<-2010.12> F<-2011.09> G<-2012.06> H<-2013.03> I<-2013.12>
+{a = U-2022.12 | `s E<-2010.12> F<-2011.09> G<-2012.06> H<-2013.03> I<-2013.12>
     J<-2014.09> K<-2015.06> L<-2016.03> M<-2016.12> N<-2017.09> O<-2018.06>
     P<-2019.03> Q<-2019.12> R<-2020.09> S<-2021.06> T<-2022.03> U<-2022.12>}
 {a = !Cylindrical | s C<ylindrical> !Cylindrical}
@@ -42,7 +42,7 @@ Example (after semicolon):
 {== v-1 Local & `a | a = 12 | `i & `>= 1}
 {== v-2 Local & `a | a = 100 | `i & `>= 1}
 
-<VAR>SimEnv      {Sentaurus T-2022.03 !Cylindrical OptOnly PBS 12 100}
+<VAR>SimEnv      {Sentaurus T-2022.03 !Cylindrical OptOnly Local}
 
 <TOOL>ST settings: Tool_label = sde Tool_name = sde
 
@@ -101,22 +101,7 @@ Examples:
 
 <VAR>RegGen      {{Gas Pyramid Remove p3.53610857633_0_0/0_0_0 3.53553390593 0 4
     1} {Gas Block Keep p0_0_0/3.53610857633_2.5_2.5} {Silicon 180 2.5 2.5} {iaSi
-    0.001 2.5 2.5} {PolySi 0.27 2.5 2.5} {Aluminum 1 2.5 2.5}} {{Gas Pyramid
-    Remove p3.53610857633_0_0/0_0_0 3.53553390593 0 4 1} {Gas Block Keep
-    p0_0_0/3.53610857633_2.5_2.5} {Silicon 180 2.5 2.5} {iaSi 0.001 2.5 2.5}
-    {PolySi 0.27 2.5 2.5} {Aluminum 1 2.5 2.5}} {{Gas Pyramid Remove
-    p3.53610857633_0_0/0_0_0 3.53553390593 0 4 1} {Gas Block Keep
-    p0_0_0/3.53610857633_2.5_2.5} {Silicon 180 2.5 2.5} {iaSi 0.001 2.5 2.5}
-    {PolySi 0.14 2.5 2.5} {Aluminum 1 2.5 2.5}} {{Gas Pyramid Remove
-    p3.53610857633_0_0/0_0_0 3.53553390593 0 4 1} {Gas Block Keep
-    p0_0_0/3.53610857633_2.5_2.5} {Silicon 180 2.5 2.5} {iaSi 0.001 2.5 2.5}
-    {PolySi 0.14 2.5 2.5} {Aluminum 1 2.5 2.5}} {{Gas Pyramid Remove
-    p3.53610857633_0_0/0_0_0 3.53553390593 0 4 1} {Gas Block Keep
-    p0_0_0/3.53610857633_2.5_2.5} {Silicon 180 2.5 2.5} {iaSi 0.001 2.5 2.5}
-    {PolySi 0.07 2.5 2.5} {Aluminum 1 2.5 2.5}} {{Gas Pyramid Remove
-    p3.53610857633_0_0/0_0_0 3.53553390593 0 4 1} {Gas Block Keep
-    p0_0_0/3.53610857633_2.5_2.5} {Silicon 180 2.5 2.5} {iaSi 0.001 2.5 2.5}
-    {PolySi 0.07 2.5 2.5} {Aluminum 1 2.5 2.5}}
+    0.001 2.5 2.5} {PolySi 0.27 2.5 2.5} {Aluminum 1 2.5 2.5}}
 
 <COMMENT>--- Region and interface fields variable
 Suppose i,j,k are region indices, regions can be referred as follows:
@@ -175,8 +160,8 @@ Tunnelling example:
     | == v1 TAT & `!a & `n & `> 0}
 {(n v1 | == v2 {C\w+} ) & `a | == v1 {c\d} & (a = 0 | `n) | == v1 TAT
     & `!a & `s c e h | a = None | s F<ull> S<imple> U<psideDown> None}
-{== v1 {c\d} & (a = 1e7 | `n | `> 0) | a}
-{== v1 {c\d} & (a | `n | `> 0) | a}
+{(n v1 | == v2 {C\w+} ) & `a | == v1 {c\d} & (a = 1e7 | `n | `> 0) | a}
+{(n v1 | == v2 {C\w+} ) & `a | == v1 {c\d} & (a | `n | `> 0) | a}
 
 <VAR>IntfAttr    {}
 
@@ -235,19 +220,7 @@ Boundary condition example:
 
 <VAR>GopAttr     {{r0/1 Raytrace 10000 MonteCarlo 1e-4 100000} {r1/2 ARC SiNx
     0.07 01mdb/SiNx_SERIS_2.03.par PolySi 0.27 01mdb/Silicon.par iaSi 0.001
-    01mdb/SiO2.par} {r5/4 0.65 Phong 4}} {{r0/1 Raytrace 10000 MonteCarlo 1e-4
-    100000} {r1/2 ARC SiNx 0.07 01mdb/SiNx_SERIS_2.03.par PolySi 0.27
-    01mdb/Silicon-5e19.par iaSi 0.001 01mdb/SiO2.par} {r5/4 0.65 Phong 4}}
-    {{r0/1 Raytrace 10000 MonteCarlo 1e-4 100000} {r1/2 ARC SiNx 0.07
-    01mdb/SiNx_SERIS_2.03.par PolySi 0.14 01mdb/Silicon.par iaSi 0.001
-    01mdb/SiO2.par} {r5/4 0.65 Phong 4}} {{r0/1 Raytrace 10000 MonteCarlo 1e-4
-    100000} {r1/2 ARC SiNx 0.07 01mdb/SiNx_SERIS_2.03.par PolySi 0.14
-    01mdb/Silicon-5e19.par iaSi 0.001 01mdb/SiO2.par} {r5/4 0.65 Phong 4}}
-    {{r0/1 Raytrace 10000 MonteCarlo 1e-4 100000} {r1/2 ARC SiNx 0.07
-    01mdb/SiNx_SERIS_2.03.par PolySi 0.07 01mdb/Silicon.par iaSi 0.001
-    01mdb/SiO2.par} {r5/4 0.65 Phong 4}} {{r0/1 Raytrace 10000 MonteCarlo 1e-4
-    100000} {r1/2 ARC SiNx 0.07 01mdb/SiNx_SERIS_2.03.par PolySi 0.07
-    01mdb/Silicon-5e19.par iaSi 0.001 01mdb/SiO2.par} {r5/4 0.65 Phong 4}}
+    01mdb/SiO2.par} {r5/4 0.65 Phong 4}}
 
 <COMMENT>--- Mesh attributes variable
 Mesh example:
@@ -319,14 +292,7 @@ SRH example:
 ...
 
 <VAR>ModPar      {{r2 01mdb/Silicon.par} {r3 01mdb/SiO2.par} {r4
-    01mdb/Silicon.par} {r5 01mdb/Al_Palik1985.par}} {{r2 01mdb/Silicon.par} {r3
-    01mdb/SiO2.par} {r4 01mdb/Silicon-5e19.par} {r5 01mdb/Al_Palik1985.par}}
-    {{r2 01mdb/Silicon.par} {r3 01mdb/SiO2.par} {r4 01mdb/Silicon.par} {r5
-    01mdb/Al_Palik1985.par}} {{r2 01mdb/Silicon.par} {r3 01mdb/SiO2.par} {r4
-    01mdb/Silicon-5e19.par} {r5 01mdb/Al_Palik1985.par}} {{r2 01mdb/Silicon.par}
-    {r3 01mdb/SiO2.par} {r4 01mdb/Silicon.par} {r5 01mdb/Al_Palik1985.par}} {{r2
-    01mdb/Silicon.par} {r3 01mdb/SiO2.par} {r4 01mdb/Silicon-5e19.par} {r5
-    01mdb/Al_Palik1985.par}}
+    01mdb/Silicon.par} {r5 01mdb/Al_Palik1985.par}}
 
 <COMMENT>--- Miscellaneous attributes variable
 Example:
@@ -354,7 +320,7 @@ Example:
 {a = 64 | s 80 128 256 64}
 {a = ParDiSo | s I<LS> S<uper> ParDiSo}
 
-<VAR>MiscAttr    {02opt/am15g_IEC60904-3-2008.txt 0.3 1.2 0.01 0 0.001 0 0 25 64
+<VAR>MiscAttr    {02opt/am15g_IEC60904-3-2008.txt 1 1.2 0.01 0 0.001 0 0 25 64
     ParDiSo}
 
 <COMMENT>--- Variable vary settings
@@ -362,11 +328,17 @@ Specify the following variables for varying - c# contact property (IntfAttr),
     SpecScaling spectrum intensity scaling, MonoScaling monochromatic light
     intensity scaling, Wavelength, etc. By varying one or more variables to
     mimic typical chacterization like DJV, LJV, QE, Suns-Voc, QSSPC, CV, etc.
-Contact varying example:
+Contact value example:
     0 Contact name defined in 'IntfAttr' c#: c1
     1 Contact attribute or goal: Voltage | Current | Charge | Frequency | 1
     2 # of intervals (0 -> no data are saved): 10 (on the linear scale)
   >=3 Value for taking snapshots: 0.5
+Contact attribute example:
+    0 Contact name defined in 'IntfAttr' c#: c1
+    1 Contact attribute: Voltage | Current | Charge | Frequency
+    2 Beginning frequency (> 0): 1e3
+    3 Ending frequency (> 0): 1e3
+    4 # of logarithmic intervals (>= 1): 1
 Spectrum and monochromatic light intensity varying example:
     0 Illumination type: S<pecScaling> or M<onoScaling>
     1 Intensity scaling goal: 1
@@ -384,12 +356,16 @@ Other variables for varying (sdevice --parameter-names):
   >=3 Value for taking snapshots: 0.3
 
 <GRAMMAR>b
-{`!a & == v0 {c\d} & (n | `s Cu<rrent> Ch<arge> F<requency> V<oltage>) | `n}
-{a = 0 | `i & `>= 0}
-{a | `n & `< v1}
+{`!a & == v0 {c\d} & (n | `s Cu<rrent> Ch<arge> F<requency> V<oltage>)
+    | == v0 Wavelength & (`n & `> 0) | `n & `>= 0}
+{== v1 {[CV]\w+} & `a | == v1 Frequency & (`!a & `n & `> 0)
+    | a = 0 | `i & `>= 0}
+{== v1 {[CV]\w+} & `a | == v1 Frequency & (`!a & `n & `>= v2) | a | `n & `< v1}
+{== v1 {[CV]\w+} & `a | == v1 Frequency & (`!a & `i & `>= 1) | a | `n & `< v1}
+{== v1 {[CFV]\w+} & `a | a | `n & `< v1}
 ...
 
-<VAR>VarVary     {{MonoScaling 1 0} {Wavelength 1.2 90}}
+<VAR>VarVary     {{MonoScaling 1 0} {Wavelength 1.2 1}}
 
 <COMMENT>--- Extract field during variable varying
 Supported fields: (Dn = excess minority carrier density)
@@ -408,14 +384,14 @@ Point extraction example:
   >=1 Supported field: n
 Other extraction example:
     0 Window, region, interface: p0_0_0/1_1_1
-    1 A<verage> | I<ntegrate> | M<axmum> | L<east>
+    1 A<verage> | I<ntegrate> | M<aximum> | L<east>
     2 Supported field: n
   >=3 Optional coordinate printing (CP) for A|M|L or supported field
 
 <GRAMMAR>{p | pp | r | rr}
 {`!a & p v0 & `s Dn n p UA UB US UP UD Gop PD Eg EA EC EV EFe EFh BGN ni NA ND x
     V Eg_eff ni_eff q UT eBT hBT eQt hQt E mue muh | `s A<verage> I<ntegrate>
-    M<axmum> L<east>}
+    M<aximum> L<east>}
 {p v0 & (a | `s Dn n p UA UB US UP UD Gop PD Eg EA EC EV EFe EFh BGN ni NA ND x
     V Eg_eff ni_eff q UT eBT hBT eQt hQt E mue muh) | `!a & `s Dn n p UA UB US
     UP UD Gop PD Eg EA EC EV EFe EFh BGN ni NA ND x V Eg_eff ni_eff q UT eBT
@@ -423,12 +399,12 @@ Other extraction example:
 {p v0 & (a | `s Dn n p UA UB US UP UD Gop PD Eg EA EC EV EFe EFh BGN ni NA ND x
     V Eg_eff ni_eff q UT eBT hBT eQt hQt E mue muh) | == v-1 CP & (a | `s
     Dn n p UA UB US UP UD Gop PD Eg EA EC EV EFe EFh BGN ni NA ND x V Eg_eff
-    ni_eff q UT eBT hBT eQt hQt E mue muh A<verage> I<ntegrate> M<axmum>
+    ni_eff q UT eBT hBT eQt hQt E mue muh A<verage> I<ntegrate> M<aximum>
     L<east>) | == v-1 {(Ave|Int|Max|Lea)\w+} & `!a & `s Dn n p UA UB US UP UD
     Gop PD Eg EA EC EV EFe EFh BGN ni NA ND x V Eg_eff ni_eff q UT eBT hBT eQt
     hQt E mue muh | a | `s CP Dn n p UA UB US UP UD Gop PD Eg EA EC EV EFe EFh
     BGN ni NA ND x V Eg_eff ni_eff q UT eBT hBT eQt hQt E mue muh A<verage>
-    I<ntegrate> M<axmum> L<east>}
+    I<ntegrate> M<aximum> L<east>}
 ...
 
 <VAR>VV2Fld      {}
@@ -464,7 +440,7 @@ Field integration example:
 Extract data from 'VarVary', prepare XY plots and make further analysis
 
 <GRAMMAR>v
-{`!a & `s JV QE S<unsVoc> Q<SSPC> R<AT>}
+{a | `s CV JV QE SunsVoc SunsJsc QSSPC RAT}
 {== v-1 QSSPC & (a = 1e15 | `n & `> 0) | `a}
 
 <VAR>PPAttr      {{v1 RAT}}
