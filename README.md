@@ -41,7 +41,12 @@ It can be much easier to learn from templates, which can be found in 07tpl.
 
 
 # Version history
-
+2.1		04/03/2023
+	Enhancement: The majority of planned features are finally implemented.
+		Optical simulation: OBAM, TMM, Raytracing
+		Electrical simulation: QSSPC (including J0 extraction), QE,
+		dark JV, light JV, Suns-Voc,Suns-Jsc, CV
+		PL and EL are not yet available
 2.0		31/07/2022
 	Enhancement: New framework to support arbitrary 2D/3D structures. Adopted
 		universal coordinate system. Reduced input parameters down to tweleve.
