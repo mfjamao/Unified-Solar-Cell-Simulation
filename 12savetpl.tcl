@@ -116,7 +116,7 @@ set FBrf [file rootname $SimArr(FVarRaw)]-brief.txt
 set FLst [concat $FLst $SimArr(FVarRaw) $FBrf 11ctrlsim.tcl $SimArr(FSave)\
     gtooldb.tcl [glob -nocomplain -directory $::SimArr(OutDir) *.csv *.plx]\
     [glob -nocomplain -directory $::SimArr(PMIDir) {*.[cC]} *.so.*]\
-    [glob -nocomplain *.out *.mfj] $SimArr(FLoad)]
+    [glob -nocomplain *.out *.mfj] $SimArr(FLoad) README.md]
 foreach Elm [glob -nocomplain .mfj/*.tcl] {
     lappend FLst $Elm
 }
