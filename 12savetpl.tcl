@@ -71,10 +71,16 @@ if {[file isfile $SimArr(FVarEnv)]} {
     error "'$SimArr(FVarEnv)' missing in directory '[pwd]'!"
 }
 
+    
+
+# If SimArr(TplDir) found at index 0, skip it
+set argv [file split [lindex [string map {\{ {} \} {}} $argv] 0]]
+if {[string equal -nocase $SimArr(TplDir) [lindex $argv 0]]} {
+    set argv [lrange $argv 1 end]
+}
 if {[llength $argv]} {
-    set argv [file split [lindex [string map {\{ {} \} {}} $argv] 0]]
-    lset argv end [clock format [clock seconds] -format\
-        "%Y-%m-%d_%H-%M-%S"]_[lindex $argv end]
+    lset argv end [lindex $argv end]_[clock format [clock seconds] -format\
+        "%Y-%m-%d_%H-%M-%S"]
     if {[llength $argv] > 1} {
 
         # Directory names should be case-insensitive

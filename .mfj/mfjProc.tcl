@@ -1258,19 +1258,19 @@ proc mfjProc::iSwitch {Dflt Str Ptn args} {
     } else {
         set Dflt true
     }
+    set Lst [string map {\{ "" \} ""} [concat $Ptn $args]]
+    if {![llength $Lst]} {
+        error "no pattern specified for function 'iSwitch'!"
+    }
 
     # Validate 'Str'
     if {$Str eq "" && !$Dflt} {
-        error "empty string specified!"
-    }
-    set Tmp [string map {\{ "" \} ""} [concat $Ptn $args]]
-    if {![llength $Tmp]} {
-        error "no pattern specified for function 'iSwitch'!"
+        error "'' for mandatory selection from '$Lst'!"
     }
     set Ptn [list]
     set KeyPtn [list]
     set OptPtn [list]
-    foreach Elm $Tmp {
+    foreach Elm $Lst {
 
         # \w characters: [a-zA-Z0-9_]
         if {[regexp {^(!\w*|\w+)(<\S+>)?$} $Elm -> Ptn1 Ptn2]} {
@@ -1284,7 +1284,7 @@ proc mfjProc::iSwitch {Dflt Str Ptn args} {
             }
         } else {
             error "illegal characters in '$Elm' in patterns\
-                '[lrange $Tmp 0 end]'!"
+                '[lrange $Lst 0 end]'!"
         }
     }
 
@@ -1645,7 +1645,7 @@ proc mfjProc::valSplit {VarName VarVal GrpID LvlIdx LvlLen} {
                         error "element 'p$Str' of $VarMsg should have the\
                             same number of coordinates as variable 'RegDim'!"
                     }
-                    set Tmp [list]
+                    set Lst [list]
                     foreach Elm $PLst Min [list $XMin $YMin $ZMin]\
                         Max [list $XMax $YMax $ZMax] {
                         if {$Elm ne ""} {
