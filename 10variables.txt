@@ -12,7 +12,7 @@
 6. Execute 11ctrlsim.tcl again to stop the running batch if necessary
 7. Download numbered results under 06out directory for further analysis
 8. Execute 12savetpl.tcl to save key files in 07tpl for future reference
-9. Execute loadtpl.tcl to load key files back from a template in 07tpl
+9. Execute 13loadtpl.tcl to load key files back from a specified template
 
 Note 1: A variable takes a list (anything enclosed by braces. Braces can be
     omitted for a one-element list) as its value. Assigning lists to a
@@ -28,9 +28,11 @@ Example (after semicolon):
    1 Choose a simulator_version: L-2016.03
    2 Enable/disable cylindrical coordinate at Y = 0: (!)Cylindrical
    3 Optical only? OptOnly | !OptOnly
-   4 Job scheduler: Local | PBS | SLURM
-   5 For PBS and SLURM, max_walltime [hr]: 12
-   6 Max_memory [GB]: 100
+   4 Initial device temperature [oC]: 25
+   5 Bit length for a floating-point number: 64 | 80 | 128 | 256
+   6 Job scheduler: Local | PBS | SLURM
+   7 For PBS and SLURM, max_walltime [hr]: 12
+   8 Max_memory [GB]: 100
 
 <GRAMMAR>{a = Sentaurus | s Sentaurus}
 {a = U-2022.12 | `s E<-2010.12> F<-2011.09> G<-2012.06> H<-2013.03> I<-2013.12>
@@ -38,11 +40,13 @@ Example (after semicolon):
     P<-2019.03> Q<-2019.12> R<-2020.09> S<-2021.06> T<-2022.03> U<-2022.12>}
 {a = !Cylindrical | s C<ylindrical> !Cylindrical}
 {a = !OptOnly | s O<ptOnly> !OptOnly}
+{a = 25 | `n & `>= -273.15}
+{a = 64 | s 80 128 256 64}
 {a = Local | s P<BS> Local}
 {== v-1 Local & `a | a = 12 | `i & `>= 1}
 {== v-2 Local & `a | a = 100 | `i & `>= 1}
 
-<VAR>SimEnv      {Sentaurus T-2022.03 !Cylindrical OptOnly Local}
+<VAR>SimEnv      {Sentaurus T-2022.03 !Cylindrical OptOnly 25 64 PBS 12 100}
 
 <TOOL>ST settings: Tool_label = sde Tool_name = sde
 
@@ -99,9 +103,8 @@ Examples:
     & `<= 1) | a | `p}
 {(n v1 | == v1 {[BCEP]\w+} ) & `a | a | `p} ...
 
-<VAR>RegGen      {{Gas Pyramid Remove p3.53610857633_0_0/0_0_0 3.53553390593 0 4
-    1} {Gas Block Keep p0_0_0/3.53610857633_2.5_2.5} {Silicon 180 2.5 2.5} {iaSi
-    0.001 2.5 2.5} {PolySi 0.27 2.5 2.5} {Aluminum 1 2.5 2.5}}
+<VAR>RegGen      {{Gas Pyramid Keep p0_0_0/3.53610857633_0_0 3.53553390593 0 4
+    1} {Silicon 165 2.5 2.5} {Aluminum 1 2.5 2.5}}
 
 <COMMENT>--- Region and interface fields variable
 Suppose i,j,k are region indices, regions can be referred as follows:
@@ -122,7 +125,7 @@ Example:
     & `<= 1 | `f}
 ...
 
-<VAR>FldAttr     {{r2 B 1.654e+14} {r5/4 03exp/TopConB.plx}}
+<VAR>FldAttr     {{r2 P 1.56e+15}}
 
 <COMMENT>--- Interface attributes variable
 Specify three types of region interfaces - SRH, metal contact and tunnelling
@@ -199,28 +202,52 @@ Boundary condition example:
     1 Reflection value or based on Fresnel: n | Fresnel
     2 Diffusive model: Phong | Gaussian | Random
     3 Characteristic value for diffusive model
+Spectrum example:
+    0 Optical ID: Spectrum
+    1 Spectrum file: 02opt/am15g_IEC60904-3-2008.txt
+    2 Beginning wavelength [um]: 0.3
+    3 Ending wavelength [um]: 1.2
+    4 Step size [um]: 0.01
+Monochromatic example:
+    0 Optical ID: Monochromatic
+    1 Wavelength of monochromatic light [um]: 0.3
+    2 Intensity or power of monochromatic light [Wcm^-2]: 1e-3
+Incidence example:
+    0 Optical ID: Incidence
+    1 Fraction of shading: 0
+    2 Incident angle (Theta): 0
+    3 Incident angle (Phi): 0
 
-<GRAMMAR>{pp | rr}
-{`!a & rr v0 & (n & `>= 0 & `<= 1 | `s A<RC> F<resnel> O<BAM> R<aytrace> T<MM>
-    E<xternal>) | `s O<BAM> R<aytrace> T<MM> E<xternal>}
-{== v1 ARC & (`!a & `m) | (n v1 | == v1 {F\w+} ) & (a | s R<andom>
+<GRAMMAR>{pp | rr | o}
+{== v0 {S\w+} & (a = 02opt/am15g_IEC60904-3-2008.txt | `f)
+    | == v0 {M\w+} & (a = 0.3 | `n & `> 0)
+    | == v0 {I\w+} & (a = 0 | `n & `>= 0 & `<= 1)
+    | !a & rr v0 & (n & `>= 0 & `<= 1 | `s A<RC> F<resnel> O<BAM> R<aytrace>
+     T<MM> E<xternal>) | `s O<BAM> R<aytrace> T<MM> E<xternal>}
+{== v0 {S\w+} & (a = 0.3 | `n & `> 0) | == v0 {M\w+} & (a = 1e-3 | `n & `> 0)
+    | == v0 {I\w+} & (a = 0 | `n & `>= 0 & `<= 90)
+    | == v1 ARC & (`!a & `m) | (n v1 | == v1 {F\w+} ) & (a | s R<andom>
     G<aussian> Phong) | == v1 TMM & (a = 1 | n & `>= 1 | `m)
     | == v1 OBAM & `a | == v1 {E\w+} & `!a & `f | `!a & `i & `> 0}
-{== v1 ARC & (`!a & `n & `> 0) | ( n v1 | == v1 {F\w+} ) & ((== v2 Phong
+{== v0 {S\w+} & (a = 1.2 | `n & `> v-1) | == v0 {M\w+} & `a
+    | == v0 {I\w+} & (a = 0 | `n & `>= 0 & `<= 90)
+    | == v1 ARC & (`!a & `n & `> 0) | ( n v1 | == v1 {F\w+} ) & ((== v2 Phong
     & a = 1 | `i & `> 0) | (== v2 {G\w+} & a = 0.1 | `n & `> 0) | a = 0
     | `i & `>= 0 & `<= 1000) | == v1 TMM & (n v2 & (a = 0 | `n & `>= 0)
-    | `a) | == v1 {[E|O]\w+} & `a
+    | `a) | == v1 {(E|O)\w+} & `a
     | a = MonteCarlo | s D<eterministic> MonteCarlo}
-{== v1 ARC & (`!a & `f) | == v1 {R\w+} & (a = 1e-4 | `n & `> 0 & `< 1)
+{== v0 {S\w+} & (a = 0.01 | `n & `< v-1) | == v0 {[IM]\w+} & `a
+    | == v1 ARC & (`!a & `f) | == v1 {R\w+} & (a = 1e-4 | `n & `> 0 & `< 1)
     | `a}
 {== v1 ARC & (a | `m) | == v1 {R\w+} & (a = 100000 | `i & `> 0) | `a}
 {== v1 ARC & (m v-1 & `!a & `n & `> 0 | n v-1 & `!a & `f | f v-1 & (a | `m))
     | `a}
 ...
 
-<VAR>GopAttr     {{r0/1 Raytrace 10000 MonteCarlo 1e-4 100000} {r1/2 ARC SiNx
-    0.07 01mdb/SiNx_SERIS_2.03.par PolySi 0.27 01mdb/Silicon.par iaSi 0.001
-    01mdb/SiO2.par} {r5/4 0.65 Phong 4}}
+<VAR>GopAttr     {{p0_0_0/0_2.5_2.5 Raytrace 5000 Deterministic 1e-4 100000}
+    {r1/2 ARC MgF2 0.09 01mdb/MgF2_Siquerios1988.par SiNx 0.07
+    01mdb/SiNx_SERIS_1.92.par} {r3/2 0.93 Phong 1} {Spectrum
+    02opt/am15g_IEC60904-3-2008.txt 0.3 1.2 0.01}}
 
 <COMMENT>--- Mesh attributes variable
 Mesh example:
@@ -239,10 +266,10 @@ Mesh example:
 {a = 0.01 | `n & `> 0}
 {a = 8 | `i & `> 1}
 {a = 1.5 | `n & `> 1}
-{a = 0.005 | `n & `> 0}
+{a = 0.001 | `n & `> 0}
 {a = 1.1 | `n & `> 1}
 
-<VAR>MeshAttr    {10 0.05 8 0.01 8 1.5 0.005 1.1}
+<VAR>MeshAttr    {10 0.05 8 0.01 8 1.5 0.001 1.1}
 
 <TOOL>ST settings: Tool_label = sdevice Tool_name = sdevice
 
@@ -291,37 +318,7 @@ SRH example:
         DC mt mu BGN SRH Aug Rad)}
 ...
 
-<VAR>ModPar      {{r2 01mdb/Silicon.par} {r3 01mdb/SiO2.par} {r4
-    01mdb/Silicon.par} {r5 01mdb/Al_Palik1985.par}}
-
-<COMMENT>--- Miscellaneous attributes variable
-Example:
-    0 Spectrum file for OBAM/TMM/Raytrace: 02opt/am15g_IEC60904-3-2008.txt
-    1 Beginning or monochromatic light wavelength for OBAM/TMM [um]: 0.3
-    2 Ending wavelength for OBAM/TMM/Raytrace [um]: 1.2
-    3 Step size for OBAM/TMM/Raytrace [um]: 0.01
-    4 fraction of shading: 0.03
-    5 Intensity of monochromatic light for OBAM/TMM/Raytrace [Wcm^-2]: 1e-3
-    6 Incident angle (Theta): 0
-    7 Incident angle (Phi): 0
-    8 Initial device temperature [oC]: 25
-    9 Bit length for a number: 64 | 80 | 128 | 256
-   10 Solver: I<LS> | S<uper> | ParDiSo
-
-<GRAMMAR>{a = 02opt/am15g_IEC60904-3-2008.txt | `f}
-{a = 0.3 | `n & `> 0}
-{a = 1.2 | `n & `> v-1}
-{a = 0.01 | `n & `> 0 & `< v-1}
-{a = 0 | `n & `>= 0}
-{a = 1e-3 | `n & `> 0}
-{a = 0 | `n & `>= 0 & `<= 90}
-{a = 0 | `n & `>= 0 & `<= 90}
-{a = 25 | `n & `>= -273.15}
-{a = 64 | s 80 128 256 64}
-{a = ParDiSo | s I<LS> S<uper> ParDiSo}
-
-<VAR>MiscAttr    {02opt/am15g_IEC60904-3-2008.txt 1 1.2 0.01 0 0.001 0 0 25 64
-    ParDiSo}
+<VAR>ModPar      {{r2 01mdb/Silicon.par} {r3 01mdb/Al_Palik1985.par}}
 
 <COMMENT>--- Variable vary settings
 Specify the following variables for varying - c# contact property (IntfAttr),
@@ -365,9 +362,11 @@ Other variables for varying (sdevice --parameter-names):
 {== v1 {[CFV]\w+} & `a | a | `n & `< v1}
 ...
 
-<VAR>VarVary     {{MonoScaling 1 0} {Wavelength 1.2 1}}
+<VAR>VarVary     {{MonoScaling 1 0} {Wavelength 1.2 90}}
 
-<COMMENT>--- Extract field during variable varying
+<COMMENT>--- Extract field during variable varying and from snapshots
+Specify a point pX_Y_Z [um] for extracting 1D structural fields from saved
+snapshots from top to bottom. Y or Z cut is performed to get 1D fields.
 Supported fields: (Dn = excess minority carrier density)
 n(eDensity) p(hDensity) UA(AugerRecombination) UB(RadiativeRecombination)
 US(SRHRecombination) UP(PMIRecombination) UD(eGapStatesRecombination)
@@ -387,54 +386,60 @@ Other extraction example:
     1 A<verage> | I<ntegrate> | M<aximum> | L<east>
     2 Supported field: n
   >=3 Optional coordinate printing (CP) for A|M|L or supported field
-
-<GRAMMAR>{p | pp | r | rr}
-{`!a & p v0 & `s Dn n p UA UB US UP UD Gop PD Eg EA EC EV EFe EFh BGN ni NA ND x
-    V Eg_eff ni_eff q UT eBT hBT eQt hQt E mue muh | `s A<verage> I<ntegrate>
-    M<aximum> L<east>}
-{p v0 & (a | `s Dn n p UA UB US UP UD Gop PD Eg EA EC EV EFe EFh BGN ni NA ND x
-    V Eg_eff ni_eff q UT eBT hBT eQt hQt E mue muh) | `!a & `s Dn n p UA UB US
-    UP UD Gop PD Eg EA EC EV EFe EFh BGN ni NA ND x V Eg_eff ni_eff q UT eBT
-    hBT eQt hQt E mue muh}
-{p v0 & (a | `s Dn n p UA UB US UP UD Gop PD Eg EA EC EV EFe EFh BGN ni NA ND x
-    V Eg_eff ni_eff q UT eBT hBT eQt hQt E mue muh) | == v-1 CP & (a | `s
-    Dn n p UA UB US UP UD Gop PD Eg EA EC EV EFe EFh BGN ni NA ND x V Eg_eff
-    ni_eff q UT eBT hBT eQt hQt E mue muh A<verage> I<ntegrate> M<aximum>
-    L<east>) | == v-1 {(Ave|Int|Max|Lea)\w+} & `!a & `s Dn n p UA UB US UP UD
-    Gop PD Eg EA EC EV EFe EFh BGN ni NA ND x V Eg_eff ni_eff q UT eBT hBT eQt
-    hQt E mue muh | a | `s CP Dn n p UA UB US UP UD Gop PD Eg EA EC EV EFe EFh
-    BGN ni NA ND x V Eg_eff ni_eff q UT eBT hBT eQt hQt E mue muh A<verage>
-    I<ntegrate> M<aximum> L<east>}
-...
-
-<VAR>VV2Fld      {}
-
-<TOOL>ST settings: Tool_label = svisual Tool_name = svisual
-
-<COMMENT>--- Extract top-bottom fields from snapshots
-Specify a point pX_Y_Z [um] for extracting 1D structural fields from saved
-snapshots from top to bottom. Y or Z cut is performed to get 1D fields.
 Axis aligned cut example: (Band = "EA EC EV EFe EFh")
-    0 Point: p-1_250
+    0 Point: p0_250
     1 # of the front dummy layers: 1
     2 # of the back dummy layers: 1
-  >=3 Supported field: Ec
+  >=3 Supported field: Band
 Field integration example:
     0 Region or a window: r1 | p0_0/1_1
-  >=1 Supported field: Ec
+  >=1 Supported field: Gop
 
-<GRAMMAR>{p | r | pp}
-{`!a & p v0 & `i & `>= 0 | `s n p UA UB US UP UD Gop E Eg EA EC EV EFe EFh BGN
-    ni N V x V Eg_eff ni_eff q UT eBT hBT eQt hQt E mue muh}
-{p v0 & `!a & `i & `>= 0 | a | `s n p UA UB US UP UD Gop E Eg EA EC EV EFe EFh
-    BGN ni N V x V Eg_eff ni_eff q UT eBT hBT eQt hQt E mue muh}
-{p v0 & `!a & `s Band n p UA UB US UP UD Gop E Eg BGN ni N V x V Eg_eff ni_eff
-    q UT eBT hBT eQt hQt E mue muh}
-{a | `s Band n p UA UB US UP UD Gop E Eg BGN ni N V x V Eg_eff ni_eff q UT
-    eBT hBT eQt hQt E mue muh}
+<GRAMMAR>{p | pp | r | rr}
+{`!a & p v0 & (i & `>= 0 | `s Dn n p UA UB US UP UD Gop PD Eg EA EC EV EFe EFh
+    BGN ni NA ND x V Eg_eff ni_eff q UT eBT hBT eQt hQt E mue muh)
+    | (!= {(Ave|Int|Max|Lea)\w*} & (r v0 | pp v0)) & `s n p UA UB US UP UD Gop
+    PD Eg EA EC EV EFe EFh BGN ni NA ND x V Eg_eff ni_eff q UT eBT hBT eQt hQt E
+    mue muh | `s Ave<rage> Int<egrate> Max<imum> Lea<st>}
+{p v0 & (i v1 & `!a & `i & `>= 0 | a | `s Dn n p UA UB US UP UD Gop PD Eg EA EC
+    EV EFe EFh BGN ni NA ND x V Eg_eff ni_eff q UT eBT hBT eQt hQt E mue muh)
+    | == v1 {(Ave|Int|Max|Lea)\w+} & (`!a & `s Dn n p UA UB US UP UD Gop PD Eg
+    EA EC EV EFe EFh BGN ni NA ND x V Eg_eff ni_eff q UT eBT hBT eQt hQt E mue
+    muh) | a | `s n p UA UB US UP UD Gop PD Eg EA EC EV EFe EFh BGN ni NA ND
+    x V Eg_eff ni_eff q UT eBT hBT eQt hQt E mue muh}
+{p v0 & (i v1 & `!a & `s Band n p UA UB US UP UD Gop E Eg BGN ni N V x V Eg_eff
+    ni_eff q UT eBT hBT eQt hQt E mue muh | a | `s Dn n p UA UB US UP UD Gop PD
+    Eg EA EC EV EFe EFh BGN ni NA ND x V Eg_eff ni_eff q UT eBT hBT eQt hQt E
+    mue muh)
+    | == v1 {(Ave|Int|Max|Lea)\w+} & (== v-1 CP & (a | `s Dn n p UA UB
+    US UP UD Gop PD Eg EA EC EV EFe EFh BGN ni NA ND x V Eg_eff ni_eff q UT eBT
+    hBT eQt hQt E mue muh Ave<rage> Int<egrate> Max<imum> Lea<st>)
+    | == v-1 {(Ave|Int|Max|Lea)\w+} & `!a & `s Dn n p UA UB US UP UD
+    Gop PD Eg EA EC EV EFe EFh BGN ni NA ND x V Eg_eff ni_eff q UT eBT hBT eQt
+    hQt E mue muh | a | `s CP Dn n p UA UB US UP UD Gop PD Eg EA EC EV EFe EFh
+    BGN ni NA ND x V Eg_eff ni_eff q UT eBT hBT eQt hQt E mue muh Ave<rage>
+    Int<egrate> Max<imum> Lea<st>) | a | `s Dn n p UA UB US UP UD Gop PD
+    Eg EA EC EV EFe EFh BGN ni NA ND x V Eg_eff ni_eff q UT eBT hBT eQt hQt E
+    mue muh}
+{p v0 & (i v1 & (a | `s Band n p UA UB US UP UD Gop E Eg BGN ni N V x V Eg_eff
+    ni_eff q UT eBT hBT eQt hQt E mue muh) | a | `s Dn n p UA UB US UP UD Gop
+    PD Eg EA EC EV EFe EFh BGN ni NA ND x V Eg_eff ni_eff q UT eBT hBT eQt hQt
+    E mue muh)
+    | == v1 {(Ave|Int|Max|Lea)\w+} & (== v-1 CP & (a | `s Dn n p UA UB US UP
+    UD Gop PD Eg EA EC EV EFe EFh BGN ni NA ND x V Eg_eff ni_eff q UT eBT
+    hBT eQt hQt E mue muh Ave<rage> Int<egrate> Max<imum> Lea<st>)
+    | == v-1 {(Ave|Int|Max|Lea)\w+} & `!a & `s Dn n p UA UB US UP UD
+    Gop PD Eg EA EC EV EFe EFh BGN ni NA ND x V Eg_eff ni_eff q UT eBT hBT eQt
+    hQt E mue muh | a | `s CP Dn n p UA UB US UP UD Gop PD Eg EA EC EV EFe EFh
+    BGN ni NA ND x V Eg_eff ni_eff q UT eBT hBT eQt hQt E mue muh Ave<rage>
+    Int<egrate> Max<imum> Lea<st>) | a | `s Dn n p UA UB US UP UD Gop PD
+    Eg EA EC EV EFe EFh BGN ni NA ND x V Eg_eff ni_eff q UT eBT hBT eQt hQt E
+    mue muh}
 ...
 
-<VAR>SS2Fld      {}
+<VAR>GetFld      {}
+
+<TOOL>ST settings: Tool_label = svisual Tool_name = svisual
 
 <COMMENT>--- Data extraction and analysis for variable varying 'VarVary'
 Extract data from 'VarVary', prepare XY plots and make further analysis

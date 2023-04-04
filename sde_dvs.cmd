@@ -61,6 +61,7 @@ if {![regexp {^[123]$} $Dim]} {
 }
 
 # Define two boolean values for easy reference later
+set SimEnv [regsub -all {\s+} $SimEnv " "]
 if {[string index [lindex $SimEnv 2] 0] eq "!"} {
     set Cylind false
 } else {
@@ -119,7 +120,8 @@ if {$OptOnly} {
 #   (pp Vn), (profile file, lateral factor), ...
 set RegFld [list]
 set IntfFld [list]
-foreach grp [lsort -unique -index 0 $FldAttr] {
+set FldAttr [lsort -unique -index 0 [regsub -all {\s+} $FldAttr " "]]
+foreach grp $FldAttr {
     set val [lindex $grp 0]
 
     # Axis normal interface: Append normal vector
@@ -271,6 +273,7 @@ set IntfCon [list]
 set IntfSRH [list]
 set IntfTun [list]
 set lst [list]
+set IntfAttr [regsub -all {\s+} $IntfAttr " "]
 foreach grp $IntfAttr {
     set lst [string map {r "" / " "} [lindex $grp 0]]
     if {[regexp {^c\d$} [lindex $grp 1]]} {
@@ -315,6 +318,7 @@ if {[llength $GopAttr]
 set txt ""
 set LPD 0
 set GopPP [list]
+set GopAttr [regsub -all {\s+} $GopAttr " "]
 foreach grp $GopAttr {
     if {[regexp {^(OBAM|TMM|Raytrace|External)$} [lindex $grp 1]]} {
         if {$txt eq ""} {

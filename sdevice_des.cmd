@@ -4,8 +4,37 @@
 #include ".mfj/varSim.tcl"
 
 # Check 'VarVary' for optical requirement
-if {[regexp {(Mono|Spec)Scaling} $VarVary] && $LPD == 0} {
+set VarVary [regsub -all {\s+} $VarVary " "]
+if {[regexp {\{(Mono|Spec)Scaling\s} $VarVary] && $LPD == 0} {
     error "no optical solver in 'GopAttr' for varying optics in 'VarVary'!"
+}
+
+# Check whether 'AbsorbedPhotonDensity' is found in 'FldAttr', or more
+# precisely, 'RegFld' and 'RegIntfFld' and set 'LoadTDR'
+set LoadTDR false
+if {[regexp {\{AbsorbedPhotonDensity\s} $RegFld]
+    || [regexp {\{AbsorbedPhotonDensity\s} $RegIntfFld]} {
+    set LoadTDR true
+}
+
+# Check whether the spectrum file is missing in 'GopAttr' if required
+if {[regexp {\{SpecScaling\s} $VarVary] && !$LoadTDR
+    && ![regexp {\{Spectrum\s} $GopAttr]} {
+    error "no spectrum file specified in 'GopAttr'!"
+}
+
+# No distributed resistance for current contact
+# Check for current contacts
+foreach grp $VarVary {
+    if {[regexp {^(c\d) Current} $grp -> var]} {
+
+        # Check distributed resistance from IntfAttr
+        foreach elm $IntfCon {
+            if {[lindex $elm 1] eq $var && [lindex $elm 4] > 0} {
+                error "no distributed resistance for current contact '$var'!"
+            }
+        }
+    }
 }
 
 # Update 'ModPar' to put each individual model and value as a sublist
@@ -37,6 +66,18 @@ foreach grp [lsort -unique -index 0 $ModPar] {
 }
 set ModPar $lst
 vputs [wrapText "'ModPar': \{$ModPar\}" "* "]
+
+# Split 'GetFld' into 'VV2Fld' and 'SS2Fld'
+set VV2Fld [list]
+set SS2Fld [list]
+foreach grp [regsub -all {\s+} $GetFld " "] {
+    if {[string is integer -strict [lindex $grp 1]]
+        || ![regexp {^(Ave|Int|Max|Lea)\w+$} [lindex $grp 1]]} {
+        lappend SS2Fld $grp
+    } else {
+        lappend VV2Fld $grp
+    }
+}
 
 # Update 'VV2Fld' to put each extraction method and fields as a sublist
 set lst [list]
@@ -105,9 +146,37 @@ foreach grp $VV2Fld {
 regsub -all {Least} $lst Minimum VV2Fld
 vputs [wrapText "'VV2Fld': \{$VV2Fld\}" "* "]
 
+# Update 'SS2Fld' to replace 'BD' with 'EA EC EV EFe EFh'
+set lst [list]
+foreach grp [lsort -unique -index 0 $SS2Fld] {
+    if {[regexp {^p[^/]+$} [lindex $grp 0]]} {
+        set grp [concat [lrange $grp 0 2]\
+            [lsort -unique [lrange $grp 3 end]]]
+    } else {
+        set grp [concat [lindex $grp 0]\
+            [lsort -unique [lrange $grp 1 end]]]
+    }
+    lappend lst [string map {Band "EA EC EV EFe EFh"} $grp]
+}
+set SS2Fld $lst
+vputs [wrapText "'SS2Fld': \{$SS2Fld\}" "* "]
+
 # Set up a global array to store initial values of variables
-array set ValArr [list SpecScaling 0 MonoScaling 0\
-    Wavelength [lindex $MiscAttr 1]]
+array set ValArr [list SpecScaling 0 MonoScaling 0]
+
+# Set the default wavelength and intensity to 0.3 um and 1e-3 W/cm^2
+if {[regexp {\{Monochromatic\s+(\S+)} $GopAttr -> val]} {
+    set ValArr(Wavelength) $val
+} else {
+    lappend GopAttr [list Monochromatic 0.3 1e-3]
+    set ValArr(Wavelength) 0.3
+}
+
+# Set the default incidence
+if {![regexp {\{Incidence\s} $GopAttr]} {
+    lappend GopAttr [list Incidence 0 0 0]
+}
+vputs [wrapText "'GopAttr': \{$GopAttr\}" "* "]
 
 # Keep the last contact settings if duplicates exist to 'IntfCon'
 set IntfCon [lsort -unique -index 1 $IntfCon]
@@ -119,39 +188,16 @@ foreach grp $IntfCon {
             [list Voltage [lindex $grp 3]]]
     }
 }
-vputs [wrapText "array 'ValArr': \{[array get ValArr]\}" "* "]
 vputs [wrapText "'IntfCon': \{$IntfCon\}" "* "]
-
-# Check whether 'AbsorbedPhotonDensity' is found in 'FldAttr', or more
-# precisely, 'RegFld' and 'RegIntfFld' and set 'LoadTDR'
-set LoadTDR false
-if {[regexp {\{AbsorbedPhotonDensity\s+} $RegFld]
-    || [regexp {\{AbsorbedPhotonDensity\s+} $RegIntfFld]} {
-    set LoadTDR true
-}
-
-# No distributed resistance for current contact
-# Check for current contacts
-foreach grp $VarVary {
-    if {[regexp {^(c\d) Current} $grp -> var]} {
-
-        # Check distributed resistance from IntfAttr
-        foreach elm $IntfCon {
-            if {[lindex $elm 1] eq $var && [lindex $elm 4] > 0} {
-                error "no distributed resistance for current contact '$var'!"
-            }
-        }
-    }
-}
+vputs [wrapText "array 'ValArr': \{[array get ValArr]\}" "* "]
 
 )!
 
 * set node dependence
 #setdep @previous@
-
 *--- Refer to Table 207 in sdevice manual vT-2022.03
+
 File {
-    ACExtract= "@acplot@"
     Current= "@plot@"
     Grid= "@tdr@"
     Output= "@log@"
@@ -161,24 +207,35 @@ File {
     PMIUserFields= "@tdr@"
     !(
 
+    if {[regexp {c\d\s+Frequency} $VarVary]} {
+        vputs -n -i-2 "
+            ACExtract= \"@acplot@\""
+    }
     vputs -n -i-2 "
             PMIPath= \"$SimArr(PMIDir)\""
     if {$LoadTDR} {
         vputs -n -i-2 "
             OpticalGenerationInput= \"@tdr@\""
     }
-    if {[regexp {\sExternal\s+([^\s\}]+)\}} $GopAttr -> str]} {
+    if {[regexp {\sExternal\s+([^\s\}]+)} $GopAttr -> str]} {
 
         # Only assign the first spectral OG file and ignore the rest
         vputs -n -i-2 "
             OpticalSolverInput= \"$str\""
     }
-    if {([regexp {\s(OBAM|TMM|Raytrace)(\s|\})} $GopAttr] && !$OptOnly)
-        || ([regexp {\sExternal\s} $GopAttr] && !$LoadTDR)} {
+    if {[regexp {\{SpecScaling\s} $VarVary] && !$LoadTDR} {
         set val n@node@_spec.txt
+        foreach grp $GopAttr {
+            if {[lindex $grp 0] eq "Spectrum"} {
+                set lst [lrange $grp 1 end]
+            }
+            if {[lindex $grp 0] eq "Incidence"} {
+                set tmp [lindex $grp 1]
+            }
+        }
 
         # 'eval': concat, interpret the string and return result
-        eval customSpec [lrange $MiscAttr 0 4] $val
+        eval customSpec $lst $tmp $val
         vputs -n -i-2 "
             IlluminationSpectrum= \"$val\""
     }
@@ -275,8 +332,9 @@ if {[regexp {\sRaytrace\s} $GopAttr]} {
                 \}\n"
         }
 
-        if {[lindex $grp 1] eq "Fresnel"
-            || [string is double -strict [lindex $grp 1]]} {
+        if {[regexp {^r\d+/\d+} [lindex $grp 0]]
+            && ([lindex $grp 1] eq "Fresnel"
+            || [string is double -strict [lindex $grp 1]])} {
             set lst [string map {r "" / " "} [lindex $grp 0]]
             set var [lindex $RegGen [lindex $lst 0] 0 1]
             set val [lindex $RegGen [lindex $lst 1] 0 1]
@@ -384,7 +442,7 @@ CurrentPlot {
     }
 
     # 'Dn' means 'n p'
-    regsub -all {Dn CP} $VV2Fld "n CP p CP Dop CP ni_eff CP" val
+    regsub -all {Dn\s+CP} $VV2Fld "n CP p CP Dop CP ni_eff CP" val
     regsub -all {Dn} $val {n p Dop ni_eff} val
 
     # Extract all fields from 'VV2Fld'
@@ -760,7 +818,7 @@ vputs -n -i-1 "
 
         # Default physics for all regions: Constant mobility,
         # no bandgap narrowing with Fermi statistics
-        Temperature= [expr [lindex $MiscAttr 8]+273.15] * K
+        Temperature= [expr [lindex $SimEnv 4]+273.15] * K
         Thermionic * Thermionic emission over interfaces
         Fermi * Enable Fermi statistics
         Mobility (HighFieldSaturation)
@@ -795,7 +853,7 @@ if {!$OptOnly && [regexp {\s[ceh]T\s} $IntfTun]} {
     }
 }
 
-if {[llength $GopAttr] || $LoadTDR} {
+if {[regexp {\{(Mono|Spec)Scaling\s} $VarVary]} {
     vputs -n -i-1 "
         * Use Unified Interface for optical generation
         * Excitation is common to TMM, OptBeam, and FromFile
@@ -818,37 +876,38 @@ if {[llength $GopAttr] || $LoadTDR} {
         vputs -n -i-1 "
                 QuantumYield (Unity)"
     }
-    if {[regexp {\s(OBAM|TMM|Raytrace|External)(\s|\})} $GopAttr]} {
+    if {[regexp {\{MonoScaling\s} $VarVary]} {
         vputs -n -i-1 "
                 ComputeFromMonochromaticSource (Scaling= 0)"
     }
-    if {([regexp {\s(OBAM|TMM|Raytrace)(\s|\})} $GopAttr] && !$OptOnly)
-        || ([regexp {\sExternal\s} $GopAttr] && !$LoadTDR)} {
-        vputs -n -i-1 "
-                ComputeFromSpectrum (Scaling= 0)"
-    }
-    if {$LoadTDR} {
-        vputs -n -i-1 "
+    if {[regexp {\{SpecScaling\s} $VarVary]} {
+        if {$LoadTDR} {
+            vputs -n -i-1 "
                 ReadFromFile (
                     DatasetName= AbsorbedPhotonDensity
                     Scaling= 0
                 )"
+        } else {
+            vputs -n -i-1 "
+                ComputeFromSpectrum (Scaling= 0)"
+        }
     }
     vputs -n -i-1 "
             ) * end of OpticalGeneration"
 
     # 'Excitation' subsection
+    regexp {\{Monochromatic\s+(\S+)\s+([^\s\}]+)} $GopAttr -> val tmp
     vputs -n -i-1 "
             Excitation (
                 Polarization= 0.5 * Unpolarized light
-                Wavelength= [lindex $MiscAttr 1] * um
-                Intensity= [lindex $MiscAttr 5] * W/cm^2"
+                Wavelength= $val * um
+                Intensity= $tmp * W/cm^2"
+    regexp {\{Incidence\s+\S+\s+(\S+)\s+([^\s\}]+)} $GopAttr -> val tmp
     if {$LPD == -1} {
-        set val [expr 270.+[lindex $MiscAttr 6]]
-        set tmp [expr 180.+[lindex $MiscAttr 7]]
+        set val [expr 270.+$val]
+        set tmp [expr 180.+$tmp]
     } else {
-        set val [expr 90.+[lindex $MiscAttr 6]]
-        set tmp [lindex $MiscAttr 7]
+        set val [expr 90.+$val]
     }
     if {$Dim == 3} {
         vputs -n -i-1 "
@@ -969,8 +1028,8 @@ if {[llength $GopAttr] || $LoadTDR} {
                     DatasetName= AbsorbedPhotonDensity
                     SpectralInterpolation= PiecewiseConstant
                 )"
-    } elseif {[regexp {\sRaytrace\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\}} $GopAttr\
-        -> val str var tmp]} {
+    } elseif {[regexp {\sRaytrace\s+(\S+)\s+(\S+)\s+(\S+)\s+([^\s\}]+)}\
+        $GopAttr -> val str var tmp]} {
         vputs -n -i-1 "
 
                 *--- Refer to Table 259 in T-2022.03
@@ -1339,13 +1398,13 @@ Math {
     * ACMethod=Blocked ACSubMethod=Super 1D, 2D default solvers for AC analysis
     * Linear solvers (ParDiSo, ILS, Super), Blocked (block decomposition)
     Method= Blocked
+    SubMethod= PARDISO
     CurrentPlot (
         IntegrationUnit= cm
     )
     !(
 
     vputs -n -i-1 "
-        SubMethod= [lindex $MiscAttr 10]
         TrapDLN= [lindex $mfjDfltSet 7]
         Traps (Damping= 100) * Default: 10
         Number_of_Threads= [lindex $mfjDfltSet end-4]
@@ -1357,30 +1416,30 @@ Math {
         * ExtendedPrecision(128) and RhsMin=1e-25 for ExtendedPrecision(256)
         * Slightly increase Iterations, for example, from 15 to 20."
 
-    set idx [lsearch [lindex $mfjDfltSet end-3] [lindex $MiscAttr 9]]
+    set idx [lsearch [lindex $mfjDfltSet end-3] [lindex $SimEnv 5]]
     if {$idx == -1} {
-        error "'[lindex $MiscAttr 9]' not found in\
+        error "'[lindex $SimEnv 5]' not found in\
             '[lindex $mfjDfltSet end-3]'!"
     }
     vputs -n -i-1 "
         Digits= [lindex $mfjDfltSet end-2 $idx]
         RhsMin= [lindex $mfjDfltSet end-1 $idx]
         Iterations= [lindex $mfjDfltSet end $idx]"
-    if {[lindex $MiscAttr 9] == 64} {
+    if {[lindex $SimEnv 5] == 64} {
         vputs -n -i-2 "
             * CheckRhsAfterUpdate * May help improve convergence"
-    } elseif {[lindex $MiscAttr 9] == 80} {
+    } elseif {[lindex $SimEnv 5] == 80} {
         vputs -n -i-2 "
             ExtendedPrecision"
     } else {
         vputs -n -i-2 "
-            ExtendedPrecision([lindex $MiscAttr 9])"
+            ExtendedPrecision([lindex $SimEnv 5])"
     }
     if {$Dim == 2 && $Cylind} {
         vputs -n -i-2 "
             Cylindrical (yAxis= 0)"
     }
-    if {[regexp {\sFrequency\s} $VarVary]} {
+    if {[regexp {c\d\s+Frequency\s} $VarVary]} {
         vputs -n -i-2 "
             ImplicitACSystem"
     }

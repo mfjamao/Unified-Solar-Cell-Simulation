@@ -1,12 +1,35 @@
-# A collaborative framework for unifying typical multidimensional solar cell simulations
+# A collaborative framework for unifying multidimensional solar cell simulations
 Typical solar cell simulations follow the same procedures, which can be well
     delineated by several variables. This project is designed to verify these
     variable values and pass the formatted results to Sentaurus TCAD, where a
     2/3D homo-/hetero-/single-/multi-junction solar cell is established and
     typical optical and electrical behaviours are investigated by ramping
     contact properties, illumination settings, etc.
+Once all the files are downloaded to a linux server, open '11ctrlsim.tcl'
+    with any text editor and update the settings for 'STHosts', 'STPaths',
+    'STLicns' and 'STLib' according to your own configuration of Sentaurus.
+    Save and make '11ctrlsim.tcl' executable.
 
-The following files are essential for the codes and Sentaurus working properly:
+# Design of experiments (DOE) using WinSCP
+1. Login to a server hosting the desired simulator and find 10variables.txt
+2. Open that text file and edit variable values following the comments
+3. Add desired comments and save this text file to finalize DOE
+4. Right click 11ctrlsim.tcl and select execute to start batch running
+5. Check 11ctrlsim.out or job scheduler output file for job progress
+6. Execute 11ctrlsim.tcl again to stop the running batch if necessary
+7. Download numbered results under 06out directory for further analysis
+8. Execute 12savetpl.tcl to save key files in 07tpl for future reference
+9. Execute 13loadtpl.tcl to load key files back from a specified template
+
+Note 1: A variable takes a list (anything enclosed by braces. Braces can be
+    omitted for a one-element list) as its value. Assigning lists to a
+    variable to enable multiple runs with spaces as the separator. i.e.
+    Multiple lists: 1 {2 3} {4 5 6} {7 8 9 10} ...
+Note 2: Case insensitiveness do NOT apply to grammar rules. Only savvy users
+    are supposed to modify grammar rules.
+Note 3: Problem or issue? Email Dr. Fa-Jun MA (mfjamao@yahoo.com) (Thanks!)
+
+# Essential files for the codes and Sentaurus working properly
 .mfj/mfjGrm.tcl
 .mfj/mfjIntrpr.tcl
 .mfj/mfjProc.tcl
@@ -27,18 +50,7 @@ svisual_vis.tcl
 Material, spectra and experimental files are also required if appeared in
     '10variables.txt'. Otherwise, they are optional. Additionally, they
     can be created following their respective patterns in directories 01mdb/,
-    02opt/ and 03exp/, respectively
-
-Once all the files are downloaded to a linux server, open '11ctrlsim.tcl'
-    with any text editor and update the settings for 'STHosts', 'STPaths',
-    'STLicns' and 'STLib' according to your own configuration of Sentaurus.
-    Save and make '11ctrlsim.tcl' executable. Open '10variables.txt' with
-    any text editor and follow the detailed comments in it.
-
-It can be much easier to learn from templates, which can be found in 07tpl.
-    Run ./13loadtpl.tcl followed by the revelant tar/gzip file, a previously
-    saved template will be loaded to the project directory.
-
+    02opt/ and 03exp/, respectively.
 
 # Version history
 2.1		04/03/2023

@@ -774,21 +774,21 @@ proc mfjIntrpr::valSimEnv {} {
     }
 
     if {$host(JobSched) eq ""} {
-        if {[llength $SimEnvGrm] >= 5
-            && [llength [lindex $SimEnvGrm 4]] >= 6
-            && ![string equal -nocase [lindex $SimEnvGrm 4 5] Local]} {
+        if {[llength $SimEnvGrm] >= 7
+            && [llength [lindex $SimEnvGrm 6]] >= 6
+            && ![string equal -nocase [lindex $SimEnvGrm 6 5] Local]} {
             set UpdateGrm true
-            lset SimEnvGrm 4 {a = Local | s Local}
+            lset SimEnvGrm 6 {a = Local | s Local}
         }
     } else {
         set Lst ""
         foreach Elm $host(JobSched) {
             lappend Lst [string index $Elm 0]<[string range $Elm 1 end]>
         }
-        if {![string equal -nocase [lrange [lindex $SimEnvGrm 4] 5 end]\
+        if {![string equal -nocase [lrange [lindex $SimEnvGrm 6] 5 end]\
             "$Lst Local"]} {
             set UpdateGrm true
-            lset SimEnvGrm 4 "a = Local | s $Lst Local"
+            lset SimEnvGrm 6 "a = Local | s $Lst Local"
         }
     }
 
@@ -974,13 +974,13 @@ proc mfjIntrpr::valSimVar {} {
                     if {[llength [lindex $VarGrm 0]]} {
 
                         # Split elements for group IDs 'b', 'm', 'v', 'p', 'r',
-                        # 'pp' and 'rr'
+                        # 'o', 'pp' and 'rr'
                         # string -> list -> sort in increasing order
                         set Grm0 [lsort [string tolower\
                             [string map {` "" | " "} [lindex $VarGrm 0]]]]
                         set Cnt 0
                         foreach Elm $Grm0 {
-                            if {[regexp {^(b|m|p|pp|r|rr|v)$} $Elm]} {
+                            if {[regexp {^(b|m|o|p|pp|r|rr|v)$} $Elm]} {
                                 incr Cnt
                             }
                         }
@@ -2222,10 +2222,6 @@ proc mfjIntrpr::updateFmt {} {
         }
         close $Ouf
         file rename -force $::SimArr(FVarFmt).mfj $::SimArr(FVarFmt)
-
-        # Update ::SimArr(FInfo)
-        set Line [lindex $arr(FmtSimEnv) 0]|[lindex $arr(FmtSimEnv) 4]
-        exec echo $Line > $::SimArr(FInfo)
         vputs
     }
 }

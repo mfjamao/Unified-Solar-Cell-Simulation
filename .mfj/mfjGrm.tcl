@@ -129,7 +129,7 @@ namespace eval mfjGrm {
                 error "No arguments for '$Test', check rule!"
             }
             if {[llength $Arg] == 1} {
-                set Arg [list $Val $Arg]
+                set Arg [concat $Val $Arg]
             }
             if {[string is double -strict [lindex $Arg 0]]
                 && [string is double -strict [lindex $Arg 1]]} {

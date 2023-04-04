@@ -1353,6 +1353,10 @@ proc mfjProc::valSplit {VarName VarVal GrpID LvlIdx LvlLen} {
         set MatLst [lindex $::SimArr(MatDB) 0]
         set GrpLst [lindex $::SimArr(MatDB) 1]
     }
+    if {[regexp {o} $GStr]} {
+        set Txt "a varying variable"
+        set OIDLst $::SimArr(OIDLst)        ;# Supported 'o' group ID list
+    }
     if {[regexp {v} $GStr]} {
         if {[string length $Txt]} {
             append Txt " or ref to a varying variable"
@@ -1458,7 +1462,7 @@ proc mfjProc::valSplit {VarName VarVal GrpID LvlIdx LvlLen} {
                     }
                     if {$Idx == 0} {
 
-                        # No multiple levels for 'IntfAttr'
+                        # Check against single-level 'IntfAttr'
                         if {[llength $::SimArr(ConLen)] == 1} {
                             if {[regexp -nocase $Val $::SimArr(ConLst)]} {
                                 set Bool true
@@ -1539,6 +1543,23 @@ proc mfjProc::valSplit {VarName VarVal GrpID LvlIdx LvlLen} {
                         }
                     } else {
                         set Bool false
+                    }
+                }
+            } elseif {$GID eq "o"} {
+                set Bool false
+                foreach Elm $OIDLst {
+                    if {[expr "\[regexp -nocase \{^$Elm$\} $Val\]"]} {
+                        if {[string index $Elm 0] eq "S"} {
+                            set Val Spectrum
+                        }
+                        if {[string index $Elm 0] eq "M"} {
+                            set Val Monochromatic
+                        }
+                        if {[string index $Elm 0] eq "I"} {
+                            set Val Incidence
+                        }
+                        set Bool true
+                        break
                     }
                 }
             } elseif {$GID eq "p"} {
@@ -1724,7 +1745,7 @@ proc mfjProc::valSplit {VarName VarVal GrpID LvlIdx LvlLen} {
 
                         # 'pp' for 'pprr' is perpendicular to one axis
                         # Otherwise, it should be a region instead
-                        if {[regexp {^pprr} $GStr]} {
+                        if {[regexp {^o?pprr} $GStr]} {
                             if {$Cnt != 1} {
                                 error "element 'p$Str' of $VarMsg should\
                                     be an interface!"
@@ -1740,7 +1761,7 @@ proc mfjProc::valSplit {VarName VarVal GrpID LvlIdx LvlLen} {
                         }
                     } else {
                         set PLst [split $Str /]
-                        if {[regexp {^pprr} $GStr]} {
+                        if {[regexp {^o?pprr} $GStr]} {
                             if {[lindex $PLst 1] eq "-"
                                 || [lindex $PLst 1] eq "+"} {
                                 lappend NewVal p[format %.12g\

@@ -1,28 +1,24 @@
-SimEnv      {Sentaurus T-2022.03 !Cylindrical OptOnly pbs}
+SimEnv      {Sentaurus T-2022.03 !Cylindrical OptOnly 25 64 PBS 12 100}
 
-RegGen      {{iasi 0.003} {}
+RegGen      {{Gas Pyramid Keep p0_0_0/3.53610857633_0_0 3.53553390593 0 4 1}
+    {Silicon 165 2.5 2.5} {Aluminum 1 2.5 2.5}}
 
-FldAttr     {{r2 B 1.654e+14} {r5/4 03exp/TopConB.plx}}
+FldAttr     {{r2 P 1.56e+15}}
 
 IntfAttr    {}
 
-GopAttr     {{r0/1 Raytrace 10000 MonteCarlo 1e-4 100000} {r1/2 ARC SiNx 0.07
-    01mdb/SiNx_SERIS_2.03.par PolySi 0.27 01mdb/Silicon.par iaSi 0.001
-    01mdb/SiO2.par} {r5/4 0.65 Phong 4}}
+GopAttr     {{p0_0_0/0_2.5_2.5 Raytrace 5000 Deterministic 1e-4 100000} {r1/2
+    ARC MgF2 0.09 01mdb/MgF2_Siquerios1988.par SiNx 0.07
+    01mdb/SiNx_SERIS_1.92.par} {r3/2 0.93 Phong 1} {Spectrum
+    02opt/am15g_IEC60904-3-2008.txt 0.3 1.2 0.01}}
 
-MeshAttr    {10 0.05 8 0.01 8 1.5 0.005 1.1}
+MeshAttr    {10 0.05 8 0.01 8 1.5 0.001 1.1}
 
-ModPar      {{r2 01mdb/Silicon.par} {r3 01mdb/SiO2.par} {r4 01mdb/Silicon.par}
-    {r5 01mdb/Al_Palik1985.par}}
+ModPar      {{r2 01mdb/Silicon.par} {r3 01mdb/Al_Palik1985.par}}
 
-MiscAttr    {02opt/am15g_IEC60904-3-2008.txt 1 1.2 0.01 0 0.001 0 0 25 64
-    ParDiSo}
+VarVary     {{MonoScaling 1 0} {Wavelength 1.2 90}}
 
-VarVary     {{MonoScaling 1 0} {Wavelength 1.2 1}}
-
-VV2Fld      {}
-
-SS2Fld      {}
+GetFld      {}
 
 PPAttr      {{v1 RAT}}
 

@@ -3,31 +3,17 @@
 #--- Get TCL global variables
 #include ".mfj/varSim.tcl"
 
-# Update 'SS2Fld' to replace 'BD' with 'EA EC EV EFe EFh'
-set lst [list]
-foreach grp [lsort -unique -index 0 $SS2Fld] {
-    if {[regexp {^p[^/]+$} [lindex $grp 0]]} {
-        set grp [concat [lrange $grp 0 2]\
-            [lsort -unique [lrange $grp 3 end]]]
-    } else {
-        set grp [concat [lindex $grp 0]\
-            [lsort -unique [lrange $grp 1 end]]]
-    }
-    lappend lst [string map {Band "EA EC EV EFe EFh"} $grp]
-}
-set SS2Fld $lst
-vputs [wrapText "'SS2Fld': \{$SS2Fld\}" "# "]
-
+set PPAttr [regsub -all {\s+} $PPAttr " "]
 )!
 
 #setdep @previous@
 #--- Get TCL parameters
 !(
 
-foreach var {RegGen VarVary MiscAttr VV2Fld SS2Fld PPAttr GopAttr
+foreach var {RegGen VarVary SimEnv VV2Fld SS2Fld PPAttr GopAttr
     IntfCon IntfSRH RegIntfTrap ModPar mfjDfltSet Dim Cylind OptOnly
     LoadTDR XMax YMax}\
-    val [list $RegGen $VarVary $MiscAttr $VV2Fld $SS2Fld $PPAttr\
+    val [list $RegGen $VarVary $SimEnv $VV2Fld $SS2Fld $PPAttr\
     $GopAttr $IntfCon $IntfSRH $RegIntfTrap $ModPar $mfjDfltSet $Dim\
     $Cylind $OptOnly $LoadTDR $XMax $YMax] {
     vputs -n -i-3 "
@@ -56,7 +42,7 @@ set h 6.62607015e-34
 set hB [expr {$h/$q}]
 set k 1.380649e-23
 set kB [expr {$k/$q}]
-set T [expr [lindex $MiscAttr 8]+273.15]
+set T [expr [lindex $SimEnv 4]+273.15]
 
 #--- Automatic alternating color, marker and line assignment
 set colorLst {black red darkRed green darkGreen blue darkBlue cyan darkCyan
@@ -318,7 +304,8 @@ foreach pp $PPAttr {
         create_plot -name PltRAT_$pp0 -1d
 
         # Calculate monochromatic light intensity
-        set pMono [expr [lindex $MiscAttr 5]*$ValArr(MonoScaling)]
+        regexp {\{Monochromatic\s+\S+\s+([^\s\}]+)} $GopAttr -> tmp
+        set pMono [expr $tmp*$ValArr(MonoScaling)]
         vputs -i2 "Monochromatic intensity: $pMono W*cm^-2"
         vputs -i2 "Create wavelength variable \[um -> nm\]"
         set xVar Wavelength|nm
@@ -346,17 +333,20 @@ foreach pp $PPAttr {
         remove_curves ${pp0}_ww
 
         # Two columns from customSpec: Wavelength [nm] intensity [W*cm^-2]
-        vputs -i2 "Build custom spectrum from '$xLow' to '$xHigh' nm based\
-            on spectrum file '[lindex $MiscAttr 0]'"
-        set specLst [customSpec [lindex $MiscAttr 0] [expr 1e-3*$xLow]\
-            [expr 1e-3*$xHigh] [expr 1e-3*$xStep]]
-        set intJph 0
-        foreach w [lindex $specLst 0] p [lindex $specLst 1] {
-            set jph [expr 1e3*$q*$p/($h*$c0/$w*1e9)]
-            set intJph [expr $intJph+$jph]
+        set specLst [list]
+        if {[regexp {\{Spectrum\s+(\S+)} $GopAttr -> fSpec]} {
+            vputs -i2 "Build custom spectrum from '$xLow' to '$xHigh' nm based\
+                on spectrum file '$fSpec'"
+            set specLst [customSpec $fSpec [expr 1e-3*$xLow]\
+                [expr 1e-3*$xHigh] [expr 1e-3*$xStep]]
+            set intJph 0
+            foreach w [lindex $specLst 0] p [lindex $specLst 1] {
+                set jph [expr 1e3*$q*$p/($h*$c0/$w*1e9)]
+                set intJph [expr $intJph+$jph]
+            }
+            vputs -i3 "DOE: ${pp0}_Jph [format %.4f $intJph]"
+            set gVarArr(${pp0}_Jph|mA*cm^-2) [format %.4f $intJph]
         }
-        vputs -i3 "DOE: ${pp0}_Jph [format %.4f $intJph]"
-        set gVarArr(${pp0}_Jph|mA*cm^-2) [format %.4f $intJph]
 
         if {[regexp {\sRaytrace\s} $GopAttr]} {
 
@@ -478,98 +468,39 @@ foreach pp $PPAttr {
             vputs -i2 "Create RAT from the sum of $lst"
             create_curve -name ${pp0}_2|RAT -function [join $lst +]
 
-            # Two columns from customSpec: Wavelength [nm] intensity [W*cm^-2]
-            vputs -i2 "Calculate weighted average reflectance, absorptance,\
-                transmittance from '$xLow' to '$xHigh' nm based on spectrum\
-                file '[lindex $MiscAttr 0]'"
-            set intJR 0
-            set intJA 0
-            set intJT 0
-            foreach w [lindex $specLst 0] p [lindex $specLst 1] {
-                set jph [expr 1e3*$q*$p/($h*$c0/$w*1e9)]
-                set r [lindex [probe_curve ${pp0}_0|R -valueX $w\
-                    -plot PltRAT_$pp0] 0]
-                set t [lindex [probe_curve ${pp0}_1|T -valueX $w\
-                    -plot PltRAT_$pp0] 0]
-                set a [expr [lindex [probe_curve ${pp0}_2|RAT\
-                    -valueX $w -plot PltRAT_$pp0] 0]-$r-$t]
-                set intJR [expr $intJR+$r*$jph]
-                set intJA [expr $intJA+$a*$jph]
-                set intJT [expr $intJT+$t*$jph]
-            }
-            vputs -i3 "DOE: ${pp0}_JR [format %.4f $intJR]"
-            set gVarArr(${pp0}_JR) [format %.4f $intJR]
-            vputs -i3 "DOE: ${pp0}_JA [format %.4f $intJA]"
-            set gVarArr(${pp0}_JA|mA*cm^-2) [format %.4f $intJA]
-            vputs -i3 "DOE: ${pp0}_JT [format %.4f $intJT]"
-            set gVarArr(${pp0}_JT|mA*cm^-2) [format %.4f $intJT]
-
-            # Calculate total 1D weighted average absorptance profile
-            vputs -i2 "Calculate total 1D weighted optical generation rate\
-                from n@previous@_OG1D.plx based on spectrum file\
-                '[lindex $MiscAttr 0]'"
+            # Read n@previous@_OG1D.plx
             if {![file exists n@previous@_OG1D.plx]} {
                 vputs -i3 "\nerror: n@previous@_OG1D.plx not found!\n"
                 continue
             }
             set idx 0
-            set len [llength [lindex $specLst 0]]
             set ogLst [list]
             array unset arr
             set inf [open n@previous@_OG1D.plx r]
             vputs -i3 "Read n@previous@_OG1D.plx"
             while {[gets $inf line] != -1} {
                 if {[string is double -strict [lindex $line 0]]} {
-                    if {!$idx} {
+                    if {$idx == 0} {
                         lappend arr(Dep|um) [lindex $line 0]
                     }
                     lappend ogLst [lindex $line end]
                 } elseif {[regexp {^# End of wavelength varying} $line]} {
-                    if {$idx >= $len} {
-                        vputs -i4 "\nerror: wavelength step '$idx' >= $len!\n"
-                        break
-                    }
                     if {$xAsc} {
-                        lappend arr(Lambda|nm) [lindex $specLst 0 $idx]
-                        lappend arr(P|W*cm^-2) [lindex $specLst 1 $idx]
+                        lappend arr(Lambda|nm) [format %g\
+                            [expr $xLow+$xStep*$idx]]
                     } else {
-                        lappend arr(Lambda|nm) [lindex $specLst 0 end-$idx]
-                        lappend arr(P|W*cm^-2) [lindex $specLst 1 end-$idx]
+                        lappend arr(Lambda|nm) [format %g\
+                            [expr $xHigh-$xStep*$idx]]
                     }
-                    vputs -i4 "[lindex $arr(Lambda|nm) end] nm\
-                        [lindex $arr(P|W*cm^-2) end] W*cm^-2"
+                    vputs -i4 "[lindex $arr(Lambda|nm) end] nm"
                     set arr([lindex $arr(Lambda|nm) end]) $ogLst
                     set ogLst [list]
                     incr idx
                 }
             }
             close $inf
-
-            # Calculate weighted average photons for each depth
-            set idx 0
-            foreach dep $arr(Dep|um) {
-                set sum 0
-                foreach w $arr(Lambda|nm) p $arr(P|W*cm^-2) {
-                    set sum [expr $sum+[lindex $arr($w) $idx]*$p/$pMono]
-                }
-                lappend arr(WOG|cm^-3*s^-1) $sum
-                incr idx
-            }
-            vputs -i2 "Save total 1D weighted optical generation rate\
-                to '$fTotGop'"
-            set ouf [open $fTotGop w]
-            puts $ouf "# Total 1D weighted optical generation rate from\
-                '$xLow' to '$xHigh' nm with a step\n# size of '[expr\
-                abs($xHigh-$xLow)/[lindex $VarVary $vIdx 2]]' nm using\
-                spectrum '[lindex $MiscAttr 0]'"
-            puts $ouf "# Depth \[um\], AbsorbedPhotonDensity \[cm^-3*s^-1\]"
-            puts $ouf {"AbsorbedPhotonDensity"}
-            foreach dep $arr(Dep|um) og $arr(WOG|cm^-3*s^-1) {
-                puts $ouf [format %.6e\t%.6e $dep $og]
-            }
-            close $ouf
             vputs -i2 "Save spectral 1D optical generation rate\
-                to '$fSpecGop'"
+                to '$fSpecGop' ascendingly"
             set ouf [open $fSpecGop w]
             puts $ouf "# Spectral 1D optical generation rate"
             puts $ouf "# Depth \[um\], AbsorbedPhotonDensity \[cm^-3*s^-1\]"
@@ -583,6 +514,69 @@ foreach pp $PPAttr {
                 }
             }
             close $ouf
+
+            # Two columns from customSpec: Wavelength [nm] intensity [W*cm^-2]
+            if {[llength $specLst]} {
+                vputs -i2 "Calculate weighted average reflectance, absorptance,\
+                    transmittance from '$xLow' to '$xHigh' nm"
+                set intJR 0
+                set intJA 0
+                set intJT 0
+                foreach w [lindex $specLst 0] p [lindex $specLst 1] {
+                    set jph [expr 1e3*$q*$p/($h*$c0/$w*1e9)]
+                    set r [lindex [probe_curve ${pp0}_0|R -valueX $w\
+                        -plot PltRAT_$pp0] 0]
+                    set t [lindex [probe_curve ${pp0}_1|T -valueX $w\
+                        -plot PltRAT_$pp0] 0]
+                    set a [expr [lindex [probe_curve ${pp0}_2|RAT\
+                        -valueX $w -plot PltRAT_$pp0] 0]-$r-$t]
+                    set intJR [expr $intJR+$r*$jph]
+                    set intJA [expr $intJA+$a*$jph]
+                    set intJT [expr $intJT+$t*$jph]
+                }
+                vputs -i3 "DOE: ${pp0}_JR [format %.4f $intJR]"
+                set gVarArr(${pp0}_JR) [format %.4f $intJR]
+                vputs -i3 "DOE: ${pp0}_JA [format %.4f $intJA]"
+                set gVarArr(${pp0}_JA|mA*cm^-2) [format %.4f $intJA]
+                vputs -i3 "DOE: ${pp0}_JT [format %.4f $intJT]"
+                set gVarArr(${pp0}_JT|mA*cm^-2) [format %.4f $intJT]
+
+                # Calculate total 1D weighted average absorptance profile
+                vputs -i2 "Calculate total 1D weighted optical generation rate"
+
+                # Calculate weighted average photons for each depth
+                set idx 0
+                set len [llength $arr(Lambda|nm)]
+                foreach dep $arr(Dep|um) {
+                    set sum 0
+                    for {set i 0} {$i < $len} {incr i} {
+                        if {$xAsc} {
+                            set sum [expr $sum+[lindex\
+                                $arr([lindex $arr(Lambda|nm) $i]) $idx]\
+                                *[lindex $specLst 1 $i]/$pMono]
+                        } else {
+                            set sum [expr $sum+[lindex\
+                                $arr([lindex $arr(Lambda|nm) $i]) $idx]\
+                                *[lindex $specLst 1 end-$i]/$pMono]
+                        }
+                    }
+                    lappend arr(WOG|cm^-3*s^-1) $sum
+                    incr idx
+                }
+                vputs -i2 "Save total 1D weighted optical generation rate\
+                    to '$fTotGop'"
+                set ouf [open $fTotGop w]
+                puts $ouf "# Total 1D weighted optical generation rate from\
+                    '$xLow' to '$xHigh' nm with a step\n# size of '[expr\
+                    abs($xHigh-$xLow)/[lindex $VarVary $vIdx 2]]' nm using\
+                    spectrum '$fSpec'"
+                puts $ouf "# Depth \[um\], AbsorbedPhotonDensity \[cm^-3*s^-1\]"
+                puts $ouf {"AbsorbedPhotonDensity"}
+                foreach dep $arr(Dep|um) og $arr(WOG|cm^-3*s^-1) {
+                    puts $ouf [format %.6e\t%.6e $dep $og]
+                }
+                close $ouf
+            }
 
         } elseif {[regexp {\sTMM\s} $GopAttr]} {
 
@@ -791,18 +785,20 @@ foreach pp $PPAttr {
 
             # Check the previous mono/spectrum scaling from 'VarVary'
             set pSum 0
-            if {$ValArr(SpecScaling) > 0} {
+            if {$ValArr(SpecScaling) > 0
+                && [regexp {\{Spectrum\s+(\S+)} $GopAttr -> str]} {
 
                 # Extract the spectrum power [mW*cm^-2]
-                set pSpec [specInt [lindex $MiscAttr 0]]
+                set pSpec [specInt $str]
                 set tmp [format %.4g $pSpec]
                 vputs -i2 "DOE: ${pp0}_Pspec $tmp"
                 set gVarArr(${pp0}_Pspec|mW*cm^-2) $tmp
                 set sunsSpec $ValArr(SpecScaling)
                 set pSum [expr $pSum+$pSpec*$sunsSpec]
             }
-            if {$ValArr(MonoScaling) > 0} {
-                set pMono [expr 1e3*[lindex $MiscAttr 5]]
+            if {$ValArr(MonoScaling) > 0 && [regexp\
+                {\{Monochromatic\s+\S+\s+([^\s\}]+)} $GopAttr -> tmp]} {
+                set pMono [expr 1e3*$tmp]
                 set tmp [format %.4g $pMono]
                 vputs -i2 "DOE: ${pp0}_Pmono $tmp"
                 set gVarArr(${pp0}_Pmono|mW*cm^-2) $tmp
@@ -994,7 +990,8 @@ foreach pp $PPAttr {
                 %.4g/%.4g mA*cm^-2" $jOGBias $jscBias]
             unload_file v${idx}_@plot@
 
-            set pSig [expr [lindex $MiscAttr 5]*$ValArr(MonoScaling)]
+            regexp {\{Monochromatic\s+\S+\s+([^\s\}]+)} $GopAttr -> tmp
+            set pSig [expr $tmp*$ValArr(MonoScaling)]
             vputs -i2 "Monochromatic signal light intensity:\
                 $pSig W*cm^-2"
         } else {
@@ -1440,7 +1437,8 @@ foreach pp $PPAttr {
         }
 
         # Extract the spectrum power [mW*cm^-2]
-        set pSpec [specInt [lindex $MiscAttr 0]]
+        regexp {\{Spectrum\s+(\S+)} $GopAttr -> str
+        set pSpec [specInt $str]
         set tmp [format %.4g $pSpec]
         vputs -i2 "DOE: ${pp0}_Pspec $tmp"
         set gVarArr(${pp0}_Pspec|mW*cm^-2) $tmp
