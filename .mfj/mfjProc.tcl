@@ -1203,7 +1203,7 @@ proc mfjProc::str2List {VarInfo StrList {Level 0}} {
         error "invalid level '$Level'!"
     }
 
-    if {$Level == 0} {
+    if {$Level == 0 && [string length $VarInfo]} {
         vputs -v3 $VarInfo
     }
     set FmtLst [list]
@@ -1228,12 +1228,14 @@ proc mfjProc::str2List {VarInfo StrList {Level 0}} {
             lappend FmtLst $SubLst
         }
     }
-    if {$Level} {
+    if {$Level && [string length $VarInfo]} {
         vputs -v3 -i1 "Level $Level: \{$FmtLst\}"
     } else {
 
         # Level 0
-        vputs -v3 -i1 "Level $Level: \{$FmtLst\}\n"
+        if {[string length $VarInfo]} {
+            vputs -v3 -i1 "Level $Level: \{$FmtLst\}\n"
+        }
     }
     return $FmtLst
 }

@@ -46,7 +46,7 @@ Example (after semicolon):
 {== v-1 Local & `a | a = 12 | `i & `>= 1}
 {== v-2 Local & `a | a = 100 | `i & `>= 1}
 
-<VAR>SimEnv      {Sentaurus T-2022.03 !Cylindrical OptOnly 25 64 PBS 12 100}
+<VAR>SimEnv      {Sentaurus T-2022.03 !Cylindrical !OptOnly 25 64 Local}
 
 <TOOL>ST settings: Tool_label = sde Tool_name = sde
 
@@ -103,8 +103,8 @@ Examples:
     & `<= 1) | a | `p}
 {(n v1 | == v1 {[BCEP]\w+} ) & `a | a | `p} ...
 
-<VAR>RegGen      {{Gas Pyramid Keep p0_0_0/3.53610857633_0_0 3.53553390593 0 4
-    1} {Silicon 165 2.5 2.5} {Aluminum 1 2.5 2.5}}
+<VAR>RegGen      {{iaSi 0.003 50} {Silicon 165 50} {iaSi 0.003 50} {paSi 0.005
+    45} {naSi 5} {Gas 0.1 44.5} {Gas 1} {Gas 4.5}}
 
 <COMMENT>--- Region and interface fields variable
 Suppose i,j,k are region indices, regions can be referred as follows:
@@ -125,7 +125,7 @@ Example:
     & `<= 1 | `f}
 ...
 
-<VAR>FldAttr     {{r2 P 1.56e+15}}
+<VAR>FldAttr     {{r2 P 1.56e+15} {r4 B 1.41e+19} {r5 P 1.45e+19}}
 
 <COMMENT>--- Interface attributes variable
 Specify three types of region interfaces - SRH, metal contact and tunnelling
@@ -166,7 +166,8 @@ Tunnelling example:
 {(n v1 | == v2 {C\w+} ) & `a | == v1 {c\d} & (a = 1e7 | `n | `> 0) | a}
 {(n v1 | == v2 {C\w+} ) & `a | == v1 {c\d} & (a | `n | `> 0) | a}
 
-<VAR>IntfAttr    {}
+<VAR>IntfAttr    {{r4/6 c0 Ohmic 0 0 0 1e7} {r5/8 c1 Ohmic 0 0 0 1e7} {r0/1
+    1e+12 100000} {r4/7 0 10000000} {r5/7 0 10000000} {r1/2 0 430} {r3/2 0 430}}
 
 <COMMENT>--- Optical generation attributes variable
 Specify four types of optical solver E(External), O(OBAM), T(TMM), R(Raytrace).
@@ -244,10 +245,8 @@ Incidence example:
     | `a}
 ...
 
-<VAR>GopAttr     {{p0_0_0/0_2.5_2.5 Raytrace 5000 Deterministic 1e-4 100000}
-    {r1/2 ARC MgF2 0.09 01mdb/MgF2_Siquerios1988.par SiNx 0.07
-    01mdb/SiNx_SERIS_1.92.par} {r3/2 0.93 Phong 1} {Spectrum
-    02opt/am15g_IEC60904-3-2008.txt 0.3 1.2 0.01}}
+<VAR>GopAttr     {{r0/1 External 02opt/Kaneka_1DGop_Spectral.plx} {Spectrum
+    02opt/am15g_IEC60904-3-2008.txt 0.3 1.2 0.01} {Monochromatic 0.3 0.001}}
 
 <COMMENT>--- Mesh attributes variable
 Mesh example:
@@ -318,7 +317,10 @@ SRH example:
         DC mt mu BGN SRH Aug Rad)}
 ...
 
-<VAR>ModPar      {{r2 01mdb/Silicon.par} {r3 01mdb/Al_Palik1985.par}}
+<VAR>ModPar      {{r2 01mdb/Silicon.par SRH 0.0088} {r1 01mdb/iaSi.par SRH
+    1.28e-11 1.28e-12} {r3 01mdb/iaSi.par SRH 1.28e-11 1.28e-12} {r4
+    01mdb/paSi.par SRH 7.13e-14 3.23e-13} {r5 01mdb/naSi.par SRH 3.93e-13
+    6.03e-14}}
 
 <COMMENT>--- Variable vary settings
 Specify the following variables for varying - c# contact property (IntfAttr),
@@ -362,7 +364,8 @@ Other variables for varying (sdevice --parameter-names):
 {== v1 {[CFV]\w+} & `a | a | `n & `< v1}
 ...
 
-<VAR>VarVary     {{MonoScaling 1 0} {Wavelength 1.2 90}}
+<VAR>VarVary     {{SpecScaling 0.3 0} {MonoScaling 1 1} {Wavelength 1.2 90}
+    {MonoScaling 0 0} {SpecScaling 1 0} {c0 0.8 160}}
 
 <COMMENT>--- Extract field during variable varying and from snapshots
 Specify a point pX_Y_Z [um] for extracting 1D structural fields from saved
@@ -437,7 +440,7 @@ Field integration example:
     mue muh}
 ...
 
-<VAR>GetFld      {}
+<VAR>GetFld      {{p5_0/160_50 Average Dn}}
 
 <TOOL>ST settings: Tool_label = svisual Tool_name = svisual
 
@@ -448,7 +451,7 @@ Extract data from 'VarVary', prepare XY plots and make further analysis
 {a | `s CV JV QE SunsVoc SunsJsc QSSPC RAT}
 {== v-1 QSSPC & (a = 1e15 | `n & `> 0) | `a}
 
-<VAR>PPAttr      {{v1 RAT}}
+<VAR>PPAttr      {{v2 QE} {v5 JV}}
 
 <TAIL>--- No variables afterwards
 Put down any notes

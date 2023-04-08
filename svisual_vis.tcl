@@ -3,7 +3,7 @@
 #--- Get TCL global variables
 #include ".mfj/varSim.tcl"
 
-set PPAttr [regsub -all {\s+} $PPAttr " "]
+set PPAttr [str2List "" $PPAttr]
 )!
 
 #setdep @previous@
@@ -396,38 +396,40 @@ foreach pp $PPAttr {
             }
             remove_curves "${pp0}_NR ${pp0}_NT"
 
-            # Calculate FCA in silicon/polysi regions (can be extended)
             vputs -i2 "Calculate absorbed photons (and FCA) in regions"
             foreach grp $RegGen {
                 set mat [lindex $grp 0 0]
                 set reg [lindex $grp 0 1]
 
                 # Skip dummy regions
-                if {$mat ne "Gas"} {
-                    vputs -i3 -n "$reg: absorbed photons"
-                    create_curve -name ${pp0}_NA_$reg -dataset Data_$pp0\
-                        -axisX $xVar -axisY "Integr$reg $monoAP"
-                    create_curve -name ${pp0}_3|A_$reg -function\
-                        "<${pp0}_NA_$reg>/<${pp0}_A_Inc>"
-                    remove_curves ${pp0}_NA_$reg
-                    if {[lindex $grp 0 2] eq "Semiconductor"} {
-                        vputs -c -n ", electron-hole pairs"
-                        create_curve -name ${pp0}_NOG_$reg\
-                            -dataset Data_$pp0\
-                            -axisX $xVar -axisY "Integr$reg $monoOG"
-                        create_curve -name ${pp0}_4|OG_$reg -function\
-                            "<${pp0}_NOG_$reg>/<${pp0}_A_Inc>"
-                        remove_curves ${pp0}_NOG_$reg
+                if {$mat eq "Gas"} continue
+                vputs -i3 -n "$reg: absorbed photons"
+                create_curve -name ${pp0}_NA_$reg -dataset Data_$pp0\
+                    -axisX $xVar -axisY "Integr$reg $monoAP"
+                create_curve -name ${pp0}_3|A_$reg -function\
+                    "<${pp0}_NA_$reg>/<${pp0}_A_Inc>"
+                remove_curves ${pp0}_NA_$reg
+                if {[lindex $grp 0 2] eq "Semiconductor"} {
+                    vputs -c -n ", electron-hole pairs"
+                    create_curve -name ${pp0}_NOG_$reg\
+                        -dataset Data_$pp0\
+                        -axisX $xVar -axisY "Integr$reg $monoOG"
+                    create_curve -name ${pp0}_4|OG_$reg -function\
+                        "<${pp0}_NOG_$reg>/<${pp0}_A_Inc>"
+                    remove_curves ${pp0}_NOG_$reg
 
-                        # Skip FCA in nonsilicon and nonpolysi regions
-                        if {$mat eq "Silicon" || $mat eq "PolySi"} {
-                            vputs -c -n ", FCA"
-                            create_curve -name ${pp0}_5|FCA_$reg -function\
-                                "<${pp0}_3|A_$reg>-<${pp0}_4|OG_$reg>"
-                        }
+                    # Skip FCA if the max value is 0
+                    create_curve -name ${pp0}_5|FCA_$reg -function\
+                        "<${pp0}_3|A_$reg>-<${pp0}_4|OG_$reg>"
+                    set lst [get_curve_data ${pp0}_5|FCA_$reg -axisY\
+                        -plot PltRAT_$pp0]
+                    if {[lindex [lsort -real -decreasing $lst] 0] > 1e-10} {
+                        vputs -c -n ", FCA"
+                    } else {
+                        remove_curves ${pp0}_5|FCA_$reg
                     }
-                    vputs
                 }
+                vputs
             }
             if {[regexp {\sARC\s} $GopAttr]} {
                 vputs -i2 "Calculating absorbed photons in the ARC layers"
@@ -547,6 +549,11 @@ foreach pp $PPAttr {
                 # Calculate weighted average photons for each depth
                 set idx 0
                 set len [llength $arr(Lambda|nm)]
+                if {$len != [llength [lindex $specLst 1]]} {
+                    vputs -i2 "\nerror: $len records !=\
+                        [llength [lindex $specLst 1]] wavelengths!\n"
+                    continue
+                }
                 foreach dep $arr(Dep|um) {
                     set sum 0
                     for {set i 0} {$i < $len} {incr i} {

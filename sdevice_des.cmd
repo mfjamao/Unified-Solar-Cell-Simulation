@@ -4,7 +4,7 @@
 #include ".mfj/varSim.tcl"
 
 # Check 'VarVary' for optical requirement
-set VarVary [regsub -all {\s+} $VarVary " "]
+set VarVary [str2List "" $VarVary]
 if {[regexp {\{(Mono|Spec)Scaling\s} $VarVary] && $LPD == 0} {
     error "no optical solver in 'GopAttr' for varying optics in 'VarVary'!"
 }
@@ -70,7 +70,7 @@ vputs [wrapText "'ModPar': \{$ModPar\}" "* "]
 # Split 'GetFld' into 'VV2Fld' and 'SS2Fld'
 set VV2Fld [list]
 set SS2Fld [list]
-foreach grp [regsub -all {\s+} $GetFld " "] {
+foreach grp [str2List "" $GetFld] {
     if {[string is integer -strict [lindex $grp 1]]
         || ![regexp {^(Ave|Int|Max|Lea)\w+$} [lindex $grp 1]]} {
         lappend SS2Fld $grp
@@ -896,26 +896,27 @@ if {[regexp {\{(Mono|Spec)Scaling\s} $VarVary]} {
             ) * end of OpticalGeneration"
 
     # 'Excitation' subsection
-    regexp {\{Monochromatic\s+(\S+)\s+([^\s\}]+)} $GopAttr -> val tmp
+    regexp {\{Monochromatic\s+(\S+)\s+([^\s\}]+)} $GopAttr -> var val
     vputs -n -i-1 "
             Excitation (
                 Polarization= 0.5 * Unpolarized light
-                Wavelength= $val * um
-                Intensity= $tmp * W/cm^2"
-    regexp {\{Incidence\s+\S+\s+(\S+)\s+([^\s\}]+)} $GopAttr -> val tmp
+                Wavelength= $var * um"
+    regexp {\{Incidence\s+(\S+)\s+(\S+)\s+([^\s\}]+)} $GopAttr -> str var tmp
+    vputs -n -i-1 "
+                Intensity= [expr $val*(1.-$str)] * W/cm^2"
     if {$LPD == -1} {
-        set val [expr 270.+$val]
+        set val [expr 270.+$var]
         set tmp [expr 180.+$tmp]
     } else {
-        set val [expr 90.+$val]
+        set val [expr 90.+$var]
     }
     if {$Dim == 3} {
         vputs -n -i-1 "
-                Theta= $val * deg
+                Theta= $var * deg
                 Phi= $tmp * deg"
     } else {
         vputs -n -i-1 "
-                Theta= $val * deg"
+                Theta= $var * deg"
     }
 
     # Every attribute has a number

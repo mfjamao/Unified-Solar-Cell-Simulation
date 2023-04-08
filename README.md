@@ -53,51 +53,51 @@ Material, spectra and experimental files are also required if appeared in
     02opt/ and 03exp/, respectively.
 
 # Version history
-2.1		04/03/2023
-	Enhancement: The majority of planned features are finally implemented.
-		Optical simulation: OBAM, TMM, Raytracing
-		Electrical simulation: QSSPC (including J0 extraction), QE,
-		dark JV, light JV, Suns-Voc,Suns-Jsc, CV
-		PL and EL are not yet available
-2.0		31/07/2022
-	Enhancement: New framework to support arbitrary 2D/3D structures. Adopted
-		universal coordinate system. Reduced input parameters down to tweleve.
-		Implementd a grammar check for input values. Combined optical, lifetime
-		and electrical simulations into one project.
-1.9		01/07/2018
-	Enhancement: New framework (prototype) to support arbitrary 2D/3D
-		structures. Tested it with optical simulation
-1.8		20/02/2017
-	Bug fix: Fixed a bug in loss analysis (Thanks to Aobo)
-	Enhancement: Re-organization of input parameters
-	Enhancement: Added support to interface recombination beyond the substrate
-1.7		06/10/2016
-	Enhancement: Added loss analysis for JV, QE and Suns-Voc sweep
-	Enhancement: Improved mesh and numerics for better convergence when
-		simulating Suns-Voc
-	Enhancement: Added support to extract field quantities at any setpoints
-		(Thanks to Alex)
-	Enhancement: Implementd series resistance at MPP using LJV and Suns-Voc
-	Enhancement: Added two band dispersion option for tunneling in III-V
-		materials (Thanks to Chuqi)
-1.6		24/08/2016
-	Enhancement: Added support to tunnel diode (Thanks to Chuqi)
-	Enhancement: Added series and shunt resistance to postprocessing (Thanks to
-		Jing)
-	Enhancement: Improved convergence of LJV for heterojunction (Thanks to Jing)
-	Enhancement: Combined doping, traps, x and y mole profiles to reduce
-		variables
-1.5		22/08/2016
-	Enhancement: Improved mesh for thin film solar cells
-1.4		09/08/2016
-	Enhancement: Move contact resistance calculation to postprocessing
-1.3		21/07/2016
-	Enhancement: Added support to thin film devices (Thanks to Chuqi)
-	Enhancement: Enabled a simple optical simulation, OBAM (Thanks to Aobo)
-1.2		05/07/2016
-	Enhancement: Added AluminumActiveConcentration and improved mesh
-1.1		30/06/2016
-	Enhancement: Added Rs calculation based on multi-light method
-1.0		27/06/2016
-	Initial version: (Thanks for the support from Ziv and feedbacks from Jing,
-		Aobo, Alex, Hongzhao and Mengjie)
+2.1     04/03/2023
+    Enhancement: The majority of planned features are finally implemented.
+        Optical simulation: OBAM, TMM, Raytracing
+        Electrical simulation: QSSPC (including J0 extraction), QE,
+        dark JV, light JV, Suns-Voc,Suns-Jsc, CV
+        PL and EL are not yet available
+2.0     31/07/2022
+    Enhancement: New framework to support arbitrary 2D/3D structures. Adopted
+        universal coordinate system. Reduced input parameters down to tweleve.
+        Implementd a grammar check for input values. Combined optical, lifetime
+        and electrical simulations into one project.
+1.9     01/07/2018
+    Enhancement: New framework (prototype) to support arbitrary 2D/3D
+        structures. Tested it with optical simulation
+1.8     20/02/2017
+    Bug fix: Fixed a bug in loss analysis (Thanks to Aobo)
+    Enhancement: Re-organization of input parameters
+    Enhancement: Added support to interface recombination beyond the substrate
+1.7     06/10/2016
+    Enhancement: Added loss analysis for JV, QE and Suns-Voc sweep
+    Enhancement: Improved mesh and numerics for better convergence when
+        simulating Suns-Voc
+    Enhancement: Added support to extract field quantities at any setpoints
+        (Thanks to Alex)
+    Enhancement: Implementd series resistance at MPP using LJV and Suns-Voc
+    Enhancement: Added two band dispersion option for tunneling in III-V
+        materials (Thanks to Chuqi)
+1.6     24/08/2016
+    Enhancement: Added support to tunnel diode (Thanks to Chuqi)
+    Enhancement: Added series and shunt resistance to postprocessing (Thanks to
+        Jing)
+    Enhancement: Improved convergence of LJV for heterojunction (Thanks to Jing)
+    Enhancement: Combined doping, traps, x and y mole profiles to reduce
+        variables
+1.5     22/08/2016
+    Enhancement: Improved mesh for thin film solar cells
+1.4     09/08/2016
+    Enhancement: Move contact resistance calculation to postprocessing
+1.3     21/07/2016
+    Enhancement: Added support to thin film devices (Thanks to Chuqi)
+    Enhancement: Enabled a simple optical simulation, OBAM (Thanks to Aobo)
+1.2     05/07/2016
+    Enhancement: Added AluminumActiveConcentration and improved mesh
+1.1     30/06/2016
+    Enhancement: Added Rs calculation based on multi-light method
+1.0     27/06/2016
+    Initial version: (Thanks for the support from Ziv and feedbacks from Jing,
+        Aobo, Alex, Hongzhao and Mengjie)

@@ -26,13 +26,13 @@ namespace import mfjProc::*
 # Need to remove excess spaces in RegGen and mfjRegInfo
 set tmp [info global RegGen<*>]
 if {$tmp eq ""} {
-    set RegGen [lindex $mfjRegInfo 0]
+    set RegGen [str2List "" [lindex $mfjRegInfo 0]]
 } else {
     set idx 0
     upvar 0 $tmp val
-    foreach grp [regsub -all {\s+} $val " "] {
+    foreach grp [str2List "" $val] {
         if {$grp eq $RegGen} {
-            regsub -all {\s+} [lindex $mfjRegInfo $idx] " " RegGen
+            set RegGen [str2List "" [lindex $mfjRegInfo $idx]]
             break
         }
         incr idx
@@ -61,7 +61,7 @@ if {![regexp {^[123]$} $Dim]} {
 }
 
 # Define two boolean values for easy reference later
-set SimEnv [regsub -all {\s+} $SimEnv " "]
+set SimEnv [str2List "" $SimEnv]
 if {[string index [lindex $SimEnv 2] 0] eq "!"} {
     set Cylind false
 } else {
@@ -120,7 +120,7 @@ if {$OptOnly} {
 #   (pp Vn), (profile file, lateral factor), ...
 set RegFld [list]
 set IntfFld [list]
-set FldAttr [lsort -unique -index 0 [regsub -all {\s+} $FldAttr " "]]
+set FldAttr [lsort -unique -index 0 [str2List "" $FldAttr]]
 foreach grp $FldAttr {
     set val [lindex $grp 0]
 
@@ -273,7 +273,7 @@ set IntfCon [list]
 set IntfSRH [list]
 set IntfTun [list]
 set lst [list]
-set IntfAttr [regsub -all {\s+} $IntfAttr " "]
+set IntfAttr [str2List "" $IntfAttr]
 foreach grp $IntfAttr {
     set lst [string map {r "" / " "} [lindex $grp 0]]
     if {[regexp {^c\d$} [lindex $grp 1]]} {
@@ -318,7 +318,7 @@ if {[llength $GopAttr]
 set txt ""
 set LPD 0
 set GopPP [list]
-set GopAttr [regsub -all {\s+} $GopAttr " "]
+set GopAttr [str2List "" $GopAttr]
 foreach grp $GopAttr {
     if {[regexp {^(OBAM|TMM|Raytrace|External)$} [lindex $grp 1]]} {
         if {$txt eq ""} {

@@ -214,10 +214,12 @@ vputs -c '[lindex $StatLst 3]'\n
 # to 'running' when the project is running. Yet, it typically requires some
 # queue time before a scheduler completes arrangement of desired resources.
 set Queue false
-set BatOut ""
-if {[lindex $InfoLst 0] eq "Sentaurus" && [lindex $StatLst 3] eq "ready"
-    && [file isfile $SimArr(FBatOut)]} {
+if {[file isfile $SimArr(FBatOut)]} {
     set BatOut [exec head -1 $SimArr(FBatOut)]
+} else {
+    set BatOut ""
+}
+if {[lindex $InfoLst 0] eq "Sentaurus" && [lindex $StatLst 3] eq "ready"} {
     if {[lindex $InfoLst 1] eq "PBS" && [regexp {^\d+\.[^\d]+} $BatOut]} {
         set Queue true
     } elseif {[lindex $InfoLst 1] eq "SLURM" && [regexp {job \d+$} $BatOut]} {
