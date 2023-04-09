@@ -591,25 +591,29 @@ foreach pp $PPAttr {
             foreach grp $GopAttr {
                 if {[lindex $grp 1] ne "TMM"} continue
                 vputs -i2 "TMM W$idx:"
-                create_curve -name ${pp0}_w${idx}_R -dataset Data_$pp0\
+                create_curve -name ${pp0}_0_w$idx|R -dataset Data_$pp0\
                     -axisX $xVar -axisY "LayerStack(W$idx) R_Total"
-                create_curve -name ${pp0}_w${idx}_A -dataset Data_$pp0\
+                create_curve -name ${pp0}_3_w$idx|A -dataset Data_$pp0\
                     -axisX $xVar -axisY "LayerStack(W$idx) A_Total"
-                create_curve -name ${pp0}_w${idx}_T -dataset Data_$pp0\
+                create_curve -name ${pp0}_1_w$idx|T -dataset Data_$pp0\
                     -axisX $xVar -axisY "LayerStack(W$idx) T_Total"
-                create_curve -name ${pp0}_w${idx}_RAT -function\
-                    "<${pp0}_w${idx}_R>+<${pp0}_w${idx}_A>+<${pp0}_w${idx}_T>"
+                create_curve -name ${pp0}_2_w$idx|RAT -function\
+                    "<${pp0}_0_w$idx|R>+<${pp0}_3_w$idx|A>+<${pp0}_1_w$idx|T>"
+                if {[llength $specLst] == 0} {
+                    incr idx
+                    continue
+                }
                 set intJR 0
                 set intJA 0
                 set intJT 0
                 foreach w [lindex $specLst 0] p [lindex $specLst 1] {
                     set jph [expr 1e3*$q*$p/($h*$c0/$w*1e9)]
-                    set r [lindex [probe_curve ${pp0}_w${idx}_R -valueX $w\
+                    set r [lindex [probe_curve ${pp0}_0_w$idx|R -valueX $w\
                         -plot PltRAT_$pp0] 0]
-                    set t [lindex [probe_curve ${pp0}_w${idx}_T -valueX $w\
+                    set t [lindex [probe_curve ${pp0}_1_w$idx|T -valueX $w\
                         -plot PltRAT_$pp0] 0]
-                    set a [lindex [probe_curve ${pp0}_w${idx}_A\
-                        -valueX $w -plot PltRAT_$pp0] 0]
+                    set a [lindex [probe_curve ${pp0}_3_w$idx|A -valueX $w\
+                        -plot PltRAT_$pp0] 0]
                     set intJR [expr $intJR+$r*$jph]
                     set intJA [expr $intJA+$a*$jph]
                     set intJT [expr $intJT+$t*$jph]
@@ -623,38 +627,40 @@ foreach pp $PPAttr {
                 incr idx
             }
 
-            # Calculate FCA in silicon/polysi regions (can be extended)
             vputs -i2 "Calculate absorbed photons (and FCA) in regions"
             foreach grp $RegGen {
                 set mat [lindex $grp 0 0]
                 set reg [lindex $grp 0 1]
 
                 # Skip dummy regions
-                if {$mat ne "Gas"} {
-                    vputs -i3 -n "$reg: absorbed photons"
-                    create_curve -name ${pp0}_NA_$reg -dataset Data_$pp0\
-                        -axisX $xVar -axisY "Integr$reg $monoAP"
-                    create_curve -name ${pp0}_A_$reg -function\
-                        "<${pp0}_NA_$reg>/<${pp0}_A_Inc>"
-                    remove_curves ${pp0}_NA_$reg
-                    if {[lindex $grp 0 2] eq "Semiconductor"} {
-                        vputs -c -n ", electron-hole pairs"
-                        create_curve -name ${pp0}_NOG_$reg\
-                            -dataset Data_$pp0\
-                            -axisX $xVar -axisY "Integr$reg $monoOG"
-                        create_curve -name ${pp0}_OG_$reg -function\
-                            "<${pp0}_NOG_$reg>/<${pp0}_A_Inc>"
-                        remove_curves ${pp0}_NOG_$reg
+                if {$mat eq "Gas"} continue
+                vputs -i3 -n "$reg: absorbed photons"
+                create_curve -name ${pp0}_NA_$reg -dataset Data_$pp0\
+                    -axisX $xVar -axisY "Integr$reg $monoAP"
+                create_curve -name ${pp0}_3|A_$reg -function\
+                    "<${pp0}_NA_$reg>/<${pp0}_A_Inc>"
+                remove_curves ${pp0}_NA_$reg
+                if {[lindex $grp 0 2] eq "Semiconductor"} {
+                    vputs -c -n ", electron-hole pairs"
+                    create_curve -name ${pp0}_NOG_$reg\
+                        -dataset Data_$pp0\
+                        -axisX $xVar -axisY "Integr$reg $monoOG"
+                    create_curve -name ${pp0}_4|OG_$reg -function\
+                        "<${pp0}_NOG_$reg>/<${pp0}_A_Inc>"
+                    remove_curves ${pp0}_NOG_$reg
 
-                        # Skip FCA in nonsilicon and nonpolysi regions
-                        if {$mat eq "Silicon" || $mat eq "PolySi"} {
-                            vputs -c -n ", FCA"
-                            create_curve -name ${pp0}_FCA_$reg -function\
-                                "<${pp0}_A_$reg>-<${pp0}_OG_$reg>"
-                        }
+                    # Skip FCA if the max value is 0
+                    create_curve -name ${pp0}_5|FCA_$reg -function\
+                        "<${pp0}_3|A_$reg>-<${pp0}_4|OG_$reg>"
+                    set lst [get_curve_data ${pp0}_5|FCA_$reg -axisY\
+                        -plot PltRAT_$pp0]
+                    if {[lindex [lsort -real -decreasing $lst] 0] > 1e-10} {
+                        vputs -c -n ", FCA"
+                    } else {
+                        remove_curves ${pp0}_5|FCA_$reg
                     }
-                    vputs
                 }
+                vputs
             }
             remove_curves ${pp0}_A_Inc
 

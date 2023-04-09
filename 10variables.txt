@@ -166,8 +166,10 @@ Tunnelling example:
 {(n v1 | == v2 {C\w+} ) & `a | == v1 {c\d} & (a = 1e7 | `n | `> 0) | a}
 {(n v1 | == v2 {C\w+} ) & `a | == v1 {c\d} & (a | `n | `> 0) | a}
 
-<VAR>IntfAttr    {{r4/6 c0 Ohmic 0 0 0 1e7} {r5/8 c1 Ohmic 0 0 0 1e7} {r0/1
-    1e+12 100000} {r4/7 0 10000000} {r5/7 0 10000000} {r1/2 0 430} {r3/2 0 430}}
+<VAR>IntfAttr    {{r4/6 c0 Ohmic 0 0 0 10000000} {r5/8 c1 Ohmic 0 0 0 10000000}
+    {r0/1 1e+12 100000} {r4/7 0 10000000} {r5/7 0 10000000} {r1/2 0 430} {r3/2 0
+    430}} {{r4/6 c0 Ohmic 0 0 0 10000000} {r5/8 c1 Ohmic 0 0 0 10000000} {r0/1 0
+    1000} {r4/7 0 10000000} {r5/7 0 10000000} {r1/2 0 430} {r3/2 0 430}}
 
 <COMMENT>--- Optical generation attributes variable
 Specify four types of optical solver E(External), O(OBAM), T(TMM), R(Raytrace).
@@ -262,13 +264,13 @@ Mesh example:
 <GRAMMAR>{a = 10 | `n & `> 0}
 {a = 0.05 | `n & `> 0}
 {a = 8 | `i & `> 1}
-{a = 0.01 | `n & `> 0}
+{a = 0.001 | `n & `> 0}
 {a = 8 | `i & `> 1}
 {a = 1.5 | `n & `> 1}
 {a = 0.001 | `n & `> 0}
 {a = 1.1 | `n & `> 1}
 
-<VAR>MeshAttr    {10 0.05 8 0.01 8 1.5 0.001 1.1}
+<VAR>MeshAttr    {10 0.05 8 0.001 8 1.5 0.001 1.1}
 
 <TOOL>ST settings: Tool_label = sdevice Tool_name = sdevice
 

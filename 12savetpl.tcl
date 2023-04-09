@@ -145,8 +145,8 @@ foreach Elm [lsort -unique $FLst] {
 # Go to the upper directory and create a Tar/GZip archive
 cd [file dirname $TmpDir]
 set Dir [file tail $TmpDir]
-mputs $Ouf "\nCreate a Tar/GZip archive './$TmpDir.tar.gz'"
-exec tar -czf $Dir.tar.gz $Dir
+mputs $Ouf "\nCreate a Tar/GZip archive './$TmpDir.tgz'"
+exec tar -czf $Dir.tgz $Dir
 mputs $Ouf "Remove the temp directory: './$TmpDir'"
 exec rm -fr $Dir
 mputs $Ouf "Done!\n"

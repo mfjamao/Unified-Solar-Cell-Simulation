@@ -905,10 +905,10 @@ if {[regexp {\{(Mono|Spec)Scaling\s} $VarVary]} {
     vputs -n -i-1 "
                 Intensity= [expr $val*(1.-$str)] * W/cm^2"
     if {$LPD == -1} {
-        set val [expr 270.+$var]
+        set var [expr 270.+$var]
         set tmp [expr 180.+$tmp]
     } else {
-        set val [expr 90.+$var]
+        set var [expr 90.+$var]
     }
     if {$Dim == 3} {
         vputs -n -i-1 "

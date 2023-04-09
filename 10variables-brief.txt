@@ -11,7 +11,7 @@ GopAttr     {{r0/1 external 02opt/kaneka_1dgop_spectral.plx}
     {Spectrum 02opt/am15g_IEC60904-3-2008.txt 0.3 1.2 0.01}
     {Monochromatic 0.3 1e-3}}
 
-MeshAttr    {10 0.05 8 0.01 8 1.5 0.001 1.1}
+MeshAttr    {10 0.05 8 0.001 8 1.5 0.001 1.1}
 
 ModPar      {{r2 01mdb/silicon.par srh 8.8e-3}
     {r1,3 01mdb/iasi.par srh 1.28e-11 1.28e-12}

@@ -49,9 +49,9 @@ mputs $Ouf "\n[clock format [clock seconds] -format "%Y-%b-%d %A %H:%M:%S"]\
 if {![llength $argv]} {
 
     # Try the current directory
-    set argv [glob -nocomplain *.tar.gz]
+    set argv [glob -nocomplain *.tgz]
     if {![llength $argv]} {
-        mputs $Ouf "\nArgument missing! Usage: [info script] xxx.tar.gz\n"
+        mputs $Ouf "\nArgument missing! Usage: [info script] xxx.tgz\n"
         close $Ouf
         exit 1
     }
@@ -112,7 +112,7 @@ if {$Flg} {
 }
 
 # Unpack the archive file
-set TmpDir [string range $argv 0 end-7]
+set TmpDir [file rootname $argv]
 mputs $Ouf "Extract it to a temp directory './$TmpDir'"
 exec tar -xzf $argv -C [file dirname $argv]
 
