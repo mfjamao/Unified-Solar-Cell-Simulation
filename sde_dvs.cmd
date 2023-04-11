@@ -580,7 +580,7 @@ foreach var {RegGen RegApp1 RegApp2 RegFld IntfFld RegIntfFld RegIntfTrap
                             (position (car P2) (cadr P2) 0) Mat Reg)
                     )
                 )
-                ((string=? Shp "Vertex")
+                ((string=? Shp "Vertices")
                     (set! Lst '())
                     (for-each
                         (lambda (PLst)
@@ -757,7 +757,13 @@ foreach var {RegGen RegApp1 RegApp2 RegFld IntfFld RegIntfFld RegIntfTrap
 )
 
 ;# Double check whether the number of regions in SDE tally with that in 'RegGen'
-(if (not (= (length (get-body-list)) (length RegGen)))
+(mfj:display "Double check the created " (length (get-body-list)) " regions:\n")
+(if (= (length (get-body-list)) (length RegGen))
+    (for-each
+        (lambda (BID)
+            (mfj:display (make-string 4 #\space)(generic:get BID "region") "\n")
+        ) (get-body-list)
+    )
     (sde:error (string-append "final region number '" (number->string
         (length (get-body-list))) "' different from 'RegGen'!\n"))
 )

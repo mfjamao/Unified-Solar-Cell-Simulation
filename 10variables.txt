@@ -80,7 +80,7 @@ Block: specify its diagonal vertices; Vertex: specify its vertices (>= 3);
 
 Examples:
     Block (2D/3D): mat B K px1_y1/x2_y2
-    Vertex (2D polygon): mat V K px1_y1 px2_y2 px3_y3 ...
+    Vertices (2D polygon): mat V K px1_y1 px2_y2 px3_y3 ...
     Ellipse (2D/3D): mat E K px1_y1/x2_y2 [MinR/MaxR]
     Cone (3D): mat C K px1_y1_z1/x2_y2_z2 BaseR [TopR MinR/MaxR]
     Pyramid (3D): mat P K px1_y1_z1/x2_y2_z2 BaseR [TopR NSides MinR/MaxR]
@@ -90,9 +90,9 @@ Examples:
         Mat6 x3 y3 z3 ...}
 
 <GRAMMAR>m
-{`!a & n & `> 0 | s E<llipse> V<ertex> P<yramid> C<one> Block}
+{`!a & n & `> 0 | s E<llipse> V<ertices> P<yramid> C<one> Block}
 {n v1 & (a | `n & `> 0) | `!a & s K<eep>  M<erge> Remove}
-{n v1 & (a | `n & `> 0) | `!a & (== v1 Vertex & `p | `pp)}
+{n v1 & (a | `n & `> 0) | `!a & (== v1 Vertices & `p | `pp)}
 {(n v1 | == v1 Block) & `a | == v1 Ellipse & (a = 1 | `n & `> 0 & `<= 1)
     | `!a & (== v1 {[CP]\w+} & `n & `> 0 | `p)}
 {(n v1 | == v1 {[BE]\w+} ) & `a | == v1 {[CP]\w+} & (a = 0 | `n & `>= 0)
@@ -168,8 +168,8 @@ Tunnelling example:
 
 <VAR>IntfAttr    {{r4/6 c0 Ohmic 0 0 0 10000000} {r5/8 c1 Ohmic 0 0 0 10000000}
     {r0/1 1e+12 100000} {r4/7 0 10000000} {r5/7 0 10000000} {r1/2 0 430} {r3/2 0
-    430}} {{r4/6 c0 Ohmic 0 0 0 10000000} {r5/8 c1 Ohmic 0 0 0 10000000} {r0/1 0
-    1000} {r4/7 0 10000000} {r5/7 0 10000000} {r1/2 0 430} {r3/2 0 430}}
+    430}} {{r4/6 c0 Ohmic 0 0 0 10000000} {r5/8 c1 Ohmic 0 0 0 10000000} {r4/7 0
+    10000000} {r5/7 0 10000000} {r1/2 0 430} {r3/2 0 430}}
 
 <COMMENT>--- Optical generation attributes variable
 Specify four types of optical solver E(External), O(OBAM), T(TMM), R(Raytrace).

@@ -575,7 +575,7 @@ proc mfjProc::override {VarName VarVal} {
             set IdxLst [string map {-0 end - end-} $IdxLst]
             set IdxLen [llength $IdxLst]
 
-            # Convert a value string to a value list
+            # Convert a comma-seperated string to a value list
             set ValLst [lrange [string map {, " "} $ValStr] 0 end]
             set ValLen [llength $ValLst]
 
