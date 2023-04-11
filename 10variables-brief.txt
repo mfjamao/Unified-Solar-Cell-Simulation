@@ -5,10 +5,9 @@ RegGen      {{iaSi 0.003 50} {Silicon 165 50} {iaSi 0.003 50} {paSi 0.005 45}
 
 FldAttr     {{r2 P 1.56e+15} {r4 B 1.41e+19} {r5 P 1.45e+19}}
 
-IntfAttr    {{r4/6 c0 Ohmic 0 0 0 10000000} {r5/8 c1 Ohmic 0 0 0 10000000} {r0/1
-    1e+12 100000} {r4/7 0 10000000} {r5/7 0 10000000} {r1/2 0 430} {r3/2 0 430}}
-    {{r4/6 c0 Ohmic 0 0 0 10000000} {r5/8 c1 Ohmic 0 0 0 10000000} {r4/7 0
-    10000000} {r5/7 0 10000000} {r1/2 0 430} {r3/2 0 430}}
+IntfAttr    {{r4/6 c0 Ohmic 0 0 0 1e7} {r5/8 c1 Ohmic 0 0 0 1e7} {r0/1 1e+12
+    100000} {r4,5/7 0 10000000} {r1,3/2 0 430}} {{r4/6 c0 Ohmic 0 0 0 1e7}
+    {r5/8 c1 Ohmic 0 0 0 1e7} {r0/1 0} {r4,5/7 0 10000000} {r1,3/2 0 430}}
 
 GopAttr     {{r0/1 External 02opt/Kaneka_1DGop_Spectral.plx} {Spectrum
     02opt/am15g_IEC60904-3-2008.txt 0.3 1.2 0.01} {Monochromatic 0.3 0.001}}

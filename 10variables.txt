@@ -158,8 +158,8 @@ Tunnelling example:
 {n v1 & (a | n & `> 0 | `f) | == v1 {c\d} & (a = Ohmic | s S<chottky>
     E<qOhmic> Cu<rrent> Ch<arge> Ohmic) | `!a & `f}
 {n v1 & (a | `n & `> 0) | == v1 {c\d} & (a = 0 | `n) | `!a & `n & `> 0}
-{n v1 & f v2 & (a | `n & `> 0) | (n v1 & n v2 | == v2 {C\w+} )
-    & `a | == v1 {c\d} & (a = 0 | `n) | == v1 {[ceh]T} & (a = 0 | `n & `>= 0)
+{n v1 & f v2 & (a | `n & `> 0) | (n v1 | == v2 {C\w+} ) & `a
+    | == v1 {c\d} & (a = 0 | `n) | == v1 {[ceh]T} & (a = 0 | `n & `>= 0)
     | == v1 TAT & `!a & `n & `> 0}
 {(n v1 | == v2 {C\w+} ) & `a | == v1 {c\d} & (a = 0 | `n) | == v1 TAT
     & `!a & `s c e h | a = None | s F<ull> S<imple> U<psideDown> None}
@@ -168,8 +168,8 @@ Tunnelling example:
 
 <VAR>IntfAttr    {{r4/6 c0 Ohmic 0 0 0 10000000} {r5/8 c1 Ohmic 0 0 0 10000000}
     {r0/1 1e+12 100000} {r4/7 0 10000000} {r5/7 0 10000000} {r1/2 0 430} {r3/2 0
-    430}} {{r4/6 c0 Ohmic 0 0 0 10000000} {r5/8 c1 Ohmic 0 0 0 10000000} {r4/7 0
-    10000000} {r5/7 0 10000000} {r1/2 0 430} {r3/2 0 430}}
+    430}} {{r4/6 c0 Ohmic 0 0 0 10000000} {r5/8 c1 Ohmic 0 0 0 10000000} {r0/1
+    0} {r4/7 0 10000000} {r5/7 0 10000000} {r1/2 0 430} {r3/2 0 430}}
 
 <COMMENT>--- Optical generation attributes variable
 Specify four types of optical solver E(External), O(OBAM), T(TMM), R(Raytrace).
