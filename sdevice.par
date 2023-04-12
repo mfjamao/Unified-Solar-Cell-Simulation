@@ -21,7 +21,8 @@ if {!$OptOnly} {
             foreach grp $IntfSRH {
                 if {"r$i/$j" ne [lindex $grp 0]
                     && "r$j/$i" ne [lindex $grp 0]} continue
-                if {[string is double -strict [lindex $grp 2]]} {
+                if {[string is double -strict [lindex $grp 2]]
+                    && [lindex $grp 2] > 0} {
                     set flg true
                     if {[string is double -strict [lindex $grp 3]]} {
                         set str "[lindex $grp 2], [lindex $grp 3]"
@@ -31,7 +32,8 @@ if {!$OptOnly} {
                 } else {
 
                     # Element 2 is a trap file
-                    if {[string is double -strict [lindex $grp 3]]} {
+                    if {[string is double -strict [lindex $grp 3]]
+                        && [lindex $grp 3] > 0} {
                         set flg true
                         if {[string is double -strict [lindex $grp 4]]} {
                             set str "[lindex $grp 3], [lindex $grp 4]"

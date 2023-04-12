@@ -1370,8 +1370,9 @@ if {!$OptOnly} {
         vputs -n -i-3 "
                 )"
 
-        if {[string is double -strict [lindex $grp 2]]
-            || [string is double -strict [lindex $grp 3]]} {
+        if {([string is double -strict [lindex $grp 2]] && [lindex $grp 2] > 0)
+            || ([string is double -strict [lindex $grp 3]]
+            && [lindex $grp 3] > 0)} {
             vputs -n -i-3 "
                 Recombination (SurfaceSRH)"
         }

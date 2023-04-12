@@ -1,27 +1,22 @@
 SimEnv      {Sentaurus T-2022.03 !Cylindrical !OptOnly 25 64 Local}
 
-RegGen      {{iaSi 0.003 50} {Silicon 165 50} {iaSi 0.003 50} {paSi 0.005 45}
-    {naSi 5} {Gas 0.1 44.5} {Gas 1} {Gas 4.5}}
+RegGen      {gas 0.1 10 gas 790 silicon 170 800 gas 0.1 10 gas 790}
 
-FldAttr     {{r2 P 1.56e+15} {r4 B 1.41e+19} {r5 P 1.45e+19}}
+FldAttr     {r3 b 1e15 p0.1_800/0.1_0 03exp/MinP74.plx r4/3 03exp/MinAl+B.plx}
 
-IntfAttr    {{r4/6 c0 Ohmic 0 0 0 1e7} {r5/8 c1 Ohmic 0 0 0 1e7} {r0/1 1e+12
-    100000} {r4,5/7 0 10000000} {r1,3/2 0 430}} {{r4/6 c0 Ohmic 0 0 0 1e7}
-    {r5/8 c1 Ohmic 0 0 0 1e7} {r0/1 0} {r4,5/7 0 10000000} {r1,3/2 0 430}}
+IntfAttr    {r4/3 c0 r1/3 c1 r2/3 4e12 0 r5/3 -4e12 3e3}
 
-GopAttr     {{r0/1 External 02opt/Kaneka_1DGop_Spectral.plx} {Spectrum
-    02opt/am15g_IEC60904-3-2008.txt 0.3 1.2 0.01} {Monochromatic 0.3 0.001}}
+GopAttr     {{p0.1_800/0.1_0 e 02opt/PERC_170um_1DSpectralGop.plx} {Spectrum
+    02opt/am0_IEC60904-3-2008.txt 0.3 1.2 0.01}}
 
 MeshAttr    {10 0.05 8 0.001 8 1.5 0.001 1.1}
 
-ModPar      {{r2 01mdb/Silicon.par SRH 0.0088} {r1 01mdb/iaSi.par SRH 1.28e-11
-    1.28e-12} {r3 01mdb/iaSi.par SRH 1.28e-11 1.28e-12} {r4 01mdb/paSi.par SRH
-    7.13e-14 3.23e-13} {r5 01mdb/naSi.par SRH 3.93e-13 6.03e-14}}
+ModPar      {r3 01mdb/silicon.par srh 03exp/e1MeV_1e12_D.txt 1.43e-4 @-1*10}
 
-VarVary     {{SpecScaling 0.3 0} {MonoScaling 1 1} {Wavelength 1.2 90}
-    {MonoScaling 0 0} {SpecScaling 1 0} {c0 0.8 160}}
+VarVary     {{SpecScaling 1 0} {c0 0.8 80}}
 
-GetFld      {{p5_0/160_50 Average Dn}}
+GetFld      {}
 
-PPAttr      {{v2 QE} {v5 JV}}
+PPAttr      {{v1 JV}}
+
 
