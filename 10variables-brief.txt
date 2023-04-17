@@ -1,22 +1,35 @@
-SimEnv      {Sentaurus T-2022.03 !Cylindrical !OptOnly 25 64 Local}
+SimEnv      {Sentaurus T-2022.03 !Cylindrical !OptOnly 25 64 }
 
-RegGen      {gas 0.1 10 gas 790 silicon 170 800 gas 0.1 10 gas 790}
+RegGen      {{Gas 0.1 30} {Gas 470} {silicon 170 500}}
 
-FldAttr     {r3 b 1e15 p0.1_800/0.1_0 03exp/MinP74.plx r4/3 03exp/MinAl+B.plx}
+FldAttr     {{r3 B 1e15} {p0.1_500/0.1_0 03exp/p65.plx} {r4/3 03exp/albsf.plx}}
 
-IntfAttr    {r4/3 c0 r1/3 c1 r2/3 4e12 0 r5/3 -4e12 3e3}
+IntfAttr    {{r1/3 c0} {r4/3 c1} {r2/3 1e12 1e5}}
 
-GopAttr     {{p0.1_800/0.1_0 e 02opt/PERC_170um_1DSpectralGop.plx} {Spectrum
-    02opt/am0_IEC60904-3-2008.txt 0.3 1.2 0.01}}
+GopAttr     {{p0.1_500/0.1_0 external 02opt/PERC_170um_1DSpectralGop.plx}
+    {spectrum 02opt/am0_IEC60904-3-2008.txt 0.3 1.2 0.01}}
 
 MeshAttr    {10 0.05 8 0.001 8 1.5 0.001 1.1}
 
-ModPar      {r3 01mdb/silicon.par srh 03exp/e1MeV_1e12_D.txt 1.43e-4 @-1*10}
+ModPar      {{r3 01mdb/silicon.par srh 03exp/2016Hamache_donorB/e1MeV_1e12_D.txt !}}
+    0/3=03exp/2016Hamache_donorB/e1MeV_1e13_D.txt
+    0/3=03exp/2016Hamache_donorB/e1MeV_1e14_D.txt
+    0/3=03exp/2016Hamache_donorB/e1MeV_1e15_D.txt
+    0/3=03exp/2016Hamache_donorB/e1MeV_1e16_D.txt
+    0/3=03exp/2016Hamache_donorB/e1MeV_2e16_D.txt
+    0/3=03exp/2016Hamache_donorB/e1MeV_3e16_D.txt
+    0/3=03exp/2016Hamache_donorB/e1MeV_4e16_D.txt
+    0/3=03exp/2016Hamache_donorB/e1MeV_5e16_D.txt
+    0/3=03exp/2016Hamache_donorB/e1MeV_6e16_D.txt
+    0/3=03exp/2016Hamache_donorB/e1MeV_7e16_D.txt
+    0/3=03exp/2016Hamache_donorB/e1MeV_8e16_D.txt
+    0/3=03exp/2016Hamache_donorB/e1MeV_9e16_D.txt
+    0/3=03exp/2016Hamache_donorB/e1MeV_1e17_D.txt
 
-VarVary     {{SpecScaling 1 0} {c0 0.8 80}}
+VarVary     {{specscaling 1 20}}
 
-GetFld      {}
+GetFld      {{p80_250 p n}}
 
-PPAttr      {{v1 JV}}
+PPAttr      {{v0 sunsjsc}}
 
 

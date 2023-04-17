@@ -71,11 +71,18 @@ vputs [wrapText "'ModPar': \{$ModPar\}" "* "]
 set VV2Fld [list]
 set SS2Fld [list]
 foreach grp [str2List "" $GetFld] {
-    if {[string is integer -strict [lindex $grp 1]]
-        || ![regexp {^(Ave|Int|Max|Lea)\w+$} [lindex $grp 1]]} {
-        lappend SS2Fld $grp
+    if {[regexp {^p[^/]+} [lindex $grp 0]]} {
+        if {[string is integer -strict [lindex $grp 1]]} {
+            lappend SS2Fld $grp
+        } else {
+            lappend VV2Fld $grp
+        }
     } else {
-        lappend VV2Fld $grp
+        if {[regexp {^(Ave|Int|Max|Lea)\w+$} [lindex $grp 1]]} {
+            lappend VV2Fld $grp
+        } else {
+            lappend SS2Fld $grp
+        }
     }
 }
 
@@ -269,7 +276,7 @@ foreach grp $IntfCon {
         if {[lindex $grp 4] > 0} {
             vputs -n -c " DistResist= [lindex $grp 4]"
         }
-        if {[lindex $grp 5] != 0} {
+        if {[lindex $grp 2] eq "Schottky"} {
             vputs -n -c " Barrier= [lindex $grp 5]"
         }
         if {[llength $grp] == 7} {

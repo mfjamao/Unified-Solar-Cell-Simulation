@@ -925,7 +925,7 @@ proc mfjProc::readTT {TTArr TTFile} {
                 if {[regexp {^"(\w+)"$} $Line -> Arr(ID)]} {
                     if {[regexp {^PMIUserField\d+$} $Arr(ID)]} {
                         set Arr(FTrap) .mfj/[file rootname [file tail\
-                            $TTFile]]-[clock second].plx
+                            $TTFile]]-[expr rand()].plx
                         set Ouf [open $Arr(FTrap) w]
                         puts $Ouf \"$Arr(ID)\"
                     }
@@ -3028,13 +3028,13 @@ proc mfjProc::gVar2DOESum {GVarArr TrialNode {FDOESum ""}} {
     # Set the file lock for exclusive access to $FDOESum
     vputs -i2 "Set a file lock for exclusive access to $FDOESum"
     close [open .mfj/DOESum.lock w]
-    set IOf [open $FDOESum r+]
+    set Inf [open $FDOESum r]
     set Lines [list]
     set IdxLst [list]
     set CmntCnt 0
     upvar 1 $GVarArr Arr
     set KeyLst [lsort [array names Arr]]
-    while {[gets $IOf Line] != -1} {
+    while {[gets $Inf Line] != -1} {
         if {[string index $Line 0] eq "#"} {
             incr CmntCnt
             lappend Lines $Line
@@ -3068,6 +3068,7 @@ proc mfjProc::gVar2DOESum {GVarArr TrialNode {FDOESum ""}} {
             }
         }
     }
+    close $Inf
 
     # Append new lines for extracted variables
     if {[llength $IdxLst] < [llength $KeyLst]} {
@@ -3095,9 +3096,9 @@ proc mfjProc::gVar2DOESum {GVarArr TrialNode {FDOESum ""}} {
     }
 
     # Set the point to the beginning
-    seek $IOf 0
-    puts $IOf [join $Lines \n]
-    close $IOf
+    set Ouf [open $FDOESum w]
+    puts $Ouf [join $Lines \n]
+    close $Ouf
 
     # Have to remove the file lock to release $FDOESum
     vputs -i2 "Remove the file lock to release access to $FDOESum"

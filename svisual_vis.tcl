@@ -1568,6 +1568,7 @@ foreach pp $PPAttr {
     foreach grp $RegGen {
         set mat [lindex $grp 0 0]
         set reg [lindex $grp 0 1]
+        set idx [lindex $grp 0 end]
         if {[lindex $grp 0 2] ne "Semiconductor"} continue
         if {$mat eq "Silicon" || [regexp \\\{r[lindex $grp 0\
             end]\[^\\\}\]+Aug $ModPar]} {
@@ -1595,7 +1596,17 @@ foreach pp $PPAttr {
         create_curve -name ${pp0}_0|SRH_$reg -function\
             "1e3*$q*<${pp0}_RSRH_$reg>/$intArea"
         remove_curves ${pp0}_RSRH_$reg
-        if {[regexp \\\{$reg $RegIntfTrap]} {
+        set flg false
+        foreach lst $ModPar {vputs $lst
+            if {[lindex $lst 0] eq "r$idx"
+                && [regexp {\{SRH\s+(\S+)} $lst -> str]} {vputs $str
+                if {[file isfile $str]} {
+                    set flg true
+                    break
+                }
+            }
+        }
+        if {[regexp \\\{r$idx $RegIntfTrap] || $flg} {
             create_curve -name ${pp0}_RTrap_$reg -dataset Data_$pp0\
                 -axisX $xVar -axisY "Integr$reg eGapStatesRecombination"
             vputs -i3 Trap_$reg

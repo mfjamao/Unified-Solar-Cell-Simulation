@@ -103,8 +103,7 @@ Examples:
     & `<= 1) | a | `p}
 {(n v1 | == v1 {[BCEP]\w+} ) & `a | a | `p} ...
 
-<VAR>RegGen      {{Gas 0.1 10} {Gas 790} {Silicon 170 800} {Gas 0.1 10} {Gas
-    790}}
+<VAR>RegGen      {{Gas 0.1 30} {Gas 470} {Silicon 170 500}}
 
 <COMMENT>--- Region and interface fields variable
 Suppose i,j,k are region indices, regions can be referred as follows:
@@ -125,8 +124,8 @@ Example:
     & `<= 1 | `f}
 ...
 
-<VAR>FldAttr     {{r3 B 1e+15} {p0.1_800/0.1_0 03exp/MinP74.plx} {r4/3
-    03exp/MinAl+B.plx}}
+<VAR>FldAttr     {{r3 B 1e+15} {p0.1_500/0.1_0 03exp/P65.plx} {r4/3
+    03exp/AlBSF.plx}}
 
 <COMMENT>--- Interface attributes variable
 Specify three types of region interfaces - SRH, metal contact and tunnelling
@@ -167,8 +166,8 @@ Tunnelling example:
 {(n v1 | == v2 {C\w+} ) & `a | == v1 {c\d} & (a = 1e7 | `n | `> 0) | a}
 {(n v1 | == v2 {C\w+} ) & `a | == v1 {c\d} & (a | `n | `> 0) | a}
 
-<VAR>IntfAttr    {{r4/3 c0 Ohmic 0 0 0 1e7} {r1/3 c1 Ohmic 0 0 0 1e7} {r2/3
-    4e+12 0} {r5/3 -4e+12 3000}}
+<VAR>IntfAttr    {{r1/3 c0 Ohmic 0 0 0 1e7} {r4/3 c1 Ohmic 0 0 0 1e7} {r2/3
+    1e+12 100000}}
 
 <COMMENT>--- Optical generation attributes variable
 Specify four types of optical solver E(External), O(OBAM), T(TMM), R(Raytrace).
@@ -246,8 +245,8 @@ Incidence example:
     | `a}
 ...
 
-<VAR>GopAttr     {{p0.1_800/0.1_0 External 02opt/PERC_170um_1DSpectralGop.plx}
-    {Spectrum 02opt/am15g_IEC60904-3-2008.txt 0.3 1.2 0.01}}
+<VAR>GopAttr     {{p0.1_500/0.1_0 External 02opt/PERC_170um_1DSpectralGop.plx}
+    {Spectrum 02opt/am0_IEC60904-3-2008.txt 0.3 1.2 0.01}}
 
 <COMMENT>--- Mesh attributes variable
 Mesh example:
@@ -318,8 +317,21 @@ SRH example:
         DC mt mu BGN SRH Aug Rad)}
 ...
 
-<VAR>ModPar      {{r3 01mdb/Silicon.par SRH 03exp/e1MeV_1e12_D.txt 0.000143
-    0.00143}}
+<VAR>ModPar      {{r3 01mdb/Silicon.par SRH
+    03exp/2016Hamache_DonorA/e1MeV_1e12_D.txt !}} {{r3 01mdb/Silicon.par SRH
+    03exp/2016Hamache_DonorA/e1MeV_1e13_D.txt !}} {{r3 01mdb/Silicon.par SRH
+    03exp/2016Hamache_DonorA/e1MeV_1e14_D.txt !}} {{r3 01mdb/Silicon.par SRH
+    03exp/2016Hamache_DonorA/e1MeV_1e15_D.txt !}} {{r3 01mdb/Silicon.par SRH
+    03exp/2016Hamache_DonorA/e1MeV_1e16_D.txt !}} {{r3 01mdb/Silicon.par SRH
+    03exp/2016Hamache_DonorA/e1MeV_2e16_D.txt !}} {{r3 01mdb/Silicon.par SRH
+    03exp/2016Hamache_DonorA/e1MeV_3e16_D.txt !}} {{r3 01mdb/Silicon.par SRH
+    03exp/2016Hamache_DonorA/e1MeV_4e16_D.txt !}} {{r3 01mdb/Silicon.par SRH
+    03exp/2016Hamache_DonorA/e1MeV_5e16_D.txt !}} {{r3 01mdb/Silicon.par SRH
+    03exp/2016Hamache_DonorA/e1MeV_6e16_D.txt !}} {{r3 01mdb/Silicon.par SRH
+    03exp/2016Hamache_DonorA/e1MeV_7e16_D.txt !}} {{r3 01mdb/Silicon.par SRH
+    03exp/2016Hamache_DonorA/e1MeV_8e16_D.txt !}} {{r3 01mdb/Silicon.par SRH
+    03exp/2016Hamache_DonorA/e1MeV_9e16_D.txt !}} {{r3 01mdb/Silicon.par SRH
+    03exp/2016Hamache_DonorA/e1MeV_1e17_D.txt !}}
 
 <COMMENT>--- Variable vary settings
 Specify the following variables for varying - c# contact property (IntfAttr),
@@ -363,7 +375,7 @@ Other variables for varying (sdevice --parameter-names):
 {== v1 {[CFV]\w+} & `a | a | `n & `< v1}
 ...
 
-<VAR>VarVary     {{SpecScaling 1 0} {c0 0.8 80}}
+<VAR>VarVary     {{SpecScaling 1 20}}
 
 <COMMENT>--- Extract field during variable varying and from snapshots
 Specify a point pX_Y_Z [um] for extracting 1D structural fields from saved
@@ -438,7 +450,7 @@ Field integration example:
     mue muh}
 ...
 
-<VAR>GetFld      {}
+<VAR>GetFld      {{p80_250 p n}}
 
 <TOOL>ST settings: Tool_label = svisual Tool_name = svisual
 
@@ -449,7 +461,7 @@ Extract data from 'VarVary', prepare XY plots and make further analysis
 {a | `s CV JV QE SunsVoc SunsJsc QSSPC RAT}
 {== v-1 QSSPC & (a = 1e15 | `n & `> 0) | `a}
 
-<VAR>PPAttr      {{v1 JV}}
+<VAR>PPAttr      {{v0 SunsJsc}}
 
 <TAIL>--- No variables afterwards
 Put down any notes
