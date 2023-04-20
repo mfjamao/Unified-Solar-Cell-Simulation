@@ -1599,11 +1599,10 @@ foreach pp $PPAttr {
         set flg false
         foreach lst $ModPar {vputs $lst
             if {[lindex $lst 0] eq "r$idx"
-                && [regexp {\{SRH\s+(\S+)} $lst -> str]} {vputs $str
-                if {[file isfile $str]} {
-                    set flg true
-                    break
-                }
+                && [regexp {\{SRH\s+(\S+)} $lst -> str]
+                && [file isfile $str]} {
+                set flg true
+                break
             }
         }
         if {[regexp \\\{r$idx $RegIntfTrap] || $flg} {

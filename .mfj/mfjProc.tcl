@@ -3019,6 +3019,10 @@ proc mfjProc::gVar2DOESum {GVarArr TrialNode {FDOESum ""}} {
         error "'$TrialNode' should be a positive integer or zero!"
     }
     vputs -i1 "\nUpdating '$FDOESum' with gVars for trial node '$TrialNode'..."
+    
+    # Delay a random time to avoid multiple processes accessing the fDOESum
+    # at the same time
+    after [expr int(1e3*rand())]
 
     # No read and write of $FDOESum until the file lock is removed
     while {[file exists .mfj/DOESum.lock]} {
