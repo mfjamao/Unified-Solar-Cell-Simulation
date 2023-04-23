@@ -119,10 +119,11 @@ foreach Elm $mfjModTime {
     lappend FLst [lindex $Elm 0]
 }
 set FBrf [file rootname $SimArr(FVarRaw)]-brief.txt
-set FLst [concat $FLst $SimArr(FVarRaw) $FBrf 11ctrlsim.tcl $SimArr(FSave)\
-    gtooldb.tcl [glob -nocomplain -directory $::SimArr(OutDir) *.csv *.plx]\
+set FLst [concat $FLst $SimArr(FVarRaw) $FBrf 11ctrlsim.tcl 11ctrlsim.mfj\
+    $SimArr(FSave)  $SimArr(FLoad) README.md gtooldb.tcl\
+    [glob -nocomplain -directory $::SimArr(OutDir) *.csv *.plx]\
     [glob -nocomplain -directory $::SimArr(PMIDir) {*.[cC]} *.so.*]\
-    [glob -nocomplain *.out *.mfj] $SimArr(FLoad) README.md]
+    [glob -nocomplain *.out v*.plt]]
 foreach Elm [glob -nocomplain .mfj/*.tcl] {
     lappend FLst $Elm
 }

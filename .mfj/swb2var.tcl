@@ -8,7 +8,7 @@ if {![file isfile 11ctrlsim.tcl]} {
     set Str [read $Inf]
     close $Inf
     if {[regexp {array set SimArr \{(.+)\};\#} $Str -> Tmp]} {
-        array set SimArr $Tmp
+        array set SimArr [regsub -all {\s+} $tmp " "]
     } else {
         error "'SimArr' not found in '11ctrlsim.tcl'!"
     }
