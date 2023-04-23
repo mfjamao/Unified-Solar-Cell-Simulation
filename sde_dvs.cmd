@@ -306,8 +306,21 @@ foreach grp $IntfCon {
     }
 }
 
+# Check whether 'AbsorbedPhotonDensity' is found in 'FldAttr', or more
+# precisely, 'RegFld' and 'RegIntfFld' and set 'LoadTDR'
+set LoadTDR false
+if {[regexp {\{AbsorbedPhotonDensity\s} $RegFld]
+    || [regexp {\{AbsorbedPhotonDensity\s} $RegIntfFld]} {
+    set LoadTDR true
+}
+
+# Disable LoadTDR for optical only simulation
+if {$OptOnly} {
+    set LoadTDR false
+}
+
 # Check whether 'GopAttr' lacks an optical solver
-if {[llength $GopAttr]
+if {!$LoadTDR && [llength $GopAttr]
     && ![regexp {\s(OBAM|TMM|Raytrace|External)(\s|\})} $GopAttr]} {
     error "no optical solver specified!"
 }
@@ -352,15 +365,15 @@ foreach grp $GopAttr {
 
 # 'LPD' for raytrace should be 1 in optical only simulation
 if {$OptOnly} {
-    if {[info exists LPD]} {
+    if {$LPD == 0} {
+        error "no optical solver specified!"
+    } else {
         if {[regexp {\sExternal\s} $GopAttr]} {
             error "no 'External' solver for optical only simulation!"
         }
         if {[regexp {\sRaytrace\s} $GopAttr] && $LPD == -1} {
             error "light propagation direction not '+X' for raytrace!"
         }
-    } else {
-        error "no optical solver specified!"
     }
 }
 

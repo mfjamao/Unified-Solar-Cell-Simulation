@@ -5,16 +5,9 @@
 
 # Check 'VarVary' for optical requirement
 set VarVary [str2List "" $VarVary]
-if {[regexp {\{(Mono|Spec)Scaling\s} $VarVary] && $LPD == 0} {
+if {([regexp {\{MonoScaling\s} $VarVary] && $LPD == 0)
+    || ([regexp {\{SpecScaling\s} $VarVary] && !$LoadTDR && $LPD == 0)} {
     error "no optical solver in 'GopAttr' for varying optics in 'VarVary'!"
-}
-
-# Check whether 'AbsorbedPhotonDensity' is found in 'FldAttr', or more
-# precisely, 'RegFld' and 'RegIntfFld' and set 'LoadTDR'
-set LoadTDR false
-if {[regexp {\{AbsorbedPhotonDensity\s} $RegFld]
-    || [regexp {\{AbsorbedPhotonDensity\s} $RegIntfFld]} {
-    set LoadTDR true
 }
 
 # Check whether the spectrum file is missing in 'GopAttr' if required
@@ -1087,9 +1080,11 @@ if {[regexp {\{(Mono|Spec)Scaling\s} $VarVary]} {
                 CarrierDep (imag)"
         }
         vputs -n -i-1 "
-            )
-        ) * end of Optics"
+            )"
     }
+
+    vputs -n -i-1 "
+        ) * end of Optics"
 }
 vputs -i-1 "
     \} * end of global physics"
@@ -1632,9 +1627,9 @@ foreach grp $VarVary {
             set arr([lindex $grp 0]) [lindex $grp 1]
             if {[lindex $grp 2]} {
                 if {$val == 0} {
-                    set txt "[expr 1e-4/[lindex $grp 1]] 1"
+                    set txt "[expr 1e-6/[lindex $grp 1]] 1"
                 } elseif {[lindex $grp 1] == 0} {
-                    set txt "0 [expr ($val-1e-4)/$val]"
+                    set txt "0 [expr ($val-1e-6)/$val]"
                 } else {
                     set txt "0 1"
                 }
@@ -1662,7 +1657,7 @@ foreach grp $VarVary {
                 if {[regexp {\s(OBAM|TMM|Raytrace)(\s|\})} $GopAttr]} {
                     set txt\
                         $tmp/ComputeFromSpectrum/Scaling
-                } elseif {[regexp {\sExternal\s} $GopAttr]} {
+                } else {
                     if {$LoadTDR} {
                         set txt\
                             $tmp/ReadFromFile/Scaling
