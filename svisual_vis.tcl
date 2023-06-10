@@ -1766,4 +1766,4 @@ foreach pp $PPAttr {
 
 # Update the file 'SimArr(OutDir)/SimArr(FDOESum)'
 gVar2DOESum gVarArr @node@
-vputs "\nDone!"
+vputs "\nProcessing time = [expr [clock seconds] - $tm] s\n"

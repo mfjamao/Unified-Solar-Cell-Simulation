@@ -1217,8 +1217,10 @@ foreach var {RegGen RegApp1 RegApp2 RegFld IntfFld RegIntfFld RegIntfTrap
                     (mfj:display "Refinement for interface attributes...\n")
                 )
             )
-            (if (not (or (member (list Reg1 Reg2) Lst)
-                (member (list Reg2 Reg1) Lst)))
+            
+            ;# Skip interface refinement for 3D to reduce mesh points
+            (if (and (not (or (member (list Reg1 Reg2) Lst)
+                (member (list Reg2 Reg1) Lst))) (< Dim 3))
                 (begin
                     (if (string=? Grp1 "Semiconductor")
                         (begin

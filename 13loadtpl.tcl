@@ -159,7 +159,7 @@ if {[file isfile $FStr]} {
                 set TgtArr($Elm) $Val
             }
             if {[regexp $Elm\\s+\\\{(\[^\\\}\]+)\\\} $Txt -> Val]} {
-                set ElmArr($Elm) $Val
+                set SrcArr($Elm) $Val
             }
 
             # Preserve the settings in the target 11ctrlsim.tcl
