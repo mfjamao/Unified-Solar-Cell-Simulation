@@ -1409,7 +1409,7 @@ Math {
     !(
 
     vputs -n -i-1 "
-        TrapDLN= [lindex $mfjDfltSet 7]
+        TrapDLN= [lindex $mfjDfltSet 6]
         Traps (Damping= 100) * Default: 10
         Number_of_Threads= [lindex $mfjDfltSet end-4]
         StackSize= 20000000 * Set stacksze as 20 MB
@@ -1565,7 +1565,7 @@ foreach grp $VarVary {
                             /([lindex $grp 1]-[lindex $val 1])]
                     }
                     set lst [lsort -real $lst]
-                    append str "\n[string repeat $mfjProc::arr(Tab) 8]Plot\
+                    append str "\n[string repeat $mfjProc::arr(Tab) 6]Plot\
                         (FilePrefix= \"$SimArr(EtcDir)/n@node@_v$idx\"\
                         Time= ([join $lst \;]) noOverwrite)"
                 } else {

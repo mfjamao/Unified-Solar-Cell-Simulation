@@ -74,7 +74,7 @@ if {[string index [lindex $SimEnv 3] 0] eq "!"} {
 }
 
 # Extract simulation max size (Dummy layers are ignored)
-# Extract the number of regions excluding dummy layers 'RegLen'
+# Extract the number of regions 'RegLen'
 set RegLen [llength $RegGen]
 if {$OptOnly} {
 
@@ -95,14 +95,11 @@ if {$OptOnly} {
         set XMax [lindex $RegGen end 1]
         set YMax [format %g [lindex $mfjDfltSet 0]]
         set ZMax 0
-        incr RegLen -1
     } elseif {$Dim == 2} {
         if {$Cylind} {
             set XMax [lindex $RegGen end-1 1 0]
-            incr RegLen -2
         } else {
             set XMax [lindex $RegGen end-2 1 0]
-            incr RegLen -3
         }
         set YMax [lindex $RegGen end 1 1]
         set ZMax 0
@@ -110,7 +107,6 @@ if {$OptOnly} {
         set XMax [lindex $RegGen end-4 1 0]
         set YMax [lindex $RegGen end-2 1 1]
         set ZMax [lindex $RegGen end 1 2]
-        incr RegLen -5
     }
 }
 

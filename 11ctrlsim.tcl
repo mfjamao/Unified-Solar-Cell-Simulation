@@ -33,7 +33,7 @@ array set SimArr {
     MDBDir 01mdb OptDir 02opt ExpDir 03exp PMIDir 04code EtcDir 05etc
     OutDir 06out TplDir 07tpl
     DfltYMax 2.0 LatFac 0.8 GasThx 0.1 Node4All !Node4All ColMode ColMode
-    FullSchenk !FullSchenk TrapDLN 26  EdgeEx 10 IntfEx 0.001
+    FullSchenk !FullSchenk TrapDLN 100  EdgeEx 10 IntfEx 0.001
     NThread 4 BitSize {64 80 128 256} Digits {5 5 6 10}
     RhsMin {1e-10 1e-12 1e-15 1e-25} Iter {10 12 15 20}
     ModTime "" RegInfo "" RegLvl 0 RegMat "" RegIdx "" DimLen "" MatDB ""

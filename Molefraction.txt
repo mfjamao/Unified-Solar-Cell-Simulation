@@ -10,3 +10,7 @@ CZTS (x=1) = CTS
 # C(x)Z(1-x)TSe
 CZTSe (x=0) = ZTSe
 CZTSe (x=1) = CTSe
+
+# A(x)Z(1-x)TSe
+AZTSe (x=0) = ZTSe
+AZTSe (x=1) = ATSe
