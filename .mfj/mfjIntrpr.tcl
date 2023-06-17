@@ -920,11 +920,17 @@ proc mfjIntrpr::valSimVar {} {
         }
 
         # Deal with multiple levels if any
+        # Users are responsible for assigning multiple levels to 'RegGen'
         if {[regexp ^(\\w+)<mfj>$ $VarName -> Var]} {
             set LvlLen [llength $VarVal]
+            set RGLvlLen $arr(RGLvlLen)
+            if {$Var eq "RegGen"} {
+                set RGLvlLen 1
+            }
         } else {
             set Var $VarName
             set LvlLen 1
+            set RGLvlLen 1
         }
         vputs -i1 '$Var':
 
@@ -935,10 +941,6 @@ proc mfjIntrpr::valSimVar {} {
         # } else {
             # set RGLvlLen 1
         # }
-
-        # Users are responsible for assigning multiple levels to 'RegGen'
-        # Skip the dependence on the levels of 'RegGen'
-        set RGLvlLen 1
 
         # Outer loop: variable levels; Inner loop: 'RegGen' levels
         set VarMsg "variable '$Var'"
@@ -964,8 +966,12 @@ proc mfjIntrpr::valSimVar {} {
                     && $LvlLen == $RGLvlLen && $i != $j} {
                     continue
                 }
-                if {$LvlLen > 1 || $RGLvlLen > 1} {
-                    vputs -v3 -i2 "Level '[incr LvlIdx]':"
+                if {$LvlLen > 1} {
+                    if {$RGLvlLen == 1} {
+                        vputs -v3 -i2 "Level '[incr LvlIdx]':"
+                    } else {
+                        vputs -v3 -i2 "Level '[incr LvlIdx]'(RegGen level $j):"
+                    }
                 }
 
                 # Validate a variable if its format is present

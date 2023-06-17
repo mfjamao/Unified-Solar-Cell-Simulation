@@ -1676,7 +1676,7 @@ proc mfjProc::valSplit {VarName VarVal GrpID LvlIdx LvlLen} {
                             # Make sure each point is within simulation domain
                             if {$Elm < $Min || $Elm > $Max} {
                                 error "element 'p$Str' of $VarMsg beyond\
-                                    simulation domain!"
+                                    simulation domain($Min $Max)!"
                             }
 
                             # Format each number to the proper form such as
@@ -1732,8 +1732,8 @@ proc mfjProc::valSplit {VarName VarVal GrpID LvlIdx LvlLen} {
                                 lset PPLst 1 $Idx [lindex $Tmp 1]
                                 if {[lindex $Tmp 0] < $Min
                                     || [lindex $Tmp 1] > $Max} {
-                                    error "element 'p$Str' of $VarMsg beyond\
-                                        simulation domain!"
+                                    error "($Tmp) in element 'p$Str' of $VarMsg\
+                                        beyond domain($Min $Max)!"
                                 }
                             }
                             incr Idx
