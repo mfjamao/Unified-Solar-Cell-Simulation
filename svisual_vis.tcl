@@ -1388,6 +1388,47 @@ foreach pp $PPAttr {
             }
         }
 
+        foreach grp $VV2Fld {
+        
+            # Skip point
+            if {[regexp {^p[^/]+$} [lindex $grp 0]]} continue
+            
+            # Skip regions and region interfaces
+            if {[string index [lindex $grp 0] 0] eq "r"} continue
+            foreach lst [lrange $grp 1 end] {
+                if {[lindex $lst 0] ne "Integrate"} continue
+                vputs -i2 "Plot lifetime curves of [lindex $grp 0]"
+                foreach elm [lrange $lst 1 end] {
+                    set val [lindex [split $mfjProc::tabArr($elm) |] 0]
+                    
+                    # Skip integration of non recombination fields
+                    if {![regexp {Recombination$} $val]} continue
+                    vputs -i3 $val
+                    if {$Dim == 1} {
+                        set str [string map {p (( / ,0),(}\
+                            [lindex $grp 0]],$YMax))
+                    } else {
+                        set str [string map {p (( _ , / ),(}\
+                            [lindex $grp 0]]))
+                    }
+                    create_variable -name tau_[lindex $grp 0]_$elm\
+                        -dataset Data_$pp0\
+                        -function "<$xVar:Data_$pp0>*$vol\
+                        /<IntegrWindow$str $val:Data_$pp0>"
+                    create_curve -name ${pp0}_3|tau_[lindex $grp 0]_$elm\
+                        -dataset Data_$pp0 -axisX $xVar\
+                        -axisY tau_[lindex $grp 0]_$elm -plot Plttau_$pp0
+                    create_variable -name J0_[lindex $grp 0]_$elm\
+                        -dataset Data_$pp0\
+                        -function "<IntegrWindow$str $val:Data_$pp0>\
+                        *1e15*$q/$intArea/<Normalised_pn:Data_$pp0>"
+                    create_curve -name ${pp0}_3|J0_[lindex $grp 0]_$elm\
+                        -dataset Data_$pp0 -axisX $xVar\
+                        -axisY J0_[lindex $grp 0]_$elm -plot PltJ0_$pp0
+                }
+            }
+        }
+
         windows_style -style max
         set_plot_prop -show_grid -show_curve_markers\
             -title_font_size 28 -title $capJ0
