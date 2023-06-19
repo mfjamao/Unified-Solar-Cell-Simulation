@@ -1,35 +1,24 @@
-SimEnv      {Sentaurus T-2022.03 !Cylindrical !OptOnly 25 64 }
+SimEnv      {Sentaurus T-2022.03 !Cylindrical OptOnly 25 64 pbs}
 
-RegGen      {{Gas 0.1 30} {Gas 470} {silicon 170 500}}
+RegGen      {{Gas Pyramid Remove p5_0_0/0_0_0 5.32843178818 0 4 1} {Gas Block
+    Keep p0_0_0/5_3.76777025051_3.76777025051} {Silicon 230 3.76777025051
+    3.76777025051} {Aluminum 1 3.76777025051 3.76777025051}}
 
-FldAttr     {{r3 B 1e15} {p0.1_500/0.1_0 03exp/p65.plx} {r4/3 03exp/albsf.plx}}
+FldAttr     {{r2 P 3.227e15} {p230_3.76777025051_2.48672836534/230_0_0 03exp/IBC-B166.plx}
+    {p230_3.76777025051_3.76777025051/230_0_3.54170403548 03exp/IBC-p35.plx}}
 
-IntfAttr    {{r1/3 c0} {r4/3 c1} {r2/3 1e12 1e5}}
+IntfAttr    {}
 
-GopAttr     {{p0.1_500/0.1_0 external 02opt/PERC_170um_1DSpectralGop.plx}
-    {spectrum 02opt/am0_IEC60904-3-2008.txt 0.3 1.2 0.01}}
+GopAttr     {{r0/1 Raytrace 5000 Deterministic 1e-4 100000} {r1/2 ARC SiO2 0.084
+    01mdb/SiO2.par SiNx 0.073 01mdb/SiNx_SERIS_1.92.par} {r3/2 0.95 Phong 1}
+    {Monochromatic 0.3 0.001}} -1/3=5
 
 MeshAttr    {10 0.05 8 0.001 8 1.5 0.001 1.1}
 
-ModPar      {{r3 01mdb/silicon.par srh 03exp/2016Hamache_donorB/e1MeV_1e12_D.txt !}}
-    0/3=03exp/2016Hamache_donorB/e1MeV_1e13_D.txt
-    0/3=03exp/2016Hamache_donorB/e1MeV_1e14_D.txt
-    0/3=03exp/2016Hamache_donorB/e1MeV_1e15_D.txt
-    0/3=03exp/2016Hamache_donorB/e1MeV_1e16_D.txt
-    0/3=03exp/2016Hamache_donorB/e1MeV_2e16_D.txt
-    0/3=03exp/2016Hamache_donorB/e1MeV_3e16_D.txt
-    0/3=03exp/2016Hamache_donorB/e1MeV_4e16_D.txt
-    0/3=03exp/2016Hamache_donorB/e1MeV_5e16_D.txt
-    0/3=03exp/2016Hamache_donorB/e1MeV_6e16_D.txt
-    0/3=03exp/2016Hamache_donorB/e1MeV_7e16_D.txt
-    0/3=03exp/2016Hamache_donorB/e1MeV_8e16_D.txt
-    0/3=03exp/2016Hamache_donorB/e1MeV_9e16_D.txt
-    0/3=03exp/2016Hamache_donorB/e1MeV_1e17_D.txt
+ModPar      {{r2 01mdb/silicon.par} {r3 01mdb/Al_Palik1985.par}}
 
-VarVary     {{specscaling 1 20}}
+VarVary     {{MonoScaling 1 0} {Wavelength 1.2 90}}
 
-GetFld      {{p80_250 p n}}
+GetFld      {}
 
-PPAttr      {{v0 sunsjsc}}
-
-
+PPAttr      {{v1 RAT}}

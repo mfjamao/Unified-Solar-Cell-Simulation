@@ -33,11 +33,14 @@ set mfjProc::arr(MaxVerb) 1
 vputs -n -w ""
 
 #--- Define a few common constants
-set PI [expr 2.*asin(1.)]
+# In integer division like a/b, if a < b, a/b = 0, which is undesired.
+# So it is necessary to convert either a or b to a real number. For example,
+# 1/3 = 0; 1./3 = 0.3333333333333333; 1/3. = 0.3333333333333333
+set PI [expr 2*asin(1)]
 set mu0 [expr {4e-7*$PI}]
 set c0 2.99792458e8
 set q 1.602176634e-19
-set eps0 [expr {1./($c0*$c0*$mu0)}]
+set eps0 [expr {1/($c0*$c0*$mu0)}]
 set h 6.62607015e-34
 set hB [expr {$h/$q}]
 set k 1.380649e-23
@@ -168,7 +171,7 @@ if {!$OptOnly && [regexp \\\{p$RE_p\\s $SS2Fld]} {
                     remove_datasets TDRData_${fID}_Z[lindex $pLst 2]
                 } else {
                     if {[llength $pLst] == 1} {
-                        set yPos [expr $YMax/2]
+                        set yPos [expr $YMax/2.]
                     } else {
                         set yPos [lindex $pLst 1]
                     }
@@ -324,7 +327,7 @@ foreach pp $PPAttr {
             set xLow [lindex $xLst end]
             set xHigh [lindex $xLst 0]
         }
-        set xStep [expr ($xHigh-$xLow)/[lindex $VarVary $vIdx 2]]
+        set xStep [expr 1.*($xHigh-$xLow)/[lindex $VarVary $vIdx 2]]
         create_curve -name ${pp0}_ww -dataset Data_$pp0\
             -axisX $xVar -axisY $xVar
         vputs -i2 "Calculate illuminated photons analytically"
@@ -381,7 +384,7 @@ foreach pp $PPAttr {
                     "1e4*<${pp0}_NR>/<${pp0}_A_Inc>"
             } else {
                 create_curve -name ${pp0}_0|R -function\
-                    "<${pp0}_NR>/<${pp0}_A_Inc>"
+                    "1.*<${pp0}_NR>/<${pp0}_A_Inc>"
             }
             vputs -i2 "Calculate transmitted photons leaving at the back"
             create_curve -name ${pp0}_NT -dataset Data_$pp0\
@@ -392,7 +395,7 @@ foreach pp $PPAttr {
                     "1e4*<${pp0}_NT>/<${pp0}_A_Inc>"
             } else {
                 create_curve -name ${pp0}_1|T -function\
-                    "<${pp0}_NT>/<${pp0}_A_Inc>"
+                    "1.*<${pp0}_NT>/<${pp0}_A_Inc>"
             }
             remove_curves "${pp0}_NR ${pp0}_NT"
 
@@ -407,7 +410,7 @@ foreach pp $PPAttr {
                 create_curve -name ${pp0}_NA_$reg -dataset Data_$pp0\
                     -axisX $xVar -axisY "Integr$reg $monoAP"
                 create_curve -name ${pp0}_3|A_$reg -function\
-                    "<${pp0}_NA_$reg>/<${pp0}_A_Inc>"
+                    "1.*<${pp0}_NA_$reg>/<${pp0}_A_Inc>"
                 remove_curves ${pp0}_NA_$reg
                 if {[lindex $grp 0 2] eq "Semiconductor"} {
                     vputs -c -n ", electron-hole pairs"
@@ -415,7 +418,7 @@ foreach pp $PPAttr {
                         -dataset Data_$pp0\
                         -axisX $xVar -axisY "Integr$reg $monoOG"
                     create_curve -name ${pp0}_4|OG_$reg -function\
-                        "<${pp0}_NOG_$reg>/<${pp0}_A_Inc>"
+                        "1.*<${pp0}_NOG_$reg>/<${pp0}_A_Inc>"
                     remove_curves ${pp0}_NOG_$reg
 
                     # Skip FCA if the max value is 0
@@ -441,7 +444,7 @@ foreach pp $PPAttr {
                     set intf [lindex $RegGen [lindex $lst 0] 0 1]/[lindex\
                         $RegGen [lindex $lst 1] 0 1]
                     set idx 0
-                    while {$idx < [expr ([llength $grp]-2)/3]} {
+                    while {$idx < [expr ([llength $grp]-2.)/3]} {
                         set str [lindex $grp 0]_[lindex $grp [expr $idx*3+2]]
                         vputs -i3 "RaytraceInterfaceTMMLayerFlux\
                             A($intf).layer$idx"
@@ -453,7 +456,7 @@ foreach pp $PPAttr {
                                 "1e4*<${pp0}_N_$str>/<${pp0}_A_Inc>"
                         } else {
                             create_curve -name ${pp0}_6|$str -function\
-                                "<${pp0}_N_$str>/<${pp0}_A_Inc>"
+                                "1.*<${pp0}_N_$str>/<${pp0}_A_Inc>"
                         }
                         remove_curves ${pp0}_N_$str
                         incr idx
@@ -638,7 +641,7 @@ foreach pp $PPAttr {
                 create_curve -name ${pp0}_NA_$reg -dataset Data_$pp0\
                     -axisX $xVar -axisY "Integr$reg $monoAP"
                 create_curve -name ${pp0}_3|A_$reg -function\
-                    "<${pp0}_NA_$reg>/<${pp0}_A_Inc>"
+                    "1.*<${pp0}_NA_$reg>/<${pp0}_A_Inc>"
                 remove_curves ${pp0}_NA_$reg
                 if {[lindex $grp 0 2] eq "Semiconductor"} {
                     vputs -c -n ", electron-hole pairs"
@@ -646,7 +649,7 @@ foreach pp $PPAttr {
                         -dataset Data_$pp0\
                         -axisX $xVar -axisY "Integr$reg $monoOG"
                     create_curve -name ${pp0}_4|OG_$reg -function\
-                        "<${pp0}_NOG_$reg>/<${pp0}_A_Inc>"
+                        "1.*<${pp0}_NOG_$reg>/<${pp0}_A_Inc>"
                     remove_curves ${pp0}_NOG_$reg
 
                     # Skip FCA if the max value is 0
@@ -679,7 +682,7 @@ foreach pp $PPAttr {
                     create_curve -name ${pp0}_NA_$reg -dataset Data_$pp0\
                         -axisX $xVar -axisY "Integr$reg $monoAP"
                     create_curve -name ${pp0}_A_$reg -function\
-                        "<${pp0}_NA_$reg>/<${pp0}_A_Inc>"
+                        "1.*<${pp0}_NA_$reg>/<${pp0}_A_Inc>"
                     remove_curves ${pp0}_NA_$reg
                     if {[lindex $grp 0 2] eq "Semiconductor"} {
                         vputs -c -n ", electron-hole pairs"
@@ -687,7 +690,7 @@ foreach pp $PPAttr {
                             -dataset Data_$pp0\
                             -axisX $xVar -axisY "Integr$reg $monoOG"
                         create_curve -name ${pp0}_OG_$reg -function\
-                            "<${pp0}_NOG_$reg>/<${pp0}_A_Inc>"
+                            "1.*<${pp0}_NOG_$reg>/<${pp0}_A_Inc>"
                         remove_curves ${pp0}_NOG_$reg
 
                         # Skip FCA in nonsilicon and nonpolysi regions
@@ -761,7 +764,7 @@ foreach pp $PPAttr {
             set xLow [lindex $xLst end]
             set xHigh [lindex $xLst 0]
         }
-        set xStep [expr ($xHigh-$xLow)/[lindex $VarVary $vIdx 2]]
+        set xStep [expr 1.*($xHigh-$xLow)/[lindex $VarVary $vIdx 2]]
 
         create_plot -name PltJV_$pp0 -1d
         create_curve -name ${pp0}_IV -dataset Data_$pp0\
@@ -1030,7 +1033,7 @@ foreach pp $PPAttr {
             set xLow [lindex $xLst end]
             set xHigh [lindex $xLst 0]
         }
-        set xStep [expr ($xHigh-$xLow)/[lindex $VarVary $vIdx 2]]
+        set xStep [expr 1.*($xHigh-$xLow)/[lindex $VarVary $vIdx 2]]
 
         vputs -i2 "Creating differential Jsc curve"
         create_curve -name ${pp0}_ww -dataset Data_$pp0\
@@ -1150,14 +1153,14 @@ foreach pp $PPAttr {
                     if {[lindex $dopLst 0] == 0} {
                         set val [expr abs([lindex $dopLst 0])]
                     } else {
-                        set val [expr pow([lindex $niLst 0],2)/abs([lindex\
+                        set val [expr 1.*pow([lindex $niLst 0],2)/abs([lindex\
                             $dopLst 0])]
                     }
                 } else {
                     if {[lindex $dopLst 0] == 0} {
                         set val [expr abs([lindex $dopLst end])]
                     } else {
-                        set val [expr pow([lindex $niLst end],2)/abs([lindex\
+                        set val [expr 1.*pow([lindex $niLst end],2)/abs([lindex\
                             $dopLst 0])]
                     }
                 }
@@ -1176,7 +1179,7 @@ foreach pp $PPAttr {
                     set xVar "Dn|cm^-3 [lindex $grp 0]"
                     set xCap Dn_[lindex $grp 0]|cm^-3
                     create_variable -name Normalised_pn -dataset Data_$pp0\
-                        -function "(<$txt hDensity:Data_$pp0>\
+                        -function "1.*(<$txt hDensity:Data_$pp0>\
                         *<$txt eDensity:Data_$pp0>\
                         -pow(<$txt EffectiveIntrinsicDensity:Data_$pp0>,2))\
                         /pow(<$txt EffectiveIntrinsicDensity:Data_$pp0>,2)"
@@ -1199,7 +1202,7 @@ foreach pp $PPAttr {
             set xLow [lindex $xLst end]
             set xHigh [lindex $xLst 0]
         }
-        set xStep [expr ($xHigh-$xLow)/[lindex $VarVary $vIdx 2]]
+        set xStep [expr 1.*($xHigh-$xLow)/[lindex $VarVary $vIdx 2]]
 
         create_plot -name Plttau_$pp0 -1d
         windows_style -style max
@@ -1223,9 +1226,15 @@ foreach pp $PPAttr {
         create_plot -name PltJ0_$pp0 -1d
 
         # Extract volume of all semiconductors [cm^3]
-        set vol [expr [lindex [get_variable_data -dataset Data_$pp0\
-            "IntegrSemiconductor $ogPlt"] 1]/[lindex [get_variable_data\
-            -dataset Data_$pp0 "AveSemiconductor $ogPlt"] 1]]
+        set val [get_variable_data -dataset Data_$pp0\
+            "IntegrSemiconductor $ogPlt"]
+        if {[lindex $val 0] == 0} {
+            set vol [expr 1.*[lindex $val end]/[lindex [get_variable_data\
+                -dataset Data_$pp0 "AveSemiconductor $ogPlt"] end]]
+        } else {
+            set vol [expr 1.*[lindex $val 0]/[lindex [get_variable_data\
+                -dataset Data_$pp0 "AveSemiconductor $ogPlt"] 0]]
+        }
         vputs -i3 "Total semiconductor region volume: $vol cm^3"
 
         if {[llength $dnLst] > 1} {
@@ -1262,8 +1271,8 @@ foreach pp $PPAttr {
         if {[lindex $pp 2] > $xLow && [lindex $pp 2] < $xHigh} {
             set tmp [lindex [probe_curve ${pp0}_0|tau_eff\
                 -valueX [lindex $pp 2] -plot Plttau_$pp0] 0]
-            vputs -i3 "DOE: ${pp0}_tau_eff [format %.4g $tmp]"
-            set gVarArr(${pp0}_tau_eff) [format %.4g $tmp]
+            vputs -i3 "DOE: ${pp0}_tau_eff [format %.4e $tmp]"
+            set gVarArr(${pp0}_tau_eff) [format %.4e $tmp]
         }
 
         vputs -i2 "Create lifetime/J0 curves in regions"
@@ -1699,14 +1708,14 @@ foreach pp $PPAttr {
                 if {[lindex $dopLst 0] == 0} {
                     set val [expr abs([lindex $dopLst 0])]
                 } else {
-                    set val [expr pow([lindex $niLst 0],2)/abs([lindex\
+                    set val [expr 1.*pow([lindex $niLst 0],2)/abs([lindex\
                         $dopLst 0])]
                 }
             } else {
                 if {[lindex $dopLst 0] == 0} {
                     set val [expr abs([lindex $dopLst end])]
                 } else {
-                    set val [expr pow([lindex $niLst end],2)/abs([lindex\
+                    set val [expr 1.*pow([lindex $niLst end],2)/abs([lindex\
                         $dopLst 0])]
                 }
             }
