@@ -997,19 +997,18 @@ foreach pp $PPAttr {
             # Extract jOGBias and jscBias before monoScaling increases
             load_file v${idx}_@plot@ -name BiasData_$pp0
             set lst [lsort -real [get_variable_data -dataset\
-                BiasData_$pp0 "IntegrSemiconductor $specOG"]]
+                BiasData_$pp0 "IntegrSemiconductor $ogPlt"]]
             set jOGBias [expr 1e3*$q*[lindex $lst 0]/$intArea]
             set lst [lsort -real [get_variable_data\
                 -dataset BiasData_$pp0 "$bCon TotalCurrent"]]
             set jscBias [expr 1e3*[lindex $lst 0]/$jArea]
-            vputs -i2 [format "Extracted JOG/Jsc at bias light:\
-                %.4g/%.4g mA*cm^-2" $jOGBias $jscBias]
+            vputs -i2 [format "Extracted Jsc/JOG at bias light:\
+                %.4g/%.4g mA*cm^-2" $jscBias $jOGBias]
             unload_file v${idx}_@plot@
 
             regexp {\{Monochromatic\s+\S+\s+([^\s\}]+)} $GopAttr -> tmp
             set pSig [expr $tmp*$ValArr(MonoScaling)]
-            vputs -i2 "Monochromatic signal light intensity:\
-                $pSig W*cm^-2"
+            vputs -i2 "Monochromatic signal light intensity: $pSig W*cm^-2"
         } else {
             vputs -i2 "\nerror: element '$vIdx' of 'VarVary' not wavelength!\n"
             continue
@@ -1043,8 +1042,14 @@ foreach pp $PPAttr {
         # X in nm, Y in mA*cm^-2
         create_curve -name ${pp0}_jsc -dataset Data_$pp0\
             -axisX $xVar -axisY "$bCon TotalCurrent"
-        create_curve -name ${pp0}_jscSig -function\
-            "abs(1e3*<${pp0}_jsc>/$jArea-<${pp0}_jscBias>)"
+        set lst [get_curve_data ${pp0}_jsc -axisY -plot PltQE_$pp0]
+        if {1e3*[lindex $lst 0]/$jArea < $jscBias} {
+            create_curve -name ${pp0}_jscSig -function\
+                "<${pp0}_jscBias>-1e3*<${pp0}_jsc>/$jArea"
+        } else {
+            create_curve -name ${pp0}_jscSig -function\
+                "1e3*<${pp0}_jsc>/$jArea-<${pp0}_jscBias>"
+        }
         vputs -i2 "Calculating signal photon current..."
 
         # X in nm, Y in mA*cm^-2 (J*s^-1*cm^2/(J*s*m/s/m) )
@@ -1647,7 +1652,7 @@ foreach pp $PPAttr {
             "1e3*$q*<${pp0}_RSRH_$reg>/$intArea"
         remove_curves ${pp0}_RSRH_$reg
         set flg false
-        foreach lst $ModPar {vputs $lst
+        foreach lst $ModPar {
             if {[lindex $lst 0] eq "r$idx"
                 && [regexp {\{SRH\s+(\S+)} $lst -> str]
                 && [file isfile $str]} {
