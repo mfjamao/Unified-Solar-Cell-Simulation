@@ -805,21 +805,19 @@ foreach pp $PPAttr {
                 && [regexp {\{Spectrum\s+(\S+)} $GopAttr -> str]} {
 
                 # Extract the spectrum power [mW*cm^-2]
-                set pSpec [specInt $str]
+                set pSpec [expr [specInt $str]*$ValArr(SpecScaling)]
                 set tmp [format %.4g $pSpec]
                 vputs -i2 "DOE: ${pp0}_Pspec $tmp"
                 set gVarArr(${pp0}_Pspec|mW*cm^-2) $tmp
-                set sunsSpec $ValArr(SpecScaling)
-                set pSum [expr $pSum+$pSpec*$sunsSpec]
+                set pSum [expr $pSum+$pSpec]
             }
             if {$ValArr(MonoScaling) > 0 && [regexp\
                 {\{Monochromatic\s+\S+\s+([^\s\}]+)} $GopAttr -> tmp]} {
-                set pMono [expr 1e3*$tmp]
+                set pMono [expr 1e3*$tmp*$ValArr(MonoScaling)]
                 set tmp [format %.4g $pMono]
                 vputs -i2 "DOE: ${pp0}_Pmono $tmp"
                 set gVarArr(${pp0}_Pmono|mW*cm^-2) $tmp
-                set sunsMono $ValArr(MonoScaling)
-                set pSum [expr $pSum+$pMono*$sunsMono]
+                set pSum [expr $pSum+$pMono]
             }
             set tmp [format %.4g $pSum]
             vputs -i2 "DOE: ${pp0}_Psum $tmp"
@@ -845,9 +843,13 @@ foreach pp $PPAttr {
                 set tmp [format %.4g [expr abs($pmpp)]]
                 vputs -i2 "DOE: ${pp0}_Pmpp $tmp"
                 set gVarArr(${pp0}_Pmpp|mW*cm^-2) $tmp
-                set tmp [format %.4g [expr 1e2*abs($pmpp)/$pSum]]
-                vputs -i2 "DOE: ${pp0}_Eff $tmp"
-                set gVarArr(${pp0}_Eff|%) $tmp
+                if {$pSum > 0} {
+                    set tmp [format %.4g [expr 1e2*abs($pmpp)/$pSum]]
+                    vputs -i2 "DOE: ${pp0}_Eff $tmp"
+                    set gVarArr(${pp0}_Eff|%) $tmp
+                } else {
+                    vputs -i2 "no spectrum specified!"
+                }
                 set tmp [format %.4g $vmpp]
                 vputs -i2 "DOE: ${pp0}_Vmpp $tmp"
                 set gVarArr(${pp0}_Vmpp|V) $tmp
@@ -1043,7 +1045,7 @@ foreach pp $PPAttr {
         create_curve -name ${pp0}_jsc -dataset Data_$pp0\
             -axisX $xVar -axisY "$bCon TotalCurrent"
         set lst [get_curve_data ${pp0}_jsc -axisY -plot PltQE_$pp0]
-        if {1e3*[lindex $lst 0]/$jArea < $jscBias} {
+        if {1e3*[lindex $lst [expr int([llength $lst]/2)]]/$jArea < $jscBias} {
             create_curve -name ${pp0}_jscSig -function\
                 "<${pp0}_jscBias>-1e3*<${pp0}_jsc>/$jArea"
         } else {
@@ -1394,10 +1396,10 @@ foreach pp $PPAttr {
         }
 
         foreach grp $VV2Fld {
-        
+
             # Skip point
             if {[regexp {^p[^/]+$} [lindex $grp 0]]} continue
-            
+
             # Skip regions and region interfaces
             if {[string index [lindex $grp 0] 0] eq "r"} continue
             foreach lst [lrange $grp 1 end] {
@@ -1405,7 +1407,7 @@ foreach pp $PPAttr {
                 vputs -i2 "Plot lifetime curves of [lindex $grp 0]"
                 foreach elm [lrange $lst 1 end] {
                     set val [lindex [split $mfjProc::tabArr($elm) |] 0]
-                    
+
                     # Skip integration of non recombination fields
                     if {![regexp {Recombination$} $val]} continue
                     vputs -i3 $val
@@ -1615,206 +1617,208 @@ foreach pp $PPAttr {
 
     }
 
-    # Current density loss analysis
-    set capJLoss "n@node@_${pp0}: JLoss at $T K"
-    set fJLoss $SimArr(OutDir)/n@node@_${pp0}_JLoss.csv
-    create_plot -name ${pp0}_PltJLoss -1d
-    vputs -i2 "\nPlot current density loss curves in regions"
-    foreach grp $RegGen {
-        set mat [lindex $grp 0 0]
-        set reg [lindex $grp 0 1]
-        set idx [lindex $grp 0 end]
-        if {[lindex $grp 0 2] ne "Semiconductor"} continue
-        if {$mat eq "Silicon" || [regexp \\\{r[lindex $grp 0\
-            end]\[^\\\}\]+Aug $ModPar]} {
-            create_curve -name ${pp0}_RAug_$reg -dataset Data_$pp0\
-                -axisX $xVar -axisY "Integr$reg AugerRecombination"
-            create_curve -name ${pp0}_RPMI_$reg -dataset Data_$pp0\
-                -axisX $xVar -axisY "Integr$reg PMIRecombination"
-            vputs -i3 Aug_$reg
-            create_curve -name ${pp0}_2|Aug_$reg -function\
-                "1e3*$q*(<${pp0}_RAug_$reg>+<${pp0}_RPMI_$reg>)/$intArea"
-            remove_curves "${pp0}_RAug_$reg ${pp0}_RPMI_$reg"
-        }
-        if {$mat eq "Silicon" || [regexp \\\{r[lindex $grp 0\
-            end]\[^\\\}\]+Rad $ModPar]} {
-            create_curve -name ${pp0}_RB2B_$reg -dataset Data_$pp0\
-                -axisX $xVar -axisY "Integr$reg RadiativeRecombination"
-            vputs -i3 B2B_$reg
-            create_curve -name ${pp0}_3|B2B_$reg -function\
-                "1e3*$q*<${pp0}_RB2B_$reg>/$intArea"
-            remove_curves ${pp0}_RB2B_$reg
-        }
-        create_curve -name ${pp0}_RSRH_$reg -dataset Data_$pp0\
-            -axisX $xVar -axisY "Integr$reg srhRecombination"
-        vputs -i3 SRH_$reg
-        create_curve -name ${pp0}_0|SRH_$reg -function\
-            "1e3*$q*<${pp0}_RSRH_$reg>/$intArea"
-        remove_curves ${pp0}_RSRH_$reg
-        set flg false
-        foreach lst $ModPar {
-            if {[lindex $lst 0] eq "r$idx"
-                && [regexp {\{SRH\s+(\S+)} $lst -> str]
-                && [file isfile $str]} {
-                set flg true
-                break
+    # Current density loss analysis for known extraction and analysis
+    if {[llength $pp] > 1} {
+        set capJLoss "n@node@_${pp0}: JLoss at $T K"
+        set fJLoss $SimArr(OutDir)/n@node@_${pp0}_JLoss.csv
+        create_plot -name ${pp0}_PltJLoss -1d
+        vputs -i2 "\nPlot current density loss curves in regions"
+        foreach grp $RegGen {
+            set mat [lindex $grp 0 0]
+            set reg [lindex $grp 0 1]
+            set idx [lindex $grp 0 end]
+            if {[lindex $grp 0 2] ne "Semiconductor"} continue
+            if {$mat eq "Silicon" || [regexp \\\{r[lindex $grp 0\
+                end]\[^\\\}\]+Aug $ModPar]} {
+                create_curve -name ${pp0}_RAug_$reg -dataset Data_$pp0\
+                    -axisX $xVar -axisY "Integr$reg AugerRecombination"
+                create_curve -name ${pp0}_RPMI_$reg -dataset Data_$pp0\
+                    -axisX $xVar -axisY "Integr$reg PMIRecombination"
+                vputs -i3 Aug_$reg
+                create_curve -name ${pp0}_2|Aug_$reg -function\
+                    "1e3*$q*(<${pp0}_RAug_$reg>+<${pp0}_RPMI_$reg>)/$intArea"
+                remove_curves "${pp0}_RAug_$reg ${pp0}_RPMI_$reg"
+            }
+            if {$mat eq "Silicon" || [regexp \\\{r[lindex $grp 0\
+                end]\[^\\\}\]+Rad $ModPar]} {
+                create_curve -name ${pp0}_RB2B_$reg -dataset Data_$pp0\
+                    -axisX $xVar -axisY "Integr$reg RadiativeRecombination"
+                vputs -i3 B2B_$reg
+                create_curve -name ${pp0}_3|B2B_$reg -function\
+                    "1e3*$q*<${pp0}_RB2B_$reg>/$intArea"
+                remove_curves ${pp0}_RB2B_$reg
+            }
+            create_curve -name ${pp0}_RSRH_$reg -dataset Data_$pp0\
+                -axisX $xVar -axisY "Integr$reg srhRecombination"
+            vputs -i3 SRH_$reg
+            create_curve -name ${pp0}_0|SRH_$reg -function\
+                "1e3*$q*<${pp0}_RSRH_$reg>/$intArea"
+            remove_curves ${pp0}_RSRH_$reg
+            set flg false
+            foreach lst $ModPar {
+                if {[lindex $lst 0] eq "r$idx"
+                    && [regexp {\{SRH\s+(\S+)} $lst -> str]
+                    && [file isfile $str]} {
+                    set flg true
+                    break
+                }
+            }
+            if {[regexp \\\{r$idx $RegIntfTrap] || $flg} {
+                create_curve -name ${pp0}_RTrap_$reg -dataset Data_$pp0\
+                    -axisX $xVar -axisY "Integr$reg eGapStatesRecombination"
+                vputs -i3 Trap_$reg
+                create_curve -name ${pp0}_1|Trap_$reg -function\
+                    "1e3*$q*<${pp0}_RTrap_$reg>/$intArea"
+                remove_curves ${pp0}_RTrap_$reg
             }
         }
-        if {[regexp \\\{r$idx $RegIntfTrap] || $flg} {
-            create_curve -name ${pp0}_RTrap_$reg -dataset Data_$pp0\
-                -axisX $xVar -axisY "Integr$reg eGapStatesRecombination"
-            vputs -i3 Trap_$reg
-            create_curve -name ${pp0}_1|Trap_$reg -function\
-                "1e3*$q*<${pp0}_RTrap_$reg>/$intArea"
-            remove_curves ${pp0}_RTrap_$reg
+
+        vputs -i2 "Plot current density loss curves at region interfaces"
+        foreach grp $IntfSRH {
+            if {![string is double -strict [lindex $grp 1]]
+                || (![string is double -strict [lindex $grp 2]]
+                && ![string is double -strict [lindex $grp 3]])} continue
+            set lst [string map {r "" / " "} [lindex $grp 0]]
+            set intf [lindex $RegGen [lindex $lst 0] 0 1]/[lindex\
+                $RegGen [lindex $lst 1] 0 1]
+            create_curve -name ${pp0}_[lindex $grp 0] -dataset Data_$pp0\
+                -axisX $xVar -axisY "Integr$intf SurfaceRecombination"
+            vputs -i3 $intf
+            create_curve -name ${pp0}_4|$intf -function\
+                "1e3*$q*<${pp0}_[lindex $grp 0]>/$intArea"
+            remove_curves ${pp0}_[lindex $grp 0]
         }
-    }
 
-    vputs -i2 "Plot current density loss curves at region interfaces"
-    foreach grp $IntfSRH {
-        if {![string is double -strict [lindex $grp 1]]
-            || (![string is double -strict [lindex $grp 2]]
-            && ![string is double -strict [lindex $grp 3]])} continue
-        set lst [string map {r "" / " "} [lindex $grp 0]]
-        set intf [lindex $RegGen [lindex $lst 0] 0 1]/[lindex\
-            $RegGen [lindex $lst 1] 0 1]
-        create_curve -name ${pp0}_[lindex $grp 0] -dataset Data_$pp0\
-            -axisX $xVar -axisY "Integr$intf SurfaceRecombination"
-        vputs -i3 $intf
-        create_curve -name ${pp0}_4|$intf -function\
-            "1e3*$q*<${pp0}_[lindex $grp 0]>/$intArea"
-        remove_curves ${pp0}_[lindex $grp 0]
-    }
-
-    # Extract minority carrier current density from contacts
-    if {[llength $IntfCon]} {
-        vputs -i2 "Plot current density loss curves at contacts"
-        foreach elm [array names ValArr] {
-            if {![regexp {^c\d$} $elm]
-                || [regexp {^Charge} $ValArr($elm)]} continue
-            vputs -i3 $elm
-            if {abs([lindex [get_variable_data -dataset Data_$pp0\
-                "$elm eCurrent"] 0]) < abs([lindex [get_variable_data\
-                -dataset Data_$pp0 "$elm hCurrent"] 0])} {
-                create_curve -name ${pp0}_Ie_$elm -dataset Data_$pp0\
-                    -axisX $xVar -axisY "$elm eCurrent"
-                create_curve -name ${pp0}_5|$elm\
-                    -function "1e3*abs(<${pp0}_Ie_$elm>)/$jArea"
-                remove_curves ${pp0}_Ie_$elm
-            } else {
-                create_curve -name ${pp0}_Ih_$elm -dataset Data_$pp0\
-                    -axisX $xVar -axisY "$elm hCurrent"
-                create_curve -name ${pp0}_5|$elm\
-                    -function "1e3*abs(<${pp0}_Ih_$elm>)/$jArea"
-                remove_curves ${pp0}_Ih_$elm
+        # Extract minority carrier current density from contacts
+        if {[llength $IntfCon]} {
+            vputs -i2 "Plot current density loss curves at contacts"
+            foreach elm [array names ValArr] {
+                if {![regexp {^c\d$} $elm]
+                    || [regexp {^Charge} $ValArr($elm)]} continue
+                vputs -i3 $elm
+                if {abs([lindex [get_variable_data -dataset Data_$pp0\
+                    "$elm eCurrent"] 0]) < abs([lindex [get_variable_data\
+                    -dataset Data_$pp0 "$elm hCurrent"] 0])} {
+                    create_curve -name ${pp0}_Ie_$elm -dataset Data_$pp0\
+                        -axisX $xVar -axisY "$elm eCurrent"
+                    create_curve -name ${pp0}_5|$elm\
+                        -function "1e3*abs(<${pp0}_Ie_$elm>)/$jArea"
+                    remove_curves ${pp0}_Ie_$elm
+                } else {
+                    create_curve -name ${pp0}_Ih_$elm -dataset Data_$pp0\
+                        -axisX $xVar -axisY "$elm hCurrent"
+                    create_curve -name ${pp0}_5|$elm\
+                        -function "1e3*abs(<${pp0}_Ih_$elm>)/$jArea"
+                    remove_curves ${pp0}_Ih_$elm
+                }
             }
         }
-    }
 
-    # Use the Dn from position or average from 'VV2Fld'
-    vputs -i2 "Create Delta n variable \[cm^-3\]"
-    set var [format %g [expr $YMax/2.]]
-    set dnLst [list]
-    foreach grp $VV2Fld {
-        set txt ""
-        set str [string range [lindex $grp 0] 1 end]
-        if {[regexp {^p[^/]+$} [lindex $grp 0]]
-            && [regexp { Dn} $grp]} {
-            if {$Dim == 1} {
-                set txt Pos($str,$var)
-            } else {
-                set txt Pos([string map {_ ,} $str])
-            }
-        }
-        if {![regexp {^p[^/]+$} [lindex $grp 0]]
-            && [regexp {\{Average[^\}]+Dn} $grp]} {
-            if {[regexp {r\d+} [lindex $grp 0]]} {
-                set txt Ave[lindex $RegGen $str 0 1]
-            } elseif {[regexp {r\d+/\d+} [lindex $grp 0]]} {
-                set lst [split $str /]
-                set txt Ave[lindex $RegGen [lindex $lst 0] 0 1]/[lindex\
-                    $RegGen [lindex $lst 1] 0 1]
-            } else {
-                set lst [split $str /]
+        # Use the Dn from position or average from 'VV2Fld'
+        vputs -i2 "Create Delta n variable \[cm^-3\]"
+        set var [format %g [expr $YMax/2.]]
+        set dnLst [list]
+        foreach grp $VV2Fld {
+            set txt ""
+            set str [string range [lindex $grp 0] 1 end]
+            if {[regexp {^p[^/]+$} [lindex $grp 0]]
+                && [regexp { Dn} $grp]} {
                 if {$Dim == 1} {
-                    set txt AveWindow(([lindex $lst 0],0),([lindex\
-                        $lst 1],$YMax))
+                    set txt Pos($str,$var)
                 } else {
-                    set txt AveWindow(([string map {_ , / ),(} $str]))
+                    set txt Pos([string map {_ ,} $str])
                 }
             }
-        }
-        if {$txt ne ""} {
-            vputs -i3 $txt
-            set dopLst [get_variable_data -dataset Data_$pp0\
-                "$txt DopingConcentration"]
-            set niLst [get_variable_data -dataset Data_$pp0\
-                "$txt EffectiveIntrinsicDensity"]
-            if {[lindex $niLst 0] < [lindex $niLst end]} {
-                if {[lindex $dopLst 0] == 0} {
-                    set val [expr abs([lindex $dopLst 0])]
+            if {![regexp {^p[^/]+$} [lindex $grp 0]]
+                && [regexp {\{Average[^\}]+Dn} $grp]} {
+                if {[regexp {r\d+} [lindex $grp 0]]} {
+                    set txt Ave[lindex $RegGen $str 0 1]
+                } elseif {[regexp {r\d+/\d+} [lindex $grp 0]]} {
+                    set lst [split $str /]
+                    set txt Ave[lindex $RegGen [lindex $lst 0] 0 1]/[lindex\
+                        $RegGen [lindex $lst 1] 0 1]
                 } else {
-                    set val [expr 1.*pow([lindex $niLst 0],2)/abs([lindex\
-                        $dopLst 0])]
-                }
-            } else {
-                if {[lindex $dopLst 0] == 0} {
-                    set val [expr abs([lindex $dopLst end])]
-                } else {
-                    set val [expr 1.*pow([lindex $niLst end],2)/abs([lindex\
-                        $dopLst 0])]
+                    set lst [split $str /]
+                    if {$Dim == 1} {
+                        set txt AveWindow(([lindex $lst 0],0),([lindex\
+                            $lst 1],$YMax))
+                    } else {
+                        set txt AveWindow(([string map {_ , / ),(} $str]))
+                    }
                 }
             }
-            if {[lindex $dopLst 0] >= 0} {
-                create_variable -name "Dn|cm^-3 [lindex $grp 0]"\
-                    -dataset Data_$pp0\
-                    -function "<$txt hDensity:Data_$pp0>-$val"
-            } else {
-                create_variable -name "Dn|cm^-3 [lindex $grp 0]"\
-                    -dataset Data_$pp0\
-                    -function "<$txt eDensity:Data_$pp0>-$val"
+            if {$txt ne ""} {
+                vputs -i3 $txt
+                set dopLst [get_variable_data -dataset Data_$pp0\
+                    "$txt DopingConcentration"]
+                set niLst [get_variable_data -dataset Data_$pp0\
+                    "$txt EffectiveIntrinsicDensity"]
+                if {[lindex $niLst 0] < [lindex $niLst end]} {
+                    if {[lindex $dopLst 0] == 0} {
+                        set val [expr abs([lindex $dopLst 0])]
+                    } else {
+                        set val [expr 1.*pow([lindex $niLst 0],2)/abs([lindex\
+                            $dopLst 0])]
+                    }
+                } else {
+                    if {[lindex $dopLst 0] == 0} {
+                        set val [expr abs([lindex $dopLst end])]
+                    } else {
+                        set val [expr 1.*pow([lindex $niLst end],2)/abs([lindex\
+                            $dopLst 0])]
+                    }
+                }
+                if {[lindex $dopLst 0] >= 0} {
+                    create_variable -name "Dn|cm^-3 [lindex $grp 0]"\
+                        -dataset Data_$pp0\
+                        -function "<$txt hDensity:Data_$pp0>-$val"
+                } else {
+                    create_variable -name "Dn|cm^-3 [lindex $grp 0]"\
+                        -dataset Data_$pp0\
+                        -function "<$txt eDensity:Data_$pp0>-$val"
+                }
+                lappend dnLst [lindex $grp 0]
             }
-            lappend dnLst [lindex $grp 0]
         }
-    }
-    if {[llength $dnLst]} {
-        vputs -i2 "Create excess carrier density curves"
-        foreach elm $dnLst {
-            create_curve -name ${pp0}_9|Dn_$elm -dataset Data_$pp0\
-                -axisX $xVar -axisY2 "Dn|cm^-3 $elm"
+        if {[llength $dnLst]} {
+            vputs -i2 "Create excess carrier density curves"
+            foreach elm $dnLst {
+                create_curve -name ${pp0}_9|Dn_$elm -dataset Data_$pp0\
+                    -axisX $xVar -axisY2 "Dn|cm^-3 $elm"
+            }
         }
-    }
 
-    windows_style -style max
-    set_plot_prop -show_grid -show_curve_markers\
-        -title_font_size 28 -title $capJLoss
-    set_grid_prop -show_minor_lines\
-        -line1_style dash -line1_color gray\
-        -line2_style dot -line2_color lightGray
-    set_axis_prop -axis x -title_font_size 20 -type linear\
-        -scale_font_size 16 -scale_format preferred\
-        -title $xCap -range "$xLow $xHigh"
-    set_axis_prop -axis y -title_font_size 20 -type log\
-        -scale_font_size 16 -scale_format preferred\
-        -title {Loss current densities|mA*cm^-2}
-    set_axis_prop -axis y2 -title_font_size 20 -type log\
-        -scale_font_size 16 -scale_format preferred\
-        -title {Excess carrier densities|cm^-3}
-    set_legend_prop -location top_left
+        windows_style -style max
+        set_plot_prop -show_grid -show_curve_markers\
+            -title_font_size 28 -title $capJLoss
+        set_grid_prop -show_minor_lines\
+            -line1_style dash -line1_color gray\
+            -line2_style dot -line2_color lightGray
+        set_axis_prop -axis x -title_font_size 20 -type linear\
+            -scale_font_size 16 -scale_format preferred\
+            -title $xCap -range "$xLow $xHigh"
+        set_axis_prop -axis y -title_font_size 20 -type log\
+            -scale_font_size 16 -scale_format preferred\
+            -title {Loss current densities|mA*cm^-2}
+        set_axis_prop -axis y2 -title_font_size 20 -type log\
+            -scale_font_size 16 -scale_format preferred\
+            -title {Excess carrier densities|cm^-3}
+        set_legend_prop -location top_left
 
-    vputs -i2 "Save all curves to $fJLoss"
-    foreach curve [list_curves -plot ${pp0}_PltJLoss] {
-        regexp {^v\d+_(.+)$} $curve -> str
-        set_curve_prop $curve -label $str -markers_type\
-            [lindex $markerLst [expr $pCnt%$markerLen]]
-        incr pCnt
-        if {[regexp {^v\d+_9\|Dn} $curve]} {
-            regexp {\|(\S+)$} [get_axis_prop -axis Y2 -title] -> str
-        } else {
-            regexp {\|(\S+)$} [get_axis_prop -axis Y -title] -> str
+        vputs -i2 "Save all curves to $fJLoss"
+        foreach curve [list_curves -plot ${pp0}_PltJLoss] {
+            regexp {^v\d+_(.+)$} $curve -> str
+            set_curve_prop $curve -label $str -markers_type\
+                [lindex $markerLst [expr $pCnt%$markerLen]]
+            incr pCnt
+            if {[regexp {^v\d+_9\|Dn} $curve]} {
+                regexp {\|(\S+)$} [get_axis_prop -axis Y2 -title] -> str
+            } else {
+                regexp {\|(\S+)$} [get_axis_prop -axis Y -title] -> str
+            }
+            curve2CSV $curve $xCap [get_curve_prop $curve -label]|$str\
+                ${pp0}_PltJLoss $fJLoss
         }
-        curve2CSV $curve $xCap [get_curve_prop $curve -label]|$str\
-            ${pp0}_PltJLoss $fJLoss
     }
 
 } ;# end of foreach
