@@ -974,7 +974,7 @@ foreach pp $PPAttr {
             }
         }
         if {[string length $bCon] > 0} {
-            vputs -i3 "Found a voltage contact '$bCon'!"
+            vputs -i2 "Found a voltage contact '$bCon'!"
         } else {
             vputs -i2 "\nerror: no voltage contact for QE!\n"
             continue
@@ -995,14 +995,25 @@ foreach pp $PPAttr {
                 vputs -i2 "\nerror: no monochromatic intensity for QE!\n"
                 continue
             }
-
-            # Extract jOGBias and jscBias before monoScaling increases
+            
+            # Make sure initial monochromatic light intensity (index 0) is 0
             load_file v${idx}_@plot@ -name BiasData_$pp0
-            set lst [lsort -real [get_variable_data -dataset\
-                BiasData_$pp0 "IntegrSemiconductor $ogPlt"]]
+            set lst [get_variable_data -dataset BiasData_$pp0\
+                "IntegrSemiconductor $monoOG"]
+            if {[lindex $lst 0] > 0} {
+                vputs -i2 "\nerror: 'v$idx' nonzero initial mono intensity!\n"
+                continue
+            }
+            set lst [get_variable_data -dataset BiasData_$pp0\
+                "$bCon OuterVoltage"]
+            vputs -i2 "Bias voltage at '$bCon': [lindex $lst 0] V"
+            
+            # Extract jOGBias and jscBias at index 0
+            set lst [get_variable_data -dataset BiasData_$pp0\
+                "IntegrSemiconductor $ogPlt"]
             set jOGBias [expr 1e3*$q*[lindex $lst 0]/$intArea]
-            set lst [lsort -real [get_variable_data\
-                -dataset BiasData_$pp0 "$bCon TotalCurrent"]]
+            set lst [get_variable_data -dataset BiasData_$pp0\
+                "$bCon TotalCurrent"]
             set jscBias [expr 1e3*[lindex $lst 0]/$jArea]
             vputs -i2 [format "Extracted Jsc/JOG at bias light:\
                 %.4g/%.4g mA*cm^-2" $jscBias $jOGBias]
@@ -1044,7 +1055,7 @@ foreach pp $PPAttr {
         # X in nm, Y in mA*cm^-2
         create_curve -name ${pp0}_jsc -dataset Data_$pp0\
             -axisX $xVar -axisY "$bCon TotalCurrent"
-        set lst [get_curve_data ${pp0}_jsc -axisY -plot PltQE_$pp0]
+        set lst [get_variable_data -dataset Data_$pp0 "$bCon TotalCurrent"]
         if {1e3*[lindex $lst [expr int([llength $lst]/2)]]/$jArea < $jscBias} {
             create_curve -name ${pp0}_jscSig -function\
                 "<${pp0}_jscBias>-1e3*<${pp0}_jsc>/$jArea"

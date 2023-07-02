@@ -46,7 +46,7 @@ Example (after semicolon):
 {== v-1 Local & `a | a = 12 | `i & `>= 1}
 {== v-2 Local & `a | a = 100 | `i & `>= 1}
 
-<VAR>SimEnv      {Sentaurus T-2022.03 !Cylindrical !OptOnly 25 128 Local}
+<VAR>SimEnv      {Sentaurus T-2022.03 !Cylindrical !OptOnly 25 64 Local}
 
 <TOOL>ST settings: Tool_label = sde Tool_name = sde
 
@@ -103,7 +103,9 @@ Examples:
     & `<= 1) | a | `p}
 {(n v1 | == v1 {[BCEP]\w+} ) & `a | a | `p} ...
 
-<VAR>RegGen      {{Silicon 230}}
+<VAR>RegGen      {{Silicon 230 250} {Gas 0.1 34.951} {Gas 4.774} {Gas 0.55} {Gas
+    4.774} {Gas 39.951} {Gas 24.725} {Gas 0.55} {Gas 69.45} {Gas 0.55} {Gas
+    69.45} {Gas 0.275}}
 
 <COMMENT>--- Region and interface fields variable
 Suppose i,j,k are region indices, regions can be referred as follows:
@@ -124,7 +126,8 @@ Example:
     & `<= 1 | `f}
 ...
 
-<VAR>FldAttr     {{r1 P 3.203e+15 PD 1e+19}}
+<VAR>FldAttr     {{r1 P 3.203e+15} {p230_34.951/230_45.049 03exp/IBC-P35.plx}
+    {p230_85/230_250 03exp/IBC-B166.plx}}
 
 <COMMENT>--- Interface attributes variable
 Specify three types of region interfaces - SRH, metal contact and tunnelling
@@ -165,15 +168,13 @@ Tunnelling example:
 {(n v1 | == v2 {C\w+} ) & `a | == v1 {c\d} & (a = 1e7 | `n | `> 0) | a}
 {(n v1 | == v2 {C\w+} ) & `a | == v1 {c\d} & (a | `n | `> 0) | a}
 
-<VAR>IntfAttr    {{r0/1 10000000000 2} {r2/1 10000000000 2}} {{r0/1 20000000000
-    2} {r2/1 20000000000 2}} {{r0/1 30000000000 2} {r2/1 30000000000 2}} {{r0/1
-    50000000000 2} {r2/1 50000000000 2}} {{r0/1 70000000000 2} {r2/1 70000000000
-    2}} {{r0/1 100000000000 2} {r2/1 100000000000 2}} {{r0/1 200000000000 2}
-    {r2/1 200000000000 2}} {{r0/1 300000000000 2} {r2/1 300000000000 2}} {{r0/1
-    500000000000 2} {r2/1 500000000000 2}} {{r0/1 700000000000 2} {r2/1
-    700000000000 2}} {{r0/1 1e+12 2} {r2/1 1e+12 2}} {{r0/1 2e+12 2} {r2/1 2e+12
-    2}} {{r0/1 3e+12 2} {r2/1 3e+12 2}} {{r0/1 5e+12 2} {r2/1 5e+12 2}} {{r0/1
-    7e+12 2} {r2/1 7e+12 2}} {{r0/1 1e+13 2} {r2/1 1e+13 2}}
+<VAR>IntfAttr    {{r1/4 c0 Ohmic 0 0 0 1e7} {r1/10 c1 Ohmic 0 0 0 1e7} {r1/12 c1
+    Ohmic 0 0 0 1e7} {r1/8 c1 Ohmic 0 0 0 1e7} {r0/1 0 2} {r1/2 0 8} {r1/6 0 8}
+    {r1/3 0 1000000} {r1/5 0 1000000} {r1/11 0 6850} {r1/7 0 6850} {r1/9 0
+    6850}} {{r1/4 c0 Ohmic 0 0 0 1e7} {r1/10 c1 Ohmic 0 0 0 1e7} {r1/12 c1 Ohmic
+    0 0 0 1e7} {r1/8 c1 Ohmic 0 0 0 1e7} {r0/1 0 3.6} {r1/2 0 15.2} {r1/6 0
+    15.2} {r1/3 0 863044} {r1/5 0 863044} {r1/11 0 5923} {r1/7 0 5923} {r1/9 0
+    5923}}
 
 <COMMENT>--- Optical generation attributes variable
 Specify four types of optical solver E(External), O(OBAM), T(TMM), R(Raytrace).
@@ -251,7 +252,8 @@ Incidence for all solvers example:
     | `a}
 ...
 
-<VAR>GopAttr     {}
+<VAR>GopAttr     {{r0/1 External 02opt/IBC-ANU-1DGop_Spectral.plx} {Spectrum
+    02opt/am15g_IEC60904-3-2008.txt 0.3 1.2 0.01} {Monochromatic 0.3 0.001}}
 
 <COMMENT>--- Mesh attributes variable
 Mesh example:
@@ -273,7 +275,7 @@ Mesh example:
 {a = 0.001 | `n & `> 0}
 {a = 1.1 | `n & `> 1}
 
-<VAR>MeshAttr    {10 0.05 8 0.001 8 1.5 0.001 1.1}
+<VAR>MeshAttr    {50 0.05 8 0.001 8 1.2 0.001 1.1}
 
 <TOOL>ST settings: Tool_label = sdevice Tool_name = sdevice
 
@@ -366,7 +368,8 @@ Other variables for varying (sdevice --parameter-names):
 {== v1 {[CFV]\w+} & `a | a | `n & `< v1}
 ...
 
-<VAR>VarVary     {{SpecScaling 1e-06 10}}
+<VAR>VarVary     {{SpecScaling 1 0} {c1 0.75 75} {c1 0 0} {SpecScaling 0.3 0}
+    {MonoScaling 1 1} {Wavelength 1.2 90}}
 
 <COMMENT>--- Extract field during variable varying and from snapshots
 Specify a point pX_Y_Z [um] for extracting 1D structural fields from saved
@@ -441,7 +444,7 @@ Field integration from snapshots example:
     mue muh}
 ...
 
-<VAR>GetFld      {{p10/220 Average Dn} {p0 n p}}
+<VAR>GetFld      {{p10_0/220_250 Average Dn}}
 
 <TOOL>ST settings: Tool_label = svisual Tool_name = svisual
 
@@ -452,7 +455,7 @@ Extract data from 'VarVary', prepare XY plots and make further analysis
 {a | `s CV JV QE SunsVoc SunsJsc QSSPC RAT}
 {== v-1 QSSPC & (a = 1e15 | `n & `> 0) | `a}
 
-<VAR>PPAttr      v0
+<VAR>PPAttr      {{v1 JV} {v5 QE}}
 
 <TAIL>--- No variables afterwards
 Put down any notes
