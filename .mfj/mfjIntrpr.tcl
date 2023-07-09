@@ -101,7 +101,7 @@ proc mfjIntrpr::readRaw {} {
                             if {$ReadHead} {
                                 set ReadHead false
                                 set arr(Head) [string trim $HStr]
-                                vputs -v3 -c <HEAD>$arr(Head)\n
+                                #vputs -v3 -c <HEAD>$arr(Head)\n
                                 vputs -v2 -i-1 "Reading simulation variables..."
                             } else {
 
@@ -132,7 +132,7 @@ proc mfjIntrpr::readRaw {} {
                     if {$ReadCmnt} {
                         set ReadCmnt false
                         lappend VarCmnt [string trim $Cmnt]
-                        vputs -v3 -c <COMMENT>[lindex $VarCmnt end]\n
+                        #vputs -v3 -c <COMMENT>[lindex $VarCmnt end]\n
                     } else {
                         error "comment missing before line [incr LineIdx]!"
                     }
@@ -290,10 +290,10 @@ proc mfjIntrpr::readRaw {} {
 
                 # Properly convert a grammar string to a list
                 lappend VarGStr [string trim $GrmStr]
-                vputs -v3 -c <GRAMMAR>[lindex $VarGStr end]\n
+                #vputs -v3 -c <GRAMMAR>[lindex $VarGStr end]\n
                 lappend VarGLst [str2List "$Var: Grammar" $GrmStr]
                 if {[lindex $VarCmnt1 end] ne ""} {
-                    vputs -v3 -c [lindex $VarCmnt1 end]\n
+                    #vputs -v3 -c [lindex $VarCmnt1 end]\n
                 }
 
                 # Convert strings properly to lists for variable values
@@ -311,7 +311,7 @@ proc mfjIntrpr::readRaw {} {
             }
             lappend VarCmnt2 $Cmnt2
             if {$Cmnt2 ne ""} {
-                vputs -v3 -c $Cmnt2\n
+                #vputs -v3 -c $Cmnt2\n
             }
             set Cmnt2 ""
             if {$ReadTail} {
@@ -341,7 +341,7 @@ proc mfjIntrpr::readRaw {} {
 
     # Remove trailing blank lines in the tail section
     set arr(Tail) [string trim $arr(Tail)]
-    vputs -v3 -c <TAIL>$arr(Tail)
+    #vputs -v3 -c <TAIL>$arr(Tail)
     vputs
 }
 
@@ -522,19 +522,19 @@ proc mfjIntrpr::rawvsBrf {} {
                     upvar 0 $Elm Alias
                     set arr(Raw$Elm) $Alias
                 }
-                vputs -v3 -i1 "\nOutput update raw variables for\
+                #vputs -v3 -i1 "\nOutput update raw variables for\
                     verification..."
                 foreach Var $arr(RawVarName) Val $arr(RawVarVal)\
                     Cmnt $arr(RawVarCmnt) Cmnt1 $arr(RawVarCmnt1)\
                     Cmnt2 $arr(RawVarCmnt2) Str $arr(RawVarGStr)\
                     Lst $arr(RawVarGLst) {
-                    vputs -v3 -c -s "<COMMENT>$Cmnt\n\n<GRAMMAR>$Str\n\n$Lst\n"
+                    #vputs -v3 -c -s "<COMMENT>$Cmnt\n\n<GRAMMAR>$Str\n\n$Lst\n"
                     if {$Cmnt1 ne ""} {
-                        vputs -v3 -c $Cmnt1\n
+                        #vputs -v3 -c $Cmnt1\n
                     }
-                    vputs -v3 -c "<VAR>$Var \{$Val\}\n"
+                    #vputs -v3 -c "<VAR>$Var \{$Val\}\n"
                     if {$Cmnt2 ne ""} {
-                        vputs -v3 -c $Cmnt2\n
+                        #vputs -v3 -c $Cmnt2\n
                     }
                 }
             }
@@ -639,7 +639,7 @@ proc mfjIntrpr::readHost {} {
 proc mfjIntrpr::actConvFeat {} {
     variable arr
 
-    vputs "Activate overriding in simulation variables if any..."
+    vputs "Activate overriding in multiple-level variables if any..."
     set NewLst [list]
     set Sum 0
     foreach SimName $arr(RawVarName) SimVal $arr(RawVarVal) {
@@ -650,7 +650,7 @@ proc mfjIntrpr::actConvFeat {} {
             if {[lindex $NewVal 0]} {
                 vputs -v2 -i1 "$VarName: [lindex $NewVal 0] overrides detected!"
                 vputs -v2 -c "Before: \{$SimVal\}"
-                vputs -v2 -c "After: \{$[lindex $NewVal 1]\}\n"
+                vputs -v2 -c "After: \{[lindex $NewVal 1]\}\n"
                 incr Sum [lindex $NewVal 0]
             }
             lappend NewLst [lindex $NewVal 1]
@@ -683,6 +683,13 @@ proc mfjIntrpr::actConvFeat {} {
                     set NewVal [list]
                     set Lvl 0
                     foreach LvlVal $SimVal {
+
+                        # Activate recycling in level 1+ first
+                        if {[regexp {^@(-?\d+[:,/&])*-?\d+$} $LvlVal]} {
+                            set LvlVal [recycle $VarName $SimVal\
+                                $LvlVal $Lvl $Lvl]
+                        }
+                        # Activate recycling within each level
                         lappend NewVal [recycle $VarName $LvlVal $LvlVal $Lvl]
                         incr Lvl
                     }
@@ -1552,7 +1559,7 @@ proc mfjIntrpr::valRegGen {} {
         lappend RegInfo $RILvl
         lappend RegMat $MatLst
         lappend RegIdx $IdxLst
-        vputs -i$Idt "Totally '[incr RegSeq]' regions!"
+        vputs -i$Idt "Totally '[incr RegSeq]' regions (including dummies)!"
         vputs -v3 -c "Region info: \{$RILvl\}"
         vputs -v3 -c "Region materials: \{$MatLst\}"
         vputs -v3 -c "Region indices: \{$IdxLst\}"

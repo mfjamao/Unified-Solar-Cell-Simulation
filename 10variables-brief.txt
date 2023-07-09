@@ -1,24 +1,23 @@
-SimEnv      {Sentaurus T-2022.03 !Cylindrical !OptOnly 25 64 PBS 38 200}
+SimEnv      {Sentaurus T-2022.03 !Cylindrical !OptOnly 25 64}
 
-RegGen      {{Gas Cone Keep p230_40_0/230.1_40_0 3.5 3.5} {Gas Cone Keep p230_110_0/230.1_110_0 3.5 3.5}
-    {Gas Cone Keep p230_180_0/230.1_180_0 3.5 3.5} {Gas Cone Keep p230_250_0/230.1_250_0 3.5 3.5}
-    {Silicon 230 250 35} {Gas 0.1 26.707 35} {Gas 26.586 13.293} {Gas 21.707} {Gas 31.707 35} {Gas 165 35}}
+RegGen      {{Silicon 230 250} {Gas 0.1 34.951} {Gas 4.774} {Gas 0.550} {Gas 4.774}
+    {Gas 39.951} {Gas 24.725} {Gas 0.550} {Gas 69.450} {Gas 0.550} {Gas 69.450} {Gas 0.275}}
 
-FldAttr     {{r5 P 3.203e15} {p230_26.707_13.293/230_53.293_0 03exp/IBC-p35.plx}
-    {p230_85_35/230_250_0 03exp/IBC-b166.plx}}
+FldAttr     {{r1 P 3.203e15} {p230_34.951/230_45.049 03exp/IBC-p35.plx}
+    {p230_85/230_250 03exp/IBC-b166.plx}}
 
-IntfAttr    {{r5/1 c0} {r5/2:4 c1} {r0/5 0 2} {r5/6,8,9 0 8} {r5/7 0 1e6} {r5/10 0 6850}}
+IntfAttr    {{r1/4 c0} {r1/8,10,12 c1} {r0/1 0 2} {r1/2,6 0 8} {r1/3,5 0 1e6} {r1/7,9,11 0 6850}}
     2:5/2=3.6,15.2,863044,5923
 
-GopAttr     {{r0/5 External 02opt/IBC-ANU-1DGop_Spectral.plx}
+GopAttr     {{r0/1 External 02opt/IBC-ANU-1DGop_Spectral.plx}
     {spectrum 02opt/am15g_IEC60904-3-2008.txt 0.3 1.2 0.01} {Monochromatic 0.3 1e-3}}
 
 MeshAttr    {50 0.05 8 0.001 8 1.2 0.001 1.1}
 
-ModPar      {{r5 01mdb/silicon.par SRH 3e-3}}
+ModPar      {{r1 01mdb/silicon.par SRH 3e-3}}
 
 VarVary     {{SpecScaling 1 0} {c1 0.75 75} {c1 0 0} {SpecScaling 0.3 0} {MonoScaling 1 1} {Wavelength 1.2 90}}
 
-GetFld      {{p10_0_0/220_250_35 Average Dn}}
+GetFld      {{p10_0/220_250 Average Dn}}
 
 PPAttr      {{v1 JV} {v5 QE}}

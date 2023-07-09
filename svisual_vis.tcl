@@ -975,6 +975,7 @@ foreach pp $PPAttr {
         }
         if {[string length $bCon] > 0} {
             vputs -i2 "Found a voltage contact '$bCon'!"
+            vputs -i2 "Bias voltage at '$bCon': $ValArr($bCon) V"
         } else {
             vputs -i2 "\nerror: no voltage contact for QE!\n"
             continue
@@ -1004,9 +1005,6 @@ foreach pp $PPAttr {
                 vputs -i2 "\nerror: 'v$idx' nonzero initial mono intensity!\n"
                 continue
             }
-            set lst [get_variable_data -dataset BiasData_$pp0\
-                "$bCon OuterVoltage"]
-            vputs -i2 "Bias voltage at '$bCon': [lindex $lst 0] V"
             
             # Extract jOGBias and jscBias at index 0
             set lst [get_variable_data -dataset BiasData_$pp0\

@@ -542,10 +542,10 @@ proc mfjProc::readIdx {IdxStr {MaxIdx ""}} {
 }
 
 # mfjProc::override
-    # Searching for the override features (i,j:k/i,j:k_l,m:n/l,m:n=). If found,
+    # Searching for the override features (i,j:k/i,j:k&l,m:n/l,m:n=). If found,
     # replace the feature with the subsequent element and retain the rest.
-    # Easy2Read form: {i,j:k/i,j:k_l,m:n/l,m:n= Val1 Val2 ...}
-    # Compact form: i,j:k/i,j:k_l,m:n/l,m:n=Val1,Val2,...
+    # Easy2Read form: {i,j:k/i,j:k&l,m:n/l,m:n= Val1 Val2 ...}
+    # Compact form: i,j:k/i,j:k&l,m:n/l,m:n=Val1,Val2,...
 # Arguments
     # VarName     Variable name
     # VarVal      Variable value
@@ -606,15 +606,14 @@ proc mfjProc::override {VarName VarVal} {
 }
 
 # mfjProc::recycle
-    # Recursively searching for the recycle features (@i,j:k/i,j:k@). If found,
-    # replace the element with the corresponding feature.
-    # Support
+    # Recursively searching for the recycle features (@i,j:k/i,j:k&l,m:n/l,m:n).
+    # If found, replace the element with the corresponding feature.
 # Arguments
     # VarName     Variable name
     # VarVal      Variable value
     # SubLst      Sublist value
     # Lvl         Optional, level sequence
-    # OldIdx      Optional, trace the index
+    # OldIdx      Optional, trace the index of the SubLst
 # Result: Return the updated list.
 proc mfjProc::recycle {VarName VarVal SubLst {Lvl ""} {OldIdx ""}} {
 
@@ -660,6 +659,8 @@ proc mfjProc::recycle {VarName VarVal SubLst {Lvl ""} {OldIdx ""}} {
                 incr LstIdx
                 continue
             }
+
+            # Eval is required if recycling is not coming alone
             if {[regexp {^@(-?\d+[:,/&])*-?\d+$} $Elm]} {
                 set NoEval true
             } else {
@@ -670,8 +671,10 @@ proc mfjProc::recycle {VarName VarVal SubLst {Lvl ""} {OldIdx ""}} {
             # Negative index is allowed with the pattern '-?\d+'
             while {[regexp {@((-?\d+[:,/&])*-?\d+)} $Elm -> IdxStr]} {
                 set NewVal [list]
-                foreach Str [split $IdxStr &] {
-                    foreach Lst [readIdx $Str] {
+                set StrLst [split $IdxStr &]
+                foreach Str $StrLst {
+                    set IdxLst [readIdx $Str]
+                    foreach Lst $IdxLst {
                         set Val $VarVal
 
                         # Start from the outmost level
@@ -708,7 +711,11 @@ proc mfjProc::recycle {VarName VarVal SubLst {Lvl ""} {OldIdx ""}} {
                                 set End [expr [llength $Val]-1]
                             }
                         }
-                        lappend NewVal $Val
+                        if {[llength $StrLst]*[llength $IdxLst] == 1} {
+                            set NewVal [concat $NewVal $Val]
+                        } else {
+                            lappend NewVal $Val
+                        }
                     }
                 }
 
@@ -716,11 +723,11 @@ proc mfjProc::recycle {VarName VarVal SubLst {Lvl ""} {OldIdx ""}} {
                 regsub {@(-?\d+[:,/&])*-?\d+} $Elm $NewVal Elm
             }
             if {$NoEval} {
-                lappend NewLst $Elm
+                set NewLst [concat $NewLst $Elm]
             } else {
 
                 # Append the evaluated result
-                if {[catch {lappend NewLst [expr $Elm]}]} {
+                if {[catch {set NewLst [concat $NewLst [expr $Elm]]}]} {
                     error "unable to evaluate element $Msg!"
                 }
             }
@@ -3019,7 +3026,7 @@ proc mfjProc::gVar2DOESum {GVarArr TrialNode {FDOESum ""}} {
         error "'$TrialNode' should be a positive integer or zero!"
     }
     vputs -i1 "\nUpdating '$FDOESum' with gVars for trial node '$TrialNode'..."
-    
+
     # Delay a random time to avoid multiple processes accessing the fDOESum
     # at the same time
     after [expr int(1e3*rand())]

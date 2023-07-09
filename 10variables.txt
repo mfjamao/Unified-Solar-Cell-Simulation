@@ -94,14 +94,14 @@ Examples:
 {n v1 & (a | `n & `> 0) | `!a & s K<eep>  M<erge> Remove}
 {n v1 & (a | `n & `> 0) | `!a & (== v1 Vertices & `p | `pp)}
 {(n v1 | == v1 Block) & `a | == v1 Ellipse & (a = 1 | `n & `> 0 & `<= 1)
-    | `!a & (== v1 {[CP]\w+} & `n & `> 0 | `p)}
-{(n v1 | == v1 {[BE]\w+} ) & `a | == v1 {[CP]\w+} & (a = 0 | `n & `>= 0)
-    | `!a & `p}
-{(n v1 | == v1 {[BE]\w+} ) & `a | == v1 Cone & (a = 1 | `n & `> 0
+    | `!a & (== v1 (Pyramid|Cone) & `n & `> 0 | `p)}
+{(n v1 | == v1 (Block|Ellipse) ) & `a
+    | == v1 (Pyramid|Cone) & (a = 0 | `n & `>= 0) | `!a & `p}
+{(n v1 | == v1 (Block|Ellipse) ) & `a | == v1 Cone & (a = 1 | `n & `> 0
     & `<= 1) | == v1 Pyramid & (a = 4 | `i & `> 2) | a | `p}
-{(n v1 | == v1 {[BCE]\w+} ) & `a | == v1 Pyramid & (a = 1 | `n & `> 0
-    & `<= 1) | a | `p}
-{(n v1 | == v1 {[BCEP]\w+} ) & `a | a | `p} ...
+{(n v1 | == v1 (Block|Cone|Ellipse) ) & `a
+    | == v1 Pyramid & (a = 1 | `n & `> 0 & `<= 1) | a | `p}
+{(n v1 | != v1 Vertices) & `a | a | `p} ...
 
 <VAR>RegGen      {{Silicon 230 250} {Gas 0.1 34.951} {Gas 4.774} {Gas 0.55} {Gas
     4.774} {Gas 39.951} {Gas 24.725} {Gas 0.55} {Gas 69.45} {Gas 0.55} {Gas
@@ -120,7 +120,7 @@ Example:
     2 Field concentration [cm^-3] or optional lateral decay factor: 8e14 | 0.8
 
 <GRAMMAR>{r | rr | pp}
-{`!a & r v0 & (!= g0 {S\w+} & `a | `s B P Al x y PD) | `f}
+{`!a & r v0 & (!= g0 Semiconductor & `a | `s B P Al x y PD) | `f}
 {r v0 & (== v-1 {[xy]} & (`!a & `n & `>= 0 & `<= 1) | == v-1 (B|P|Al|PD)
     & (`!a & `n & `>= 0) | a | `s B P Al x y PD) | f v-1 & a | n & `>= 0
     & `<= 1 | `f}
@@ -227,27 +227,29 @@ Incidence for all solvers example:
     3 Incident angle (Phi): 0
 
 <GRAMMAR>{pp | rr | o}
-{== v0 {S\w+} & (a = 02opt/am15g_IEC60904-3-2008.txt | `f)
-    | == v0 {M\w+} & (a = 0.3 | `n & `> 0)
-    | == v0 {I\w+} & (a = 0 | `n & `>= 0 & `<= 1)
+{== v0 Spectrum & (a = 02opt/am15g_IEC60904-3-2008.txt | `f)
+    | == v0 Monochromatic & (a = 0.3 | `n & `> 0)
+    | == v0 Incidence & (a = 0 | `n & `>= 0 & `<= 1)
     | !a & rr v0 & (n & `>= 0 & `<= 1 | `s A<RC> F<resnel> O<BAM> R<aytrace>
      T<MM> E<xternal>) | `s O<BAM> R<aytrace> T<MM> E<xternal>}
-{== v0 {S\w+} & (a = 0.3 | `n & `> 0) | == v0 {M\w+} & (a = 1e-3 | `n & `> 0)
-    | == v0 {I\w+} & (a = 0 | `n & `>= 0 & `<= 90)
-    | == v1 ARC & (`!a & `m) | (n v1 | == v1 {F\w+} ) & (a | s R<andom>
+{== v0 Spectrum & (a = 0.3 | `n & `> 0)
+    | == v0 Monochromatic  & (a = 1e-3 | `n & `> 0)
+    | == v0 Incidence & (a = 0 | `n & `>= 0 & `<= 90)
+    | == v1 ARC & (`!a & `m) | (n v1 | == v1 Fresnel ) & (a | s R<andom>
     G<aussian> Phong) | == v1 TMM & (a = 1 | n & `>= 1 | `m)
-    | == v1 OBAM & `a | == v1 {E\w+} & `!a & `f | `!a & `i & `> 0}
-{== v0 {S\w+} & (a = 1.2 | `n & `> v-1) | == v0 {M\w+} & `a
-    | == v0 {I\w+} & (a = 0 | `n & `>= 0 & `<= 90)
-    | == v1 ARC & (`!a & `n & `> 0) | ( n v1 | == v1 {F\w+} ) & ((== v2 Phong
-    & a = 1 | `i & `> 0) | (== v2 {G\w+} & a = 0.1 | `n & `> 0) | a = 0
-    | `i & `>= 0 & `<= 1000) | == v1 TMM & (n v2 & (a = 0 | `n & `>= 0)
-    | `a) | == v1 {(E|O)\w+} & `a
+    | == v1 OBAM & `a | == v1 External & `!a & `f | `!a & `i & `> 0}
+{== v0 Spectrum & (a = 1.2 | `n & `> v-1) | == v0 Monochromatic & `a
+    | == v0 Incidence & (a = 0 | `n & `>= 0 & `<= 90)
+    | == v1 ARC & (`!a & `n & `> 0) | ( n v1 | == v1 Fresnel ) & (== v2 Phong
+    & (a = 1 | `i & `> 0) | == v2 Gaussian & (a = 0.1 | `n & `> 0)
+    | == v2 Random  & (a = 0 | `i & `>= 0 & `<= 1000) | `a)
+    | == v1 TMM & (n v2 & (a = 0 | `n & `>= 0) | `a)
+    | == v1 (External|OBAM) & `a
     | a = MonteCarlo | s D<eterministic> MonteCarlo}
-{== v0 {S\w+} & (a = 0.01 | `n & `< v-1) | == v0 {[IM]\w+} & `a
-    | == v1 ARC & (`!a & `f) | == v1 {R\w+} & (a = 1e-4 | `n & `> 0 & `< 1)
+{== v0 Spectrum & (a = 0.01 | `n & `< v-1) | == v0 {[IM]\w+} & `a
+    | == v1 ARC & (`!a & `f) | == v1 Raytrace & (a = 1e-4 | `n & `> 0 & `< 1)
     | `a}
-{== v1 ARC & (a | `m) | == v1 {R\w+} & (a = 100000 | `i & `> 0) | `a}
+{== v1 ARC & (a | `m) | == v1 Raytrace & (a = 100000 | `i & `> 0) | `a}
 {== v1 ARC & (m v-1 & `!a & `n & `> 0 | n v-1 & `!a & `f | f v-1 & (a | `m))
     | `a}
 ...
@@ -306,8 +308,8 @@ SRH example:
         lifetimes are the same
 
 <GRAMMAR>{m | r} {`!a & `f}
-{a | r v0 & (== g0 {I\w+} & `s EA0 Eg0 DC mt | == g0 {S\w+} & `s EA0 Eg0
-    NC300 NV300 DC mt mu BGN SRH Aug Rad)}
+{a | r v0 & (== g0 Insulator & `s EA0 Eg0 DC mt
+    | == g0 Semiconductor & `s EA0 Eg0 NC300 NV300 DC mt mu BGN SRH Aug Rad)}
 {e v-1 & `a | == v-1 (EA0|Eg0|NC300|NV300|DC|mt) & `!a & `n & `> 0
     | == v-1 mu & (`!a & n & `> 0 | `s A<rora> M<asetti>)
     | == v-1 BGN & `!a & `s B<enettWilson> d<elAlamo> J<ainRoulston> S<lotboom>
