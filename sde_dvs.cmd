@@ -217,15 +217,8 @@ foreach grp $IntfFld {
                     foreach var $RegIntfFld {
                         if {[lindex $var 0] eq "r[lindex $reg 0 end]"} {
                             lappend var [list $arr(ID) $val]
-
-                            # Alert users to remove/combine duplicates in file
-                            set tmp [lsort -index 0 [lrange $var 1 end]]
-                            if {[llength [lsort -unique $tmp]]
-                                < [llength $tmp]} {
-                                error "duplicate fields found in FldAttr\
-                                    '[lindex $elm 0]'!"
-                            }
-                            set var [concat [lindex $var 0] $tmp]
+                            set var [concat [lindex $var 0] [lsort -unique\
+                                -index 0 [lrange $var 1 end]]]
                             set flg false
                         }
                         lappend lst $var
@@ -249,15 +242,8 @@ foreach grp $IntfFld {
                                     }
                                 }
                                 lappend var [concat $arr(ID) $tmp]
-
-                                # Alert users to remove/combine duplicates
-                                set tmp [lsort -index 0 [lrange $var 1 end]]
-                                if {[llength [lsort -unique $tmp]]
-                                    < [llength $tmp]} {
-                                    error "duplicate fields found in FldAttr\
-                                        '[lindex $elm 0]'!"
-                                }
-                                set var [concat [lindex $var 0] $tmp]
+                                set var [concat [lindex $var 0] [lsort -unique\
+                                    -index 0 [lrange $var 1 end]]]
                                 set flg false
                             }
                             lappend lst $var
