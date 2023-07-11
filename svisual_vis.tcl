@@ -3,7 +3,12 @@
 #--- Get TCL global variables
 #include ".mfj/varSim.tcl"
 
-set PPAttr [str2List "" $PPAttr]
+# Alert users to remove/combine duplicate vv#
+set PPAttr [lsort -index 0 [str2List "" $PPAttr]]
+if {[llength [lsort -unique $PPAttr]] < [llength $PPAttr]} {
+    error "duplicate entries found in PPAttr '$PPAttr'!"
+}
+
 )!
 
 #setdep @previous@
@@ -996,7 +1001,7 @@ foreach pp $PPAttr {
                 vputs -i2 "\nerror: no monochromatic intensity for QE!\n"
                 continue
             }
-            
+
             # Make sure initial monochromatic light intensity (index 0) is 0
             load_file v${idx}_@plot@ -name BiasData_$pp0
             set lst [get_variable_data -dataset BiasData_$pp0\
@@ -1005,7 +1010,7 @@ foreach pp $PPAttr {
                 vputs -i2 "\nerror: 'v$idx' nonzero initial mono intensity!\n"
                 continue
             }
-            
+
             # Extract jOGBias and jscBias at index 0
             set lst [get_variable_data -dataset BiasData_$pp0\
                 "IntegrSemiconductor $ogPlt"]

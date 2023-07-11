@@ -30,10 +30,15 @@ foreach grp $VarVary {
     }
 }
 
+# Alert users to remove/combine duplicate regions/materials
+set ModPar [lsort -index 0 $ModPar]
+if {[llength [lsort -unique $ModPar]] < [llength $ModPar]} {
+    error "duplicate entries found in ModPar '$ModPar'!"
+}
+
 # Update 'ModPar' to put each individual model and value as a sublist
-# Only retain the last duplicate region/material model/parameter
 set lst [list]
-foreach grp [lsort -unique -index 0 $ModPar] {
+foreach grp $ModPar {
     set val [lrange $grp 0 1]
     set grp [lrange $grp 2 end]
     set tmp ""
@@ -53,9 +58,12 @@ foreach grp [lsort -unique -index 0 $ModPar] {
         lappend val $tmp
     }
 
-    # Keep the last duplicate individual model and sort in increasing order
-    lappend lst [concat [lrange $val 0 1]\
-        [lsort -unique -index 0 [lrange $val 2 end]]]
+    # Alert users to remove/combine duplicate models
+    set tmp [lsort -index 0 [lrange $val 2 end]]
+    if {[llength [lsort -unique $tmp]] < [llength $tmp]} {
+        error "duplicate models found in ModPar '$val'!"
+    }
+    lappend lst [concat [lrange $val 0 1] $tmp]
 }
 set ModPar $lst
 vputs [wrapText "'ModPar': \{$ModPar\}" "* "]

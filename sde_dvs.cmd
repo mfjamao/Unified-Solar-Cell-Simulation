@@ -110,13 +110,18 @@ if {$OptOnly} {
     }
 }
 
-# Remove duplicate regions/interfaces and fields and seperate settings
+# Split 'FldAttr' to 'RegFld' and 'IntfFld' for easier handling
 # RegFld format: Region ID, (field ID, value), (field ID, value), ...
 # IntfFld format: rr, (profile file, lateral factor), ...
 #   (pp Vn), (profile file, lateral factor), ...
 set RegFld [list]
 set IntfFld [list]
-set FldAttr [lsort -unique -index 0 [str2List "" $FldAttr]]
+set FldAttr [lsort -index 0 [str2List "" $FldAttr]]
+
+# Alert users to remove/combine duplicate regions/interfaces
+if {[llength [lsort -unique $FldAttr]] < [llength $FldAttr]} {
+    error "duplicate entries found in FldAttr '$FldAttr'!"
+}
 foreach grp $FldAttr {
     set val [lindex $grp 0]
 
@@ -158,7 +163,13 @@ foreach grp $FldAttr {
     }
 
     # Keep the last duplicate (field value) or (file lateralfactor)
-    set lst [concat $val [lsort -unique -index 0 $lst]]
+    set tmp [lsort -index 0 $lst]
+
+    # Alert users to remove/combine duplicate fields/files
+    if {[llength [lsort -unique $tmp]] < [llength $tmp]} {
+        error "duplicate fields/files found in FldAttr '$val $tmp'!"
+    }
+    set lst [concat $val $tmp]
     if {[regexp {^r\d+$} $val]} {
         lappend RegFld $lst
     } else {
@@ -206,8 +217,15 @@ foreach grp $IntfFld {
                     foreach var $RegIntfFld {
                         if {[lindex $var 0] eq "r[lindex $reg 0 end]"} {
                             lappend var [list $arr(ID) $val]
-                            set var [concat [lindex $var 0]\
-                                [lsort -unique -index 0 [lrange $var 1 end]]]
+
+                            # Alert users to remove/combine duplicates in file
+                            set tmp [lsort -index 0 [lrange $var 1 end]]
+                            if {[llength [lsort -unique $tmp]]
+                                < [llength $tmp]} {
+                                error "duplicate fields found in FldAttr\
+                                    '[lindex $elm 0]'!"
+                            }
+                            set var [concat [lindex $var 0] $tmp]
                             set flg false
                         }
                         lappend lst $var
@@ -231,8 +249,15 @@ foreach grp $IntfFld {
                                     }
                                 }
                                 lappend var [concat $arr(ID) $tmp]
-                                set var [concat [lindex $var 0] [lsort -unique\
-                                    -index 0 [lrange $var 1 end]]]
+
+                                # Alert users to remove/combine duplicates
+                                set tmp [lsort -index 0 [lrange $var 1 end]]
+                                if {[llength [lsort -unique $tmp]]
+                                    < [llength $tmp]} {
+                                    error "duplicate fields found in FldAttr\
+                                        '[lindex $elm 0]'!"
+                                }
+                                set var [concat [lindex $var 0] $tmp]
                                 set flg false
                             }
                             lappend lst $var
@@ -1213,7 +1238,7 @@ foreach var {RegGen RegApp1 RegApp2 RegFld IntfFld RegIntfFld RegIntfTrap
                     (mfj:display "Refinement for interface attributes...\n")
                 )
             )
-            
+
             ;# Skip interface refinement for 3D to reduce mesh points
             (if (and (not (or (member (list Reg1 Reg2) Lst)
                 (member (list Reg2 Reg1) Lst))) (< Dim 3))

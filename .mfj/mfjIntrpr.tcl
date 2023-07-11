@@ -388,6 +388,7 @@ proc mfjIntrpr::readBrf {} {
             # blank line or the last line
             if {$Char eq "#" || $Line eq "" || $LineIdx == $LineEnd} {
                 if {[llength $Str] == 0} {
+                    incr LineIdx
                     continue
                 }
                 if {[llength $Str] == 1} {
@@ -1167,8 +1168,8 @@ proc mfjIntrpr::valRegGen {} {
         if {$RegLen == 0} {
             error "no region specified for $Msg!"
         }
-        foreach Elm {YMax1 ZMax1 XMax YMax ZMax X1 X2 Y1 Y2 Z1 Z2 Lyr RegSeq
-            NegSeq App1} {
+        foreach Elm {YMax1st ZMax1st XMax YMax ZMax X1 X2 Y1 Y2 Z1 Z2 Lyr
+            RegSeq NegSeq Imp} {
             set $Elm 0
         }
         foreach Elm [list 1D 2D 3D] Tmp [list RILst RDLst MatLst IdxLst] {
@@ -1190,12 +1191,12 @@ proc mfjIntrpr::valRegGen {} {
             if {$Len == 0} {
                 error "no dimension specified for '[lindex $Mat 0]'!"
             }
-
-            # Regions are specified using Approach 1, which determines the
-            # simulation domain. Convert Approach 1 to two diagonal points
-            # for each region (1D, 2D and 3D).
             if {[string is double -strict [lindex $DimLst 0]]} {
-                set App1 true
+
+                # Regions are specified using the implicit method, which
+                # determines the simulation domain. Calculate two diagonal
+                # points for each specified region (1D, 2D and 3D).
+                set Imp true
                 lset Mat 1 [incr RegSeq]_[lindex $Mat 0]
                 lset Mat end $RegSeq
                 if {$Len == 1} {
@@ -1246,31 +1247,35 @@ proc mfjIntrpr::valRegGen {} {
                 }
                 vputs -i[expr $Idt+1] $OldReg
 
-                # If the last region, update the max size of each dimension
+                # Set YMax of the first layer
+                if {$Y1 == 0 && $Z1 == 0 && $YMax1st == 0 && $YMax > 0} {
+                    set YMax1st $YMax
+                }
+
+                # Set ZMax of the first section/layer
+                if {$Z1 == 0 && $ZMax1st == 0 && $ZMax > 0} {
+                    set ZMax1st $ZMax
+                }
+
+                # The last region: update dimensions for alignment check
                 if {$Seq == $RegLen} {
                     set XMax [format %.12g $X2]
                     set YMax [format %.12g $Y2]
                     set ZMax [format %.12g $Z2]
                 }
 
-                # Check alignment of the previous region in Y and Z directions
-                if {($Y1 == 0 && $Z1 == 0 || $Seq == $RegLen) && $YMax > 0} {
-                    if {$YMax1 == 0} {
-                        set YMax1 $YMax
-                    }
-                    if {$YMax1 > 0 && abs($YMax1-$YMax) > 1e-7} {
-                        error "YMax '$YMax' is different from the previous\
-                            layer YMax '$YMax1' in $Msg!"
-                    }
+                # Check Y alignment against the first layer
+                if {($Y1 == 0 && $Z1 == 0 || $Seq == $RegLen) && $YMax1st > 0
+                    && abs($YMax1st-$YMax) > 1e-7} {
+                    error "YMax '$YMax' is different from the first\
+                        layer YMax '$YMax1st' in $Msg!"
                 }
-                if {($Z1 == 0 || $Seq == $RegLen) && $ZMax > 0} {
-                    if {$ZMax1 == 0} {
-                        set ZMax1 $ZMax
-                    }
-                    if {$ZMax1 > 0 && abs($ZMax1-$ZMax) > 1e-7} {
-                        error "ZMax '$ZMax' is different from the previous\
-                            section ZMax '$ZMax1' in $Msg!"
-                    }
+
+                # Check Z alignment against the first section/layer
+                if {($Z1 == 0 || $Seq == $RegLen) && $ZMax1st > 0
+                    && abs($ZMax1st-$ZMax) > 1e-7} {
+                    error "ZMax '$ZMax' is different from the first\
+                        section/layer ZMax '$ZMax1st' in $Msg!"
                 }
 
                 # Update the max size of each dimension with the current region
@@ -1281,11 +1286,12 @@ proc mfjIntrpr::valRegGen {} {
                 }
             } else {
 
-                # Regions specified using Approach 2. No alignment check so
-                # users are responsible for drawing reasonable regions. Any
-                # region outside of the simulation domain is trimmed
-                if {$App1} {
-                    error "approach 1 should come after approach 2!"
+                # Regions specified using the explicit method. No alignment
+                # check so users are responsible for drawing reasonable regions.
+                # Any region outside of the simulation domain is trimmed
+                if {$Imp} {
+                    error "The explicit method should be specified before the\
+                        implicit method!"
                 }
                 if {[lindex $DimLst 1] eq "Remove"} {
                     lset Mat 1 [incr NegSeq -1]_[lindex $Mat 0]
@@ -1404,8 +1410,8 @@ proc mfjIntrpr::valRegGen {} {
             incr Seq
         }
 
-        if {!$App1} {
-            error "no approach 1 for defining simulation domain!"
+        if {!$Imp} {
+            error "no implicit method for defining simulation domain!"
         }
 
         # If a single level, 'RegGen' should be treated differently
