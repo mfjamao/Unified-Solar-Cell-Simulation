@@ -119,7 +119,7 @@ set IntfFld [list]
 set FldAttr [lsort -index 0 [str2List "" $FldAttr]]
 
 # Alert users to remove/combine duplicate regions/interfaces
-if {[llength [lsort -unique $FldAttr]] < [llength $FldAttr]} {
+if {[llength [lsort -unique -index 0 $FldAttr]] < [llength $FldAttr]} {
     error "duplicate entries found in FldAttr '$FldAttr'!"
 }
 foreach grp $FldAttr {
@@ -140,6 +140,9 @@ foreach grp $FldAttr {
         } else {
             if {[llength $elm]} {
                 if {[file isfile $elm]} {
+                    append elm " 1 [lindex $mfjDfltSet 1]"
+                } elseif {[llength $elm] == 2
+                    && [file isfile [lindex $elm 0]]} {
                     lappend elm [lindex $mfjDfltSet 1]
                 }
                 lappend lst $elm
@@ -157,16 +160,18 @@ foreach grp $FldAttr {
     }
     if {[llength $elm]} {
         if {[file isfile $elm]} {
+            append elm " 1 [lindex $mfjDfltSet 1]"
+        } elseif {[llength $elm] == 2 && [file isfile [lindex $elm 0]]} {
             lappend elm [lindex $mfjDfltSet 1]
         }
         lappend lst $elm
     }
 
-    # Keep the last duplicate (field value) or (file lateralfactor)
+    # Sort region (field value) or interface (file lateralfactor)
     set tmp [lsort -index 0 $lst]
 
     # Alert users to remove/combine duplicate fields/files
-    if {[llength [lsort -unique $tmp]] < [llength $tmp]} {
+    if {[llength [lsort -unique -index 0 $tmp]] < [llength $tmp]} {
         error "duplicate fields/files found in FldAttr '$val $tmp'!"
     }
     set lst [concat $val $tmp]
@@ -194,16 +199,17 @@ foreach grp $IntfFld {
     set cnt 1
     foreach elm [lrange $grp 1 end] {
         array unset arr
-        readTT arr [lindex $elm 0]
-        if {[info exists arr(FTrap)]} {
+        readTT arr [lindex $elm 0] [lindex $elm 1]
+        if {[info exists arr(Field)] && [llength $arr(Field)]} {
 
-            # Update the original trap file to n@node@_xxx.plx
+            # Update the original interface field file to n@node@_xxx.plx
             set str n@node@_[file tail [lindex $elm 0]]
             lset IntfFld $idx $cnt 0 $str
-            file rename -force $arr(FTrap) $str
+            file rename -force $arr(FFld) $str
+        } else {
+            error "no depth-field pairs found in '[lindex $elm 0]'!"
         }
-        if {[string index [lindex $grp 0] 0] ne "r"
-            && [info exists arr(Field)] && [llength $arr(Field)]} {
+        if {[string index [lindex $grp 0] 0] ne "r"} {
             foreach reg $RegGen {
                 if {[lindex $reg 0 2] ne "Semiconductor"
                     || ([llength [lindex $reg 1]] == 1
@@ -229,7 +235,7 @@ foreach grp $IntfFld {
                     } else {
                         set RegIntfFld $lst
                     }
-                    if {[info exists arr(FTrap)]} {
+                    if {[info exists arr(TrapNat)]} {
                         set flg true
                         set lst [list]
                         foreach var $RegIntfTrap {
@@ -237,7 +243,7 @@ foreach grp $IntfFld {
                                 set tmp [list]
                                 foreach key [array names arr] {
                                     if {$key ne "ID" && $key ne "Field"
-                                        && $key ne "FTrap"} {
+                                        && $key ne "FFld"} {
                                         lappend tmp [list $key $arr($key)]
                                     }
                                 }
@@ -252,7 +258,7 @@ foreach grp $IntfFld {
                             set tmp [list]
                             foreach key [array names arr] {
                                 if {$key ne "ID" && $key ne "Field"
-                                    && $key ne "FTrap"} {
+                                    && $key ne "FFld"} {
                                     lappend tmp [list $key $arr($key)]
                                 }
                             }
@@ -272,39 +278,59 @@ foreach grp $IntfFld {
 set RegIntfFld [lsort -index 0 $RegIntfFld]
 set RegIntfTrap [lsort -index 0 $RegIntfTrap]
 
-# Seperate interfaces from 'IntfAttr'
+# Seperate interfaces from 'IntfAttr' and check duplicates
+# 'IntfSRV': the SRH recombiantion interfaces using SRVs
+# 'IntfTrap': the SRH recombiantion interfaces using trap settings
 # 'IntfCon': only contacts
-# 'IntfSRH': the SRH recombiantion interfaces
 # 'IntfTun': the tunnel interfaces
-set IntfCon [list]
-set IntfSRH [list]
-set IntfTun [list]
-set lst [list]
+foreach elm {IntfSRV IntfTrap IntfCon IntfTun lst} {
+    set $elm [list]
+}
 set IntfAttr [str2List "" $IntfAttr]
 foreach grp $IntfAttr {
     set lst [string map {r "" / " "} [lindex $grp 0]]
+    regsub {^r(\d+)/(\d+)} $grp {r\2/\1} str
     if {[regexp {^c\d$} [lindex $grp 1]]} {
+        set var [concat $IntfCon [list $str]]
+        set val [concat $IntfCon [list $grp]]
         lappend IntfCon $grp
     } elseif {[string is double -strict [lindex $grp 1]]} {
-        if {([string is double -strict [lindex $grp 2]]
-            || [string is double -strict [lindex $grp 3]])
+        if {[string is double -strict [lindex $grp 2]]
             && [lindex $RegGen [lindex $lst 0] 0 2] ne "Semiconductor"
             && [lindex $RegGen [lindex $lst 1] 0 2] ne "Semiconductor"} {
             error "either 'r[lindex $lst 0]' or 'r[lindex $lst 1]' should\
                 be semiconductor!"
         } else {
-            lappend IntfSRH $grp
+            set var [concat $IntfSRV [list $str]]
+            set val [concat $IntfSRV [list $grp]]
+            lappend IntfSRV $grp
         }
+    } elseif {[file isfile [lindex $grp 1]]} {
+        set var [concat $IntfTrap [list $str]]
+        set val [concat $IntfTrap [list $grp]]
+        lappend IntfTrap $grp
     } else {
+        set var [concat $IntfTun [list $str]]
+        set val [concat $IntfTun [list $grp]]
         lappend IntfTun $grp
+    }
+
+    # Alert users to remove/combine duplicate interface attributes
+    if {[llength [lsort -unique -index 0 $var]] < [llength $var]
+        || [llength [lsort -unique -index 0 $val]] < [llength $val]} {
+        error "duplicate '$grp' found in IntfAttr '[lrange $var 0 end-1]'!"
     }
 }
 
 # Make sure a contact is not used for other interfaces
 foreach grp $IntfCon {
     regsub {r(\d+)/(\d+)} [lindex $grp 0] {r\2/\1} str
-    if {[regexp \\\{([lindex $grp 0]|$str)\\s $IntfSRH -> val]} {
-        error "interface '$val' of $IntfSRH is already the contact\
+    if {[regexp \\\{([lindex $grp 0]|$str)\\s $IntfSRV -> val]} {
+        error "interface '$val' of $IntfSRV is already the contact\
+            '[lindex $grp 1]'!"
+    }
+    if {[regexp \\\{([lindex $grp 0]|$str)\\s $IntfTrap -> val]} {
+        error "interface '$val' of $IntfTrap is already the contact\
             '[lindex $grp 1]'!"
     }
     if {[regexp \\\{([lindex $grp 0]|$str)\\s $IntfTun -> val]} {
@@ -398,10 +424,10 @@ if {[regexp {\sRaytrace\s} $GopAttr] && $Cylind
 
 #--- Pass all global TCL parameters to SCHEME
 foreach var {RegGen RegApp1 RegApp2 RegFld IntfFld RegIntfFld RegIntfTrap
-    IntfAttr IntfCon IntfSRH IntfTun GopAttr GopPP MeshAttr Cylind OptOnly
-    LPD Dim XMax YMax ZMax RegLen}\
+    IntfAttr IntfSRV IntfTrap IntfCon IntfTun GopAttr GopPP MeshAttr Cylind
+    OptOnly LPD Dim XMax YMax ZMax RegLen}\
     val [list $RegGen $RegApp1 $RegApp2 $RegFld $IntfFld $RegIntfFld\
-    $RegIntfTrap $IntfAttr $IntfCon $IntfSRH $IntfTun $GopAttr $GopPP\
+    $RegIntfTrap $IntfAttr $IntfSRV $IntfTrap $IntfCon $IntfTun $GopAttr $GopPP\
     $MeshAttr $Cylind $OptOnly $LPD $Dim $XMax $YMax $ZMax $RegLen] {
     vputs "(define $var [tcl2Scheme $var $val])"
 }

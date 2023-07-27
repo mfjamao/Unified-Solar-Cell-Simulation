@@ -886,234 +886,280 @@ proc mfjProc::getRegIdx {RegDim Intf} {
 }
 
 # mfjProc::readTT
-#     Read a file to extract ID line, depth concentration pair, trap settings,
-#     depth trap concentration pair, nonlocal mesh settings
+#     Read a file to extract ID line, depth field density pair, trap settings,
+#     depth trap density pair, nonlocal mesh settings. Only one ID line and
+#     depth-field pairs are allowed!
 # Arguments:
 #     TTArr       Trap/tunnel array
 #     TTFile      Trap/tunnel setting file
+#     TTRatio     Optional field density ratio
 # Result: Return ID, field depth, optional trap settings and trap profile file
-proc mfjProc::readTT {TTArr TTFile} {
-    if {[file isfile $TTFile]} {
-        upvar 1 $TTArr Arr
-        set OptLst {TrapNat TrapRef EnergyMid Xsection TrapDist Reference Conc
-            EnergySig Jfactor PhononEnergy TrapVolume Discretization Digits
-            EnergyResolution MaxAngle Transparent Permeable Endpoint Refined
-            TwoBand Multivalley PModel Region}
-        set ReadTbl false
-        set Inf [open $TTFile r]
+proc mfjProc::readTT {TTArr TTFile {TTRatio 1}} {
+    if {![file isfile $TTFile]} {
+        error "'$TTFile' should be a file!"
+    }
 
-        # 'gets' is safer than 'read' in case the file is too big
-        while {[gets $Inf Line] != -1} {
-            set Line [string trim $Line]
+    # Map the local array 'Arr' to the global array 'TTArr'
+    upvar 1 $TTArr Arr
+    set OptLst {TrapNat TrapRef EnergyMid Xsection TrapDist Reference Conc
+        EnergySig Jfactor PhononEnergy TrapVolume Discretization Digits
+        EnergyResolution MaxAngle Transparent Permeable Endpoint Refined
+        TwoBand Multivalley PModel Region}
+    set ReadTbl false
+    set Inf [open $TTFile r]
 
-            # Skip comments and blank lines
-            if {$Line eq "" || [string index $Line 0] eq "#"} {
-                continue
+    # 'gets' is safer than 'read' in case the file is too big
+    while {[gets $Inf Line] != -1} {
+        set Line [string trim $Line]
+
+        # Skip comments and blank lines
+        if {$Line eq "" || [string index $Line 0] eq "#"} {
+            continue
+        }
+        if {[regexp -nocase {^<Table>(.+)} $Line -> Line]} {
+            if {$ReadTbl} {
+                lappend Arr(Table) $Tbl
+            } else {
+                set ReadTbl true
             }
-            if {[regexp -nocase {^<Table>(.+)} $Line -> Line]} {
+            if {[llength $Line] == 2
+                && [string is double -strict [lindex $Line 0]]
+                && [string is double -strict [lindex $Line 1]]
+                && [lindex $Line 1] > 0} {
+                set Tbl [lrange $Line 0 1]
+            } else {
+                set Tbl ""
+            }
+            continue
+        }
+
+        # Only the ID line has one element
+        if {[llength $Line] == 1} {
+            if {[regexp {^"(\w+)"$} $Line -> Str]} {
+                if {[info exists Arr(ID)]} {
+                    error "> 1 ID lines detected in '$TTFile'!"
+                }
+                set Arr(ID) $Str
+                set Arr(FFld) .mfj/[file rootname [file tail\
+                    $TTFile]]-[expr rand()].plx
+                set Ouf [open $Arr(FFld) w]
+                puts $Ouf \"$Arr(ID)\"
+            } else {
+                error "'$Line': invalid ID!"
+            }
+        } else {
+
+            # Trap energetic distribution or spatial distribution
+            if {[llength $Line] == 2
+                && [string is double -strict [lindex $Line 0]]
+                && [string is double -strict [lindex $Line 1]]} {
                 if {$ReadTbl} {
-                    lappend Arr(Table) $Tbl
-                } else {
-                    set ReadTbl true
-                }
-                if {[llength $Line] == 2
-                    && [string is double -strict [lindex $Line 0]]
-                    && [string is double -strict [lindex $Line 1]]
-                    && [lindex $Line 1] > 0} {
-                    set Tbl [lrange $Line 0 1]
-                } else {
-                    set Tbl ""
-                }
-                continue
-            }
-
-            # Only the ID line has one element
-            if {[llength $Line] == 1} {
-                if {[regexp {^"(\w+)"$} $Line -> Arr(ID)]} {
-                    if {[regexp {^PMIUserField\d+$} $Arr(ID)]} {
-                        set Arr(FTrap) .mfj/[file rootname [file tail\
-                            $TTFile]]-[expr rand()].plx
-                        set Ouf [open $Arr(FTrap) w]
-                        puts $Ouf \"$Arr(ID)\"
+                    if {[lindex $Line 1] > 0} {
+                        lappend Tbl [lindex $Line 0]
+                        lappend Tbl [format %.4e [lindex $Line 1]]
+                    } else {
+                        error "'$Line': invalid trap density!"
                     }
                 } else {
-                    error "'$Line': invalid ID!"
-                }
-            } else {
-
-                # Trap energetic distribution or spatial distribution
-                if {[llength $Line] == 2
-                    && [string is double -strict [lindex $Line 0]]
-                    && [string is double -strict [lindex $Line 1]]} {
-                    if {$ReadTbl} {
-                        if {[lindex $Line 1] > 0} {
-                            lappend Tbl [lindex $Line 0]
-                            lappend Tbl [lindex $Line 1]
-                        } else {
-                            error "'$Line': invalid trap density!"
+                    if {[lindex $Line 0] >= 0 && [lindex $Line 1] >= 0} {
+                        set Val [format %.4e [expr 1.*$TTRatio\
+                            *[lindex $Line 1]]]
+                        lappend Arr(Field) "[lindex $Line 0] $Val"
+                        if {[info exists Ouf]} {
+                            puts $Ouf "[lindex $Line 0] $Val"
                         }
                     } else {
-                        if {[lindex $Line 0] >= 0 && [lindex $Line 1] >= 0} {
-                            lappend Arr(Field) [lrange $Line 0 1]
-                            if {[info exists Ouf]} {
-                                puts $Ouf [lrange $Line 0 1]
-                            }
-                        } else {
-                            error "'$Line': invalid trap profile!"
-                        }
+                        error "'$Line': invalid depth-field profile!"
                     }
-                    continue
                 }
-                set Idx [lsearch -regexp $OptLst (?i)^[lindex $Line 0]$]
-                if {$Idx == -1} {
-                    error "'[lindex $Line 0]': unknown option!"
-                } else {
-                    set Key [lindex $OptLst $Idx]
+                continue
+            }
+            set Idx [lsearch -regexp $OptLst (?i)^[lindex $Line 0]$]
+            if {$Idx == -1} {
+                error "'[lindex $Line 0]': unknown option!"
+            } else {
+                set Key [lindex $OptLst $Idx]
+                if {$ReadTbl} {
+                    lappend Arr(Table) $Tbl
+                    set ReadTbl false
                 }
+            }
 
-                # Check each option and validate its values
-                switch -regexp -- $Key {
-                    ^(TrapNat|TrapRef|TrapDist|Reference|PModel)$ {
-                        if {$Key eq "TrapNat"} {
-                            set Lst {A<cceptor> D<onor>}
-                        } elseif {$Key eq "TrapRef"} {
-                            set Lst {FromCondBand FromMidBandGap FromValBand}
-                        } elseif {$Key eq "TrapDist"} {
-                            set Lst {L<evel> U<niform> E<xpoential> G<aussian>
-                                T<able>}
-                        } elseif {$Key eq "Reference"} {
-                            set Lst {B<andGap> E<ffectiveBandGap>}
-                        } elseif {$Key eq "PModel"} {
-                            set Lst {W<KB> S<chroedinger>}
-                        }
-                        lappend Arr($Key) [iSwitch !Dflt [lindex $Line 1] $Lst]
+            # Check each option and validate its values
+            switch -regexp -- $Key {
+                ^(TrapNat|TrapRef|TrapDist|Reference|PModel)$ {
+                    if {$Key eq "TrapNat"} {
+                        set Lst {A<cceptor> D<onor>}
+                    } elseif {$Key eq "TrapRef"} {
+                        set Lst {FromCondBand FromMidBandGap FromValBand}
+                    } elseif {$Key eq "TrapDist"} {
+                        set Lst {L<evel> U<niform> E<xpoential> G<aussian>
+                            T<able>}
+                    } elseif {$Key eq "Reference"} {
+                        set Lst {B<andGap> E<ffectiveBandGap>}
+                    } elseif {$Key eq "PModel"} {
+                        set Lst {W<KB> S<chroedinger>}
                     }
-                    ^(Conc|EnergySig|TrapVolume)$ {
-                        if {[string is double -strict [lindex $Line 1]]
-                            && [lindex $Line 1] > 0} {
-                            lappend Arr($Key) [format %.12g [lindex $Line 1]]
-                        } else {
-                            error "'$Line': unknown [string tolower $Key]!"
-                        }
+                    lappend Arr($Key) [iSwitch !Dflt [lindex $Line 1] $Lst]
+                }
+                ^(Conc|EnergySig|TrapVolume)$ {
+                    if {[string is double -strict [lindex $Line 1]]
+                        && [lindex $Line 1] > 0} {
+                        lappend Arr($Key) [format %.12g [lindex $Line 1]]
+                    } else {
+                        error "'$Line': unknown [string tolower $Key]!"
                     }
-                    ^EnergyMid$ {
-                        if {[string is double -strict [lindex $Line 1]]} {
-                            lappend Arr($Key) [format %.12g [lindex $Line 1]]
-                        } else {
-                            error "'$Line': unknown [string tolower $Key]!"
-                        }
+                }
+                ^EnergyMid$ {
+                    if {[string is double -strict [lindex $Line 1]]} {
+                        lappend Arr($Key) [format %.12g [lindex $Line 1]]
+                    } else {
+                        error "'$Line': unknown [string tolower $Key]!"
                     }
-                    ^Xsection$ {
-                        if {[string is double -strict [lindex $Line 1]]
-                            && [string is double -strict [lindex $Line 2]]
-                            && [lindex $Line 1] > 0 && [lindex $Line 2] > 0} {
-                            lappend Arr(e$Key) [format %.12g [lindex $Line 1]]
-                            lappend Arr(h$Key) [format %.12g [lindex $Line 2]]
-                        } elseif {[string is double -strict [lindex $Line 1]]
-                            && [lindex $Line 1] > 0} {
-                            lappend Arr(e$Key) [format %.12g [lindex $Line 1]]
-                            lappend Arr(h$Key) [lindex $Arr(e$Key) end]
-                        } else {
-                            error "'$Line': unknown [string tolower $Key]!"
-                        }
+                }
+                ^Xsection$ {
+                    if {[string is double -strict [lindex $Line 1]]
+                        && [string is double -strict [lindex $Line 2]]
+                        && [lindex $Line 1] > 0 && [lindex $Line 2] > 0} {
+                        lappend Arr(e$Key) [format %.12g [lindex $Line 1]]
+                        lappend Arr(h$Key) [format %.12g [lindex $Line 2]]
+                    } elseif {[string is double -strict [lindex $Line 1]]
+                        && [lindex $Line 1] > 0} {
+                        lappend Arr(e$Key) [format %.12g [lindex $Line 1]]
+                        lappend Arr(h$Key) [lindex $Arr(e$Key) end]
+                    } else {
+                        error "'$Line': unknown [string tolower $Key]!"
                     }
-                    ^Jfactor$ {
-                        if {[string is double -strict [lindex $Line 1]]
-                            && [string is double -strict [lindex $Line 2]]
-                            && [lindex $Line 1] >= 0 && [lindex $Line 1] <= 1
-                            && [lindex $Line 2] >= 0 && [lindex $Line 2] <= 1} {
-                            lappend Arr(e$Key) [format %.12g [lindex $Line 1]]
-                            lappend Arr(h$Key) [format %.12g [lindex $Line 2]]
-                        } elseif {[string is double -strict [lindex $Line 1]]
-                            && [lindex $Line 1] >= 0 && [lindex $Line 1] <= 1} {
-                            lappend Arr(e$Key) [format %.12g [lindex $Line 1]]
-                            lappend Arr(h$Key) [lindex $Arr(e$Key) end]
-                        } else {
-                            error "'$Line': unknown [string tolower $Key]!"
-                        }
+                }
+                ^Jfactor$ {
+                    if {[string is double -strict [lindex $Line 1]]
+                        && [string is double -strict [lindex $Line 2]]
+                        && [lindex $Line 1] >= 0 && [lindex $Line 1] <= 1
+                        && [lindex $Line 2] >= 0 && [lindex $Line 2] <= 1} {
+                        lappend Arr(e$Key) [format %.12g [lindex $Line 1]]
+                        lappend Arr(h$Key) [format %.12g [lindex $Line 2]]
+                    } elseif {[string is double -strict [lindex $Line 1]]
+                        && [lindex $Line 1] >= 0 && [lindex $Line 1] <= 1} {
+                        lappend Arr(e$Key) [format %.12g [lindex $Line 1]]
+                        lappend Arr(h$Key) [lindex $Arr(e$Key) end]
+                    } else {
+                        error "'$Line': unknown [string tolower $Key]!"
                     }
-                    ^PhononEnergy$ {
-                        if {[string is double -strict [lindex $Line 1]]
-                            && [lindex $Line 1] >= 0} {
-                            lappend Arr($Key) [format %.12g [lindex $Line 1]]
-                        } else {
-                            error "'$Line': unknown [string tolower $Key]!"
-                        }
+                }
+                ^PhononEnergy$ {
+                    if {[string is double -strict [lindex $Line 1]]
+                        && [lindex $Line 1] >= 0} {
+                        lappend Arr($Key) [format %.12g [lindex $Line 1]]
+                    } else {
+                        error "'$Line': unknown [string tolower $Key]!"
                     }
-                    ^Region$ {
-                        if {[lindex $Line 1] == 1 || [lindex $Line 1] == 2} {
-                            lappend Arr($Key) [format %.12g [lindex $Line 1]]
-                        } else {
-                            error "'$Line': unknown [string tolower $Key]!"
-                        }
+                }
+                ^Region$ {
+                    if {[lindex $Line 1] == 1 || [lindex $Line 1] == 2} {
+                        lappend Arr($Key) [format %.12g [lindex $Line 1]]
+                    } else {
+                        error "'$Line': unknown [string tolower $Key]!"
                     }
-                    ^(Discretization|EnergyResolution)$ {
-                        if {[string is double -strict [lindex $Line 1]]
-                            && [lindex $Line 1] > 0} {
-                            set Arr($Key) [format %.12g [lindex $Line 1]]
-                        } else {
-                            error "'$Line': unknown [string tolower $Key]!"
-                        }
+                }
+                ^(Discretization|EnergyResolution)$ {
+                    if {[string is double -strict [lindex $Line 1]]
+                        && [lindex $Line 1] > 0} {
+                        set Arr($Key) [format %.12g [lindex $Line 1]]
+                    } else {
+                        error "'$Line': unknown [string tolower $Key]!"
                     }
-                    ^MaxAngle$ {
-                        if {[string is double -strict [lindex $Line 1]]
-                            && [lindex $Line 1] >= 0
-                            && [lindex $Line 1] <= 180} {
-                            set Arr($Key) [format %.12g [lindex $Line 1]]
-                        } else {
-                            error "'$Line': unknown [string tolower $Key]!"
-                        }
+                }
+                ^MaxAngle$ {
+                    if {[string is double -strict [lindex $Line 1]]
+                        && [lindex $Line 1] >= 0
+                        && [lindex $Line 1] <= 180} {
+                        set Arr($Key) [format %.12g [lindex $Line 1]]
+                    } else {
+                        error "'$Line': unknown [string tolower $Key]!"
                     }
-                    ^Digits$ {
-                        if {[string is integer -strict [lindex $Line 1]]
-                            && [lindex $Line 1] > 0} {
-                            set Arr($Key) [format %.12g [lindex $Line 1]]
-                        } else {
-                            error "'$Line': unknown [string tolower $Key]!"
-                        }
+                }
+                ^Digits$ {
+                    if {[string is integer -strict [lindex $Line 1]]
+                        && [lindex $Line 1] > 0} {
+                        set Arr($Key) [format %.12g [lindex $Line 1]]
+                    } else {
+                        error "'$Line': unknown [string tolower $Key]!"
                     }
-                    ^(Transparent|Permeable|Endpoint|Refined)$ {
-                        if {[regexp {^[+-]$} [lindex $Line 1]]
-                            && [regexp {^[+-]$} [lindex $Line 2]]} {
-                            set Arr($Key) [lrange $Line 1 2]
-                        } else {
-                            error "'$Line': unknown [string tolower $Key]!"
-                        }
+                }
+                ^(Transparent|Permeable|Endpoint|Refined)$ {
+                    if {[regexp {^[+-]$} [lindex $Line 1]]
+                        && [regexp {^[+-]$} [lindex $Line 2]]} {
+                        set Arr($Key) [lrange $Line 1 2]
+                    } else {
+                        error "'$Line': unknown [string tolower $Key]!"
                     }
-                    ^(TwoBand|Multivalley)$ {
-                        if {[regexp {^[+-]$} [lindex $Line 1]]} {
-                            set Arr($Key) [lindex $Line 1]
-                        } else {
-                            error "'$Line': unknown [string tolower $Key]!"
-                        }
+                }
+                ^(TwoBand|Multivalley)$ {
+                    if {[regexp {^[+-]$} [lindex $Line 1]]} {
+                        set Arr($Key) [lindex $Line 1]
+                    } else {
+                        error "'$Line': unknown [string tolower $Key]!"
                     }
-                    default {
-                        error "double check '$Line'!"
-                    }
+                }
+                default {
+                    error "double check '$Line'!"
                 }
             }
         }
-        if {$ReadTbl} {
-            lappend Arr(Table) $Tbl
+    }
+    if {$ReadTbl} {
+        lappend Arr(Table) $Tbl
+    }
+    close $Inf
+    if {[info exists Ouf]} {
+        close $Ouf
+    }
+
+    # Check trap related keys
+    if {[info exists Arr(TrapNat)]} {
+        set Len [llength $Arr(TrapNat)]
+
+        # Ensure a minimum set of keys for traps
+        foreach Elm {TrapRef EnergyMid eXsection} {
+            if {![info exists Arr($Elm)]} {
+                error "no '$Elm' found in '$TTFile'!"
+            }
         }
-        close $Inf
-        if {[info exists Ouf]} {
-            close $Ouf
+
+        # Default trap distribution 'level'
+        if {[info exists Arr(TrapDist)]} {
+            if {[lindex $Arr(TrapDist) 0] eq "Table"} {
+                if {![info exists Arr(Table)]} {
+                    error "no '<Table>' found in '$TTFile'!"
+                }
+            } else {
+                if {![info exists Arr(Field)] && ![info exists Arr(Conc)]} {
+                    error "no 'Conc' found in '$TTFile'!"
+                }
+                if {[lindex $Arr(TrapDist) 0] ne "Level"
+                    && ![info exists Arr(EnergySig)]} {
+                    error "no 'EnergySig' found in '$TTFile'!"
+                }
+            }
+        } else {
+            set Arr(TrapDist) [string repeat "Level " [expr $Len-1]]Level
+        }
+
+        # Trap-assisted tunneling
+        if {[info exists Arr(TrapVolume)]} {
+            if {![info exists Arr(PhononEnergy)]} {
+                error "no 'PhononEnergy' found in '$TTFile'!"
+            }
         }
 
         # The length of trap related options should tally with each other
-        if {[info exists Arr(TrapNat)]} {
-            set Len [llength $Arr(TrapNat)]
-            foreach Elm {TrapDist TrapRef Conc EnergyMid EnergySig eXsection
-                hXsection Table eJfactor hJfactor Reference PhononEnergy
-                TrapVolume Region} {
-                if {[info exists Arr($Elm)] && [llength $Arr($Elm)] != $Len} {
-                    error "length of $Elm '$Arr($Elm)' != $Len!"
-                }
+        foreach Elm {TrapDist TrapRef Conc EnergyMid EnergySig eXsection
+            hXsection Table eJfactor hJfactor Reference PhononEnergy
+            TrapVolume Region} {
+            if {[info exists Arr($Elm)] && [llength $Arr($Elm)] != $Len} {
+                error "length of $Elm '$Arr($Elm)' != $Len!"
             }
         }
-    } else {
-        error "'$TTFile' should be a file!"
     }
 }
 

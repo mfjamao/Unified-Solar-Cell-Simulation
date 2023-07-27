@@ -1418,7 +1418,8 @@ proc mfjST::miscTask {} {
     }
 
     vputs -i1 "Clearing junk files from the previous run if any..."
-    foreach Junk [glob -nocomplain slurm* pbs* n_tclResults_* *_crash_*] {
+    foreach Junk [glob -nocomplain slurm* pbs* n_tclResults_* *_crash_*\
+        *.restech.*] {
         file delete $Junk
         vputs -v5 -i2 "'$Junk' deleted"
     }

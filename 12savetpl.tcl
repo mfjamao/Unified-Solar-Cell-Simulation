@@ -71,7 +71,7 @@ if {[file isfile $SimArr(FVarEnv)]} {
     error "'$SimArr(FVarEnv)' missing in directory '[pwd]'!"
 }
 
-    
+
 
 # If SimArr(TplDir) found at index 0, skip it
 set argv [file split [lindex [string map {\{ {} \} {}} $argv] 0]]
@@ -123,7 +123,7 @@ set FLst [concat $FLst $SimArr(FVarRaw) $FBrf 11ctrlsim.tcl 11ctrlsim.mfj\
     $SimArr(FSave)  $SimArr(FLoad) README.md gtooldb.tcl\
     [glob -nocomplain -directory $::SimArr(OutDir) *.csv *.plx]\
     [glob -nocomplain -directory $::SimArr(PMIDir) {*.[cC]} *.so.*]\
-    [glob -nocomplain *.out v*.plt]]
+    [glob -nocomplain *.out n*_OG1D.plx v*.plt pbs.*]]
 foreach Elm [glob -nocomplain .mfj/*.tcl] {
     lappend FLst $Elm
 }
@@ -147,9 +147,21 @@ foreach Elm [lsort -unique $FLst] {
 cd [file dirname $TmpDir]
 set Dir [file tail $TmpDir]
 mputs $Ouf "\nCreate a Tar/GZip archive './$TmpDir.tgz'"
-exec tar -czf $Dir.tgz $Dir
-mputs $Ouf "Remove the temp directory: './$TmpDir'"
-exec rm -fr $Dir
-mputs $Ouf "Done!\n"
-close $Ouf
-exit 0
+
+# Delete files if "tar: file changed as we read it" error occurs
+if {[catch {exec tar -czf $Dir.tgz $Dir} ErrMsg]} {
+    mputs $Ouf $ErrMsg
+    mputs $Ouf "Remove the temp directory: './$TmpDir'"
+    exec rm -fr $Dir
+    mputs $Ouf "\Remove the Tar/GZip archive: './$TmpDir.tgz'"
+    exec rm -fr $Dir.tgz
+    mputs $Ouf "\nSimulation not saved! Try again!\n"
+    close $Ouf
+    exit 1
+} else {
+    mputs $Ouf "Remove the temp directory: './$TmpDir'"
+    exec rm -fr $Dir
+    mputs $Ouf "Done!\n"
+    close $Ouf
+    exit 0
+}

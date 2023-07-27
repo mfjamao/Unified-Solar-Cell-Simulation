@@ -19,28 +19,17 @@ if {!$OptOnly} {
     for {set i 0} {$i < $val} {incr i} {
         for {set j [expr $i+1]} {$j < $RegLen} {incr j} {
             set flg false
-            foreach grp $IntfSRH {
+            foreach grp $IntfSRV {
                 if {"r$i/$j" ne [lindex $grp 0]
                     && "r$j/$i" ne [lindex $grp 0]} continue
                 if {[string is double -strict [lindex $grp 2]]
                     && [lindex $grp 2] > 0} {
                     set flg true
-                    if {[string is double -strict [lindex $grp 3]]} {
+                    if {[string is double -strict [lindex $grp 3]]
+                        && [lindex $grp 3] > 0} {
                         set str "[lindex $grp 2], [lindex $grp 3]"
                     } else {
                         set str "[lindex $grp 2], [lindex $grp 2]"
-                    }
-                } else {
-
-                    # Element 2 is a trap file
-                    if {[string is double -strict [lindex $grp 3]]
-                        && [lindex $grp 3] > 0} {
-                        set flg true
-                        if {[string is double -strict [lindex $grp 4]]} {
-                            set str "[lindex $grp 3], [lindex $grp 4]"
-                        } else {
-                            set str "[lindex $grp 3], [lindex $grp 3]"
-                        }
                     }
                 }
                 if {$flg} {
@@ -193,17 +182,6 @@ foreach grp $ModPar {
                     set str "[lindex $lst 1], [lindex $lst 2]"
                 } else {
                     set str "[lindex $lst 1], [lindex $lst 1]"
-                }
-                vputs -n -i-4 "
-                    Scharfetter \{
-                        taumin= $str * s
-                        taumax= $str * s
-                    \}"
-            } elseif {[string is double -strict [lindex $lst 2]]} {
-                if {[string is double -strict [lindex $lst 3]]} {
-                    set str "[lindex $lst 2], [lindex $lst 3]"
-                } else {
-                    set str "[lindex $lst 2], [lindex $lst 2]"
                 }
                 vputs -n -i-4 "
                     Scharfetter \{

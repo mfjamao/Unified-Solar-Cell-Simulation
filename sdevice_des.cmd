@@ -32,7 +32,7 @@ foreach grp $VarVary {
 
 # Alert users to remove/combine duplicate regions/materials
 set ModPar [lsort -index 0 $ModPar]
-if {[llength [lsort -unique $ModPar]] < [llength $ModPar]} {
+if {[llength [lsort -unique -index 0 $ModPar]] < [llength $ModPar]} {
     error "duplicate entries found in ModPar '$ModPar'!"
 }
 
@@ -43,7 +43,7 @@ foreach grp $ModPar {
     set grp [lrange $grp 2 end]
     set tmp ""
     while {[llength $grp]} {
-        if {[regexp {^(EA0|Eg0|NC300|NV300|DC|mt|mu|BGN|SRH|Aug|Rad)$}\
+        if {[regexp {^(EA0|Eg0|NC300|NV300|DC|mt|mu|BGN|SRH|Trap|Aug|Rad)$}\
             [lindex $grp 0]]} {
             if {[llength $tmp]} {
                 lappend val $tmp
@@ -60,7 +60,7 @@ foreach grp $ModPar {
 
     # Alert users to remove/combine duplicate models
     set tmp [lsort -index 0 [lrange $val 2 end]]
-    if {[llength [lsort -unique $tmp]] < [llength $tmp]} {
+    if {[llength [lsort -unique -index 0 $tmp]] < [llength $tmp]} {
         error "duplicate models found in ModPar '$val'!"
     }
     lappend lst [concat [lrange $val 0 1] $tmp]
@@ -794,10 +794,8 @@ CurrentPlot {
 
     # By default, integrate surface recombination along region interfaces
     set flg false
-    foreach grp $IntfSRH {
-        if {![string is double -strict [lindex $grp 1]]
-            || (![string is double -strict [lindex $grp 2]]
-            && ![string is double -strict [lindex $grp 3]])} continue
+    foreach grp $IntfSRV {
+        if {![string is double -strict [lindex $grp 2]]} continue
         set lst [string map {r "" / " "} [lindex $grp 0]]
         set intf [lindex $RegGen [lindex $lst 0] 0 1]/[lindex\
             $RegGen [lindex $lst 1] 0 1]
@@ -1143,9 +1141,21 @@ if {!$OptOnly} {
                 foreach val [lrange $var 1 end] {
                     set arr([lindex $val 0]) [lindex $val 1]
                 }
-                lappend str "($arr(TrapNat) Level $arr(TrapRef)\nEnergyMid=\
-                    $arr(EnergyMid) eXsection= $arr(eXsection)\nhXsection=\
-                    $arr(hXsection) SFactor= \"[lindex $var 0]\")"
+                lappend str "($arr(TrapNat) $arr(TrapRef)"
+                lappend str "SFactor= \"[lindex $var 0]\""
+                if {[info exists arr(Reference)]} {
+                    lappend str "Reference= $arr(Reference)"
+                }
+                if {$arr(TrapDist) eq "Level"} {
+                    lappend str "Level EnergyMid= $arr(EnergyMid)"
+                } elseif {$arr(TrapDist) eq "Table"} {
+                    lappend str "Table= ($arr(Table))"
+                } else {
+                    lappend str "$arr(TrapDist) EnergyMid= $arr(EnergyMid)"
+                    lappend str "EnergySig= $arr(EnergySig)"
+                }
+                lappend str "eXsection= $arr(eXsection)"
+                lappend str "hXsection= $arr(hXsection))"
             }
 
         }
@@ -1164,44 +1174,51 @@ if {!$OptOnly} {
             readTT arr [lindex $elm 2]
             set len [llength $arr(TrapNat)]
             for {set idx 0} {$idx < $len} {incr idx} {
-                lappend lst "([lindex $arr(TrapNat) $idx]\
-                    [lindex $arr(TrapRef) $idx]"
-                lappend lst "eXsection= [lindex $arr(eXsection) $idx]\
-                    hXsection= [lindex $arr(hXsection) $idx]"
-                lappend lst "Reference= [lindex $arr(Reference) $idx]"
-                lappend lst "TrapVolume= [lindex $arr(TrapVolume) $idx]\
-                    PhononEnergy= [lindex $arr(PhononEnergy) $idx]"
+                set tmp [lindex $arr(TrapRef) $idx]
+                lappend lst "([lindex $arr(TrapNat) $idx] $tmp"
+                if {[info exists arr(Reference)]} {
+                    lappend lst "Reference= [lindex $arr(Reference) $idx]"
+                }
+                if {[info exists arr(TrapVolume)]} {
+                    lappend lst "TrapVolume= [lindex $arr(TrapVolume) $idx]"
+                    lappend lst "PhononEnergy= [lindex $arr(PhononEnergy) $idx]"
+                }
                 if {[lindex $arr(TrapDist) $idx] eq "Level"} {
-                    lappend lst "Level Conc= [lindex $arr(Conc) $idx]"
+                    set tmp [format %g [lindex $arr(Conc) $idx]]
+                    lappend lst "Level Conc= $tmp"
                     lappend lst "EnergyMid= [lindex $arr(EnergyMid) $idx]"
                 } elseif {[lindex $arr(TrapDist) $idx] eq "Table"} {
                     lappend lst "Table= ([lindex $arr(Table) $idx])"
                 } else {
-                    lappend lst "[lindex $arr(TrapDist) $idx]\
-                        Conc= [lindex $arr(Conc) $idx]"
-                    lappend lst "EnergyMid= [lindex $arr(EnergyMid) $idx]\
-                        EnergySig= [lindex $arr(EnergySig) $idx]"
+                    set tmp [format %g [lindex $arr(Conc) $idx]]
+                    lappend lst "[lindex $arr(TrapDist) $idx] Conc= $tmp"
+                    lappend lst "EnergyMid= [lindex $arr(EnergyMid) $idx]"
+                    lappend lst "EnergySig= [lindex $arr(EnergySig) $idx]"
                 }
                 if {[lindex $elm 5] eq "c"} {
                     lappend lst "eBarrierTunneling (NonLocal= \"NLM$val\")"
-                    lappend lst "hBarrierTunneling (NonLocal= \"NLM$val\"))"
+                    lappend lst "hBarrierTunneling (NonLocal= \"NLM$val\")"
                 } else {
                     lappend lst "[lindex $elm 5]BarrierTunneling (NonLocal=\
-                        \"NLM$val\"))"
+                        \"NLM$val\")"
                 }
+                set tmp [format %g [lindex $arr(eXsection) $idx]]
+                lappend lst "eXsection= $tmp"
+                set tmp [format %g [lindex $arr(hXsection) $idx]]
+                lappend lst "hXsection= $tmp)"
             }
             incr val
         }
 
-        # Parse mu, BGN, Aug, Rad, SRH in 'ModPar'
+        # Parse mu, BGN, Aug, Rad, SRH, Trap in 'ModPar'
         # Set a flag for trap
         set flg false
         foreach elm $ModPar {
             if {"r[lindex $grp 0 end]" ne [lindex $elm 0]} continue
-            if {[regexp {\{(mu(\s+[^\}]+)+)\}} $elm -> tmp]} {
-                if {![string is double -strict [lindex $tmp 1]]} {
+            if {[regexp {\{(mu(\s+[^\}]+)+)\}} $elm -> var]} {
+                if {![string is double -strict [lindex $var 1]]} {
                     vputs -n -i-5 "
-                        Mobility (DopingDependence ([lindex $tmp 1]))"
+                        Mobility (DopingDependence ([lindex $var 1]))"
                 }
             } else {
                 if {[lindex $grp 0 0] eq "Silicon"} {
@@ -1209,10 +1226,10 @@ if {!$OptOnly} {
                         Mobility (PhuMob (Phosphorus) HighFieldSaturation)"
                 }
             }
-            if {[regexp {\{(BGN(\s+[^\}]+)+)\}} $elm -> tmp]} {
+            if {[regexp {\{(BGN(\s+[^\}]+)+)\}} $elm -> var]} {
                 vputs -n -i-5 "
                         EffectiveIntrinsicDensity\
-                            (BandGapNarrowing([lindex $tmp 1]))"
+                            (BandGapNarrowing([lindex $var 1]))"
             } else {
                 if {[lindex $grp 0 0] eq "Silicon"} {
                     vputs -n -i-5 "
@@ -1225,16 +1242,16 @@ if {!$OptOnly} {
             set val [list]
             if {[regexp {\sAug} $elm]} {
                 lappend val Auger
-            } elseif {[regexp {\{(Aug(\s+[^\}]+)+)\}} $elm -> tmp]} {
-                if {[lindex $tmp 1] ne "!"} {
+            } elseif {[regexp {\{(Aug(\s+[^\}]+)+)\}} $elm -> var]} {
+                if {[lindex $var 1] ne "!"} {
                     lappend val Auger
                 }
             } else {
                 if {[lindex $grp 0 0] eq "Silicon"} {
 
                     # 'intrinsicRichter' is available from L-2016.03
-                    regexp {\-(\d+\.\d+)} [lindex $SimEnv 1] -> tmp
-                    if {$tmp >= 2016.03} {
+                    regexp {\-(\d+\.\d+)} [lindex $SimEnv 1] -> var
+                    if {$var >= 2016.03} {
                         lappend val intrinsicRichter
                     } else {
                         lappend val pmi_Richter
@@ -1243,8 +1260,8 @@ if {!$OptOnly} {
             }
             if {[regexp {\sRad} $elm]} {
                 lappend val Radiative
-            } elseif {[regexp {\{(Rad(\s+[^\}]+)+)\}} $elm -> tmp]} {
-                if {[lindex $tmp 1] ne "!"} {
+            } elseif {[regexp {\{(Rad(\s+[^\}]+)+)\}} $elm -> var]} {
+                if {[lindex $var 1] ne "!"} {
                     lappend val Radiative
                 }
             } else {
@@ -1252,63 +1269,72 @@ if {!$OptOnly} {
                     lappend val Radiative
                 }
             }
-            if {[regexp {\sSRH} $elm]} {
-                lappend val SRH
-            } elseif {[regexp {\{(SRH(\s+[^\}]+)+)\}} $elm -> tmp]} {
-                if {[file isfile [lindex $tmp 1]]} {
-                    set flg true
-                    vputs -n -i-5 "
-                        Traps ("
-                    array unset arr
-                    readTT arr [lindex $tmp 1]
-                    set len [llength $arr(TrapNat)]
-                    for {set idx 0} {$idx < $len} {incr idx} {
-                        vputs -n -i-5 "
-                            ([lindex $arr(TrapNat) $idx]
-                            eXsection= [lindex $arr(eXsection) $idx]
-                            hXsection= [lindex $arr(hXsection) $idx]
-                            [lindex $arr(TrapRef) $idx]
-                            Reference= [lindex $arr(Reference) $idx]"
-                        if {[lindex $arr(TrapDist) $idx] eq "Level"} {
-                            vputs -n -i-6 "
-                                Level Conc= [lindex $arr(Conc) $idx]
-                                EnergyMid= [lindex $arr(EnergyMid) $idx]"
-                        } elseif {[lindex $arr(TrapDist) $idx] eq "Table"} {
-                            vputs -n -i-6 "
-                                Table= ([lindex $arr(Table) $idx])"
-                        } else {
-                            vputs -n -i-6 "
-                                [lindex $arr(TrapDist) $idx]
-                                Conc= [lindex $arr(Conc) $idx]
-                                EnergyMid= [lindex $arr(EnergyMid) $idx]
-                                EnergySig= [lindex $arr(EnergySig) $idx]"
-                        }
-                        vputs -n -i-5 ")"
-                    }
-
-                    # Check trap settings in 'RegIntfTrap'
-                    if {[llength $str]} {
-                        vputs -n -i2 \n[join $str \n]
-                    }
-
-                    # Check trap settings in 'IntfTun'
-                    if {[llength $lst]} {
-                        vputs -n -i2 \n[join $lst \n]
-                    }
-                    vputs -n -i-5 "
-                        )"
-                    if {[lindex $tmp 2] ne "!"} {
-                        lappend val SRH
-                    }
-                } else {
-                    if {[lindex $tmp 1] ne "!"} {
-                        lappend val SRH
-                    }
+            if {[regexp {\{(SRH(\s+[^\}]+)+)\}} $elm -> var]} {
+                if {[lindex $var 1] ne "!"} {
+                    lappend val SRH
                 }
             } else {
 
                 # SRH should be enabled by default
                 lappend val SRH
+            }
+            if {[regexp {\{(Trap(\s+[^\}]+)+)\}} $elm -> var]} {
+
+                # Default trap ratios are 1
+                if {[llength $var] == 2} {
+                    set var [concat $var 1 1 1]
+                } elseif {[llength $var] == 3} {
+                    set var [concat $var 1 1]
+                } elseif {[llength $var] == 4} {
+                    lappend var 1
+                }
+                set flg true
+                vputs -n -i-5 "
+                        Traps ("
+                array unset arr
+                readTT arr [lindex $var 1]
+                set len [llength $arr(TrapNat)]
+                for {set idx 0} {$idx < $len} {incr idx} {
+                    set tmp [lindex $arr(TrapRef) $idx]
+                    vputs -n -i-5 "
+                            ([lindex $arr(TrapNat) $idx] $tmp"
+                    if {[info exists arr(reference)]} {
+                        vputs -n -i-5 "
+                            Reference= [lindex $arr(Reference) $idx]"
+                    }
+                    if {[lindex $arr(TrapDist) $idx] eq "Level"} {
+                        vputs -n -i-5 "
+                            Level Conc= [format %g [expr [lindex $var 2]\
+                                *[lindex $arr(Conc) $idx]]]
+                            EnergyMid= [lindex $arr(EnergyMid) $idx]"
+                    } elseif {[lindex $arr(TrapDist) $idx] eq "Table"} {
+                        vputs -n -i-5 "
+                            Table= ([lindex $arr(Table) $idx])"
+                    } else {
+                        vputs -n -i-5 "
+                            [lindex $arr(TrapDist) $idx] Conc= [format %g [expr\
+                                [lindex $var 2]*[lindex $arr(Conc) $idx]]]
+                            EnergyMid= [lindex $arr(EnergyMid) $idx]
+                            EnergySig= [lindex $arr(EnergySig) $idx]"
+                    }
+                    vputs -n -i-5 "
+                            eXsection= [format %g [expr [lindex $var 3]\
+                                *[lindex $arr(eXsection) $idx]]]
+                            hXsection= [format %g [expr [lindex $var 4]\
+                                *[lindex $arr(hXsection) $idx]]])"
+                }
+
+                # Check trap settings in 'RegIntfTrap'
+                if {[llength $str]} {
+                    vputs -n -i2 \n[join $str \n]
+                }
+
+                # Check trap settings in 'IntfTun'
+                if {[llength $lst]} {
+                    vputs -n -i2 \n[join $lst \n]
+                }
+                vputs -n -i-5 "
+                        )"
             }
             vputs -n -i-3 "
                 Recombination ($val)"
@@ -1333,7 +1359,7 @@ if {!$OptOnly} {
     }
 
     # Enable interface recombination or traps
-    foreach grp $IntfSRH {
+    foreach grp $IntfSRV {
         set lst [string map {r "" / " "} [lindex $grp 0]]
         set var [lindex $RegGen [lindex $lst 0] 0 1]
         set val [lindex $RegGen [lindex $lst 1] 0 1]
@@ -1341,28 +1367,34 @@ if {!$OptOnly} {
             Physics (RegionInterface= \"$var/$val\") \{
                 Traps (
                     (FixedCharge Conc= [lindex $grp 1])"
-        if {[file isfile [lindex $grp 2]]} {
+        foreach elm $IntfTrap {
+            if {[lindex $grp 0] ne [lindex $elm 0]
+                && "r[lindex $lst 1]/[lindex $lst 0]" ne [lindex $elm 0]} {
+                continue
+            }
             array unset arr
-            readTT arr [lindex $grp 2]
+            readTT arr [lindex $elm 1]
             set len [llength $arr(TrapNat)]
             for {set idx 0} {$idx < $len} {incr idx} {
+                set tmp [lindex $arr(TrapRef) $idx]
                 vputs -n -i-3 "
-                    ([lindex $arr(TrapNat) $idx]
-                    eXsection= [lindex $arr(eXsection) $idx]
-                    hXsection= [lindex $arr(hXsection) $idx]
-                    [lindex $arr(TrapRef) $idx]
-                    Reference= [lindex $arr(Reference) $idx]"
+                        ([lindex $arr(TrapNat) $idx] $tmp"
+                if {[info exists arr(Reference)]} {
+                    vputs -n -i-4 "
+                        Reference= $arr(Reference)"
+                }
                 if {[lindex $arr(TrapDist) $idx] eq "Level"} {
                     vputs -n -i-4 "
-                        Level Conc= [lindex $arr(Conc) $idx]
+                        Level Conc= [format %g [expr [lindex $elm 2]\
+                            *[lindex $arr(Conc) $idx]]]
                         EnergyMid= [lindex $arr(EnergyMid) $idx]"
                 } elseif {[lindex $arr(TrapDist) $idx] eq "Table"} {
                     vputs -n -i-4 "
                         Table= ([lindex $arr(Table) $idx])"
                 } else {
                     vputs -n -i-4 "
-                        [lindex $arr(TrapDist) $idx]
-                        Conc= [lindex $arr(Conc) $idx]
+                        [lindex $arr(TrapDist) $idx] Conc= [format %g [expr\
+                            [lindex $elm 2]*[lindex $arr(Conc) $idx]]]
                         EnergyMid= [lindex $arr(EnergyMid) $idx]
                         EnergySig= [lindex $arr(EnergySig) $idx]"
                 }
@@ -1373,12 +1405,16 @@ if {!$OptOnly} {
                         Region= \"[lindex $RegGen [lindex $lst\
                             [lindex $Arr(Region) $idx]] 0 1]\""
                 }
-                vputs -n -i-3 "
-                    )"
+                vputs -n -i-4 "
+                        eXsection= [format %g [expr [lindex $elm 3]\
+                            *[lindex $arr(eXsection) $idx]]]
+                        hXsection= [format %g [expr [lindex $elm 4]\
+                            *[lindex $arr(hXsection) $idx]]])"
             }
+            break
         }
-        vputs -n -i-3 "
-                )"
+        vputs -n -i-4 "
+                    )"
 
         if {([string is double -strict [lindex $grp 2]] && [lindex $grp 2] > 0)
             || ([string is double -strict [lindex $grp 3]]
@@ -1387,6 +1423,60 @@ if {!$OptOnly} {
                 Recombination (SurfaceSRH)"
         }
         vputs -n -i-3 "
+            \}\n"
+    }
+
+    # In case trap interfaces are not visited previously
+    foreach elm $IntfTrap {
+        regsub {r(\d+)/(\d+)} [lindex $elm 0] {r\2/\1} str
+        if {[regexp \\\{([lindex $elm 0]|$str)\\s $IntfSRV} continue
+        set lst [string map {r "" / " "} [lindex $elm 0]]
+        set var [lindex $RegGen [lindex $lst 0] 0 1]
+        set val [lindex $RegGen [lindex $lst 1] 0 1]
+        vputs -n -i-3 "
+            Physics (RegionInterface= \"$var/$val\") \{
+                Traps ("
+        array unset arr
+        readTT arr [lindex $elm 1]
+        set len [llength $arr(TrapNat)]
+        for {set idx 0} {$idx < $len} {incr idx} {
+            vputs -n -i-3 "
+                    ([lindex $arr(TrapNat) $idx] [lindex $arr(TrapRef) $idx]
+                    eXsection= [format %g [expr [lindex $elm 3]\
+                        *[lindex $arr(eXsection) $idx]]]
+                    hXsection= [format %g [expr [lindex $elm 4]\
+                        *[lindex $arr(hXsection) $idx]]]"
+            if {[info exists arr(Reference)]} {
+                vputs -n -i-3 "
+                    Reference= $arr(Reference)"
+            }
+            if {[lindex $arr(TrapDist) $idx] eq "Level"} {
+                vputs -n -i-3 "
+                    Level Conc= [format %g [expr [lindex $elm 2]\
+                        *[lindex $arr(Conc) $idx]]]
+                    EnergyMid= [lindex $arr(EnergyMid) $idx]"
+            } elseif {[lindex $arr(TrapDist) $idx] eq "Table"} {
+                vputs -n -i-3 "
+                    Table= ([lindex $arr(Table) $idx])"
+            } else {
+                vputs -n -i-3 "
+                    [lindex $arr(TrapDist) $idx] Conc= [format %g [expr\
+                        [lindex $elm 2]*[lindex $arr(Conc) $idx]]]
+                    EnergyMid= [lindex $arr(EnergyMid) $idx]
+                    EnergySig= [lindex $arr(EnergySig) $idx]"
+            }
+            if {[lindex $RegGen [lindex $lst 0] 0 2] eq "Semiconductor"
+                && [lindex $RegGen [lindex $lst 1] 0 2]
+                eq "Semiconductor" && [info exists Arr(Region)]} {
+                vputs -n -i-3 "
+                    Region= \"[lindex $RegGen [lindex $lst\
+                        [lindex $Arr(Region) $idx]] 0 1]\""
+            }
+            vputs -n -i-3 "
+                    )"
+        }
+        vputs -n -i-3 "
+                )
             \}\n"
     }
 }
@@ -1473,8 +1563,7 @@ Math {
                 }
                 array unset arr
                 readTT arr [lindex $grp 2]
-                foreach elm {Discretization Digits EnergyResolution
-                    MaxAngle} {
+                foreach elm {Discretization Digits EnergyResolution MaxAngle} {
                     if {![info exists arr($elm)]} continue
                     vputs -n -i-4 "
                         $elm= $arr($elm)"
