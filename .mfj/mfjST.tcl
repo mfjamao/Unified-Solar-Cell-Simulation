@@ -1146,7 +1146,7 @@ proc mfjST::updateArr {} {
     variable arr
     if {$arr(UpdateArr)} {
         vputs "Updating keys ColMode, Node4All, and VarName in ::SimArr..."
-        if {[file isfile 11ctrlsim.tcl]} {
+        if {![file isfile 11ctrlsim.tcl]} {
             error "'11ctrlsim.tcl' missing in directory '[file tail [pwd]]'!"
         }
         file copy -force 11ctrlsim.tcl 11ctrlsim.tcl.backup

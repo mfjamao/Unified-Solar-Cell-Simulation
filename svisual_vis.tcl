@@ -1720,12 +1720,34 @@ foreach pp $PPAttr {
             foreach elm $cLst {
                 create_curve -name ${pp0}_SVoc_$elm -dataset Data_$pp0\
                     -axisX $xVar -axisY "$elm OuterVoltage" -plot PltSuns_$pp0
+                set smpp 0
+                set vmpp 0
+                set pmpp 0
+                foreach s [get_curve_data ${pp0}_SVoc_$elm -axisX\
+                    -plot PltSuns_$pp0] v [get_curve_data ${pp0}_SVoc_$elm\
+                    -axisY -plot PltSuns_$pp0] {
+                    set p [expr ($s-1.)*$v]
+                    if {$p < $pmpp} {
+                        set pmpp $p
+                        set vmpp $v
+                        set smpp $s
+                    }
+                }
+                set tmp [format %.4g $vmpp]
+                vputs -i2 "DOE: ${pp0}_Vocmpp_$elm $tmp"
+                set gVarArr(${pp0}_Vocmpp_$elm|V) $tmp
+                set tmp [format %.4g $smpp]
+                vputs -i2 "DOE: ${pp0}_Sunsmpp_$elm $tmp"
+                set gVarArr(${pp0}_Sunsmpp_$elm) $tmp
                 if {$xLow <= 1 && $xHigh >= 1} {
                     set voc [lindex [probe_curve ${pp0}_SVoc_$elm -valueX 1\
                         -plot PltSuns_$pp0] 0]
                     set tmp [format %.4g $voc]
                     vputs -i2 "DOE: ${pp0}_Voc_$elm $tmp"
                     set gVarArr(${pp0}_Voc_$elm|V) $tmp
+                    set tmp [format %.4g [expr 1e2*(1.-$smpp)*$vmpp/$voc]]
+                    vputs -i2 "DOE: ${pp0}_FF_$elm $tmp"
+                    set gVarArr(${pp0}_FF_$elm) $tmp
                 }
             }
         } else {

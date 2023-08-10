@@ -685,12 +685,15 @@ proc mfjIntrpr::actConvFeat {} {
                     set Lvl 0
                     foreach LvlVal $SimVal {
 
-                        # Activate recycling in level 1+ first
+                        # Activate recycling only feature in level 1+:
+                        # Set reference to the previous levels
                         if {[regexp {^@(-?\d+[:,/&])*-?\d+$} $LvlVal]} {
                             set LvlVal [recycle $VarName $SimVal\
-                                $LvlVal $Lvl $Lvl]
+                                $LvlVal $Lvl $Lvl !InLvl]
                         }
-                        # Activate recycling within each level
+
+                        # Activate recycling feature within each level:
+                        # Set reference within the current level
                         lappend NewVal [recycle $VarName $LvlVal $LvlVal $Lvl]
                         incr Lvl
                     }

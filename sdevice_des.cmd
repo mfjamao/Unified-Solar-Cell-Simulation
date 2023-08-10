@@ -1488,12 +1488,12 @@ Math {
     WallClock
     CoordinateSystem {AsIs}
     * CNormPrint
-    ExitonFailure
+    ExitOnFailure
     Extrapolate
     Derivatives
     RelErrControl
-    Notdamped= 50
-    rhsfactor= 1e50
+    NotDamped= 50
+    RhsFactor= 1e50
 
     * Direct solver PARDISO and iterative solver ILS support parallelization
     * Method=Blocked SubMethod=Super 1D, 2D default solvers for Coupled
@@ -1664,7 +1664,7 @@ foreach grp $VarVary {
                     set lst [lsort -real $lst]
                     append str "\n[string repeat $mfjProc::arr(Tab) 6]Plot\
                         (FilePrefix= \"$SimArr(EtcDir)/n@node@_v$idx\"\
-                        Time= ([join $lst \;]) noOverwrite)"
+                        Time= ([join $lst {; }]) noOverwrite)"
                 } else {
                     set str "CurrentPlot (Time= (-1))"
                 }
@@ -1672,7 +1672,7 @@ foreach grp $VarVary {
                     NewCurrentPrefix= \"v${idx}_\"
                     Quasistationary (
                         InitialStep= 1 MaxStep= 1 MinStep= 1e-100
-                        Increment= 2 Decrement= 2 DoZero
+                        Increment= 2 Decrement= 10 DoZero
                         Goal \{
                             Name= \"[lindex $grp 0]\"
                             [lindex $val 0]= [lindex $grp 1]
@@ -1722,29 +1722,51 @@ foreach grp $VarVary {
         set val $arr([lindex $grp 0])
         if {$val != [lindex $grp 1]} {
             set arr([lindex $grp 0]) [lindex $grp 1]
-            if {[lindex $grp 2]} {
-                if {$val == 0} {
-                    set txt "[expr 1e-6/[lindex $grp 1]] 1"
-                } elseif {[lindex $grp 1] == 0} {
-                    set txt "0 [expr ($val-1e-6)/$val]"
-                } else {
-                    set txt "0 1"
-                }
-                set str "CurrentPlot (Time= (range=(0 1);\
-                        range= ($txt) intervals= [lindex $grp 2]\
-                        decade))"
+            if {[lindex $grp 2] > 1} {
 
-                # By default save snapshots at 0 and 1
-                set lst [list 0 1]
-                foreach elm [lrange $grp 3 end] {
-                    lappend lst [expr 1.*($elm-$val)\
-                        /([lindex $grp 1]-$val)]
+                # Manually realise linear intervals logarithmically
+                # Maximum power point for Suns-Voc is around 4-5% sun
+                if {$val == 0} {
+                    set txt 0
+                    set tmp -1
+                    while {$tmp < [lindex $grp 2]} {
+                        append txt "\; [expr exp(log(1e-2)+[incr tmp]\
+                            *(log([lindex $grp 1])-log(1e-2))/[lindex $grp 2])\
+                            /[lindex $grp 1]]"
+                    }
+                } elseif {[lindex $grp 1] == 0} {
+                    set txt ""
+                    set tmp -1
+                    while {$tmp < [lindex $grp 2]} {
+                        append txt "[expr exp(log($val)+[incr tmp]\
+                            *(log(1e-2)-log($val))/[lindex $grp 2])/$val]\; "
+                    }
+                    append txt 1
+                } else {
+                    set txt 0
+                    set tmp 0
+                    while {$tmp < [lindex $grp 2]} {
+                        append txt "\; [expr 1.*(exp(log($val)+[incr tmp]\
+                            *(log([lindex $grp 1])-log($val))/[lindex $grp 2])\
+                            -$val)/([lindex $grp 1]-$val)]"
+                    }
                 }
-                set lst [lsort -real $lst]
-                append str "\n[string repeat $mfjProc::arr(Tab)\
-                    7]Plot (FilePrefix= \"$SimArr(EtcDir)/n@node@_v$idx\"\
-                    Time= ([join $lst \;]) noOverwrite)"
+                set str "CurrentPlot (Time= ($txt))"
             } else {
+                set str "CurrentPlot (Time= (0; 1))"
+            }
+
+            # By default save snapshots at 0 and 1
+            set lst [list 0 1]
+            foreach elm [lrange $grp 3 end] {
+                lappend lst [expr 1.*($elm-$val)\
+                    /([lindex $grp 1]-$val)]
+            }
+            set lst [lsort -real $lst]
+            append str "\n[string repeat $mfjProc::arr(Tab)\
+                6]Plot (FilePrefix= \"$SimArr(EtcDir)/n@node@_v$idx\"\
+                Time= ([join $lst {; }]) noOverwrite)"
+            if {[lindex $grp 2] == 0} {
                 set str "CurrentPlot (Time= (-1))"
             }
 
@@ -1810,9 +1832,9 @@ foreach grp $VarVary {
                         /([lindex $grp 1]-[lindex $val 1])]
                 }
                 set lst [lsort -real $lst]
-                append str "\n[string repeat $mfjProc::arr(Tab) 7]Plot\
+                append str "\n[string repeat $mfjProc::arr(Tab) 6]Plot\
                     (FilePrefix= \"$SimArr(EtcDir)/n@node@_v$idx\"\
-                    Time= ([join $lst \;]) noOverwrite)"
+                    Time= ([join $lst {; }]) noOverwrite)"
             } else {
                 set str "CurrentPlot (Time= (-1))"
             }
@@ -1827,7 +1849,7 @@ foreach grp $VarVary {
                     NewCurrentPrefix= \"v${idx}_\"
                     Quasistationary (
                         InitialStep= 1 MaxStep= 1 MinStep= 1e-100
-                        Increment= 2 Decrement= 2 DoZero
+                        Increment= 2 Decrement= 10 DoZero
                         Goal \{
                             ModelParameter= \"$txt\"
                             Value= [lindex $grp 1]

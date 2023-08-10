@@ -612,10 +612,11 @@ proc mfjProc::override {VarName VarVal} {
     # VarName     Variable name
     # VarVal      Variable value
     # SubLst      Sublist value
-    # Lvl         Optional, level sequence
-    # OldIdx      Optional, trace the index of the SubLst
+    # Lvl         Optional, level sequence (default: -1)
+    # OldIdx      Optional, trace the index of the SubLst (default: "")
+    # InLvl       Optional, restrict reference within a level (default: true)
 # Result: Return the updated list.
-proc mfjProc::recycle {VarName VarVal SubLst {Lvl ""} {OldIdx ""}} {
+proc mfjProc::recycle {VarName VarVal SubLst {Lvl ""} {OldIdx ""} {InLvl ""}} {
 
     # Validate arguments
     # All levels should not be negative integers
@@ -636,41 +637,34 @@ proc mfjProc::recycle {VarName VarVal SubLst {Lvl ""} {OldIdx ""}} {
         }
     }
 
+    if {[string index $InLvl 0] eq "!"} {
+        set InLvl false
+    } else {
+        set InLvl true
+    }
+
     set VarMsg "variable '$VarName'"
     set NewLst [list]
     set LstIdx 0
     foreach Elm $SubLst {
         set NewIdx [concat $OldIdx $LstIdx]
-        if {[llength $Elm] > 1  || [regexp {^\{.+\}$} $Elm]} {
-
-            # Visit all the elements by regression
-            # The function name is adaptive using '[lindex [info level 0] 0]'
-            lappend NewLst [[lindex [info level 0] 0] $VarName $VarVal\
-                $Elm $Lvl $NewIdx]
+        if {$Lvl != -1} {
+            set Msg "'$Elm' of level '$Lvl' (index $NewIdx) of $VarMsg"
         } else {
-            if {$Lvl != -1} {
-                set Msg "'$Elm' of level '$Lvl' (index $NewIdx) of $VarMsg"
-            } else {
-                set Msg "'$Elm' of $VarMsg (index $NewIdx)"
-            }
-            set Cnt [regexp -all {@(-?\d+[:,/&])*-?\d+} $Elm]
-            if {$Cnt == 0} {
-                lappend NewLst $Elm
-                incr LstIdx
-                continue
-            }
+            set Msg "'$Elm' of $VarMsg (index $NewIdx)"
+        }
 
-            # Eval is required if recycling is not coming alone
-            if {[regexp {^@(-?\d+[:,/&])*-?\d+$} $Elm]} {
-                set NoEval true
-            } else {
-                set NoEval false
-            }
+        # Replace each recycling feature and evaluate the final expression
+        # Negative index is allowed with the pattern '-?\d+'
+        while {[regexp {@((-?\d+[:,/&])*-?\d+)} $Elm -> IdxStr]} {
+            if {[llength $Elm] > 1  || [regexp {^\{.+\}$} $Elm]} {
 
-            # Replace each recycling feature and evaluate the final expression
-            # Negative index is allowed with the pattern '-?\d+'
-            while {[regexp {@((-?\d+[:,/&])*-?\d+)} $Elm -> IdxStr]} {
-                set NewVal [list]
+                # Visit all the elements by regression
+                # The function name is adaptive: '[lindex [info level 0] 0]'
+                set Elm [[lindex [info level 0] 0] $VarName $VarVal\
+                    $Elm $Lvl $NewIdx]
+            } else {
+                set NewElm [list]
                 set StrLst [split $IdxStr &]
                 foreach Str $StrLst {
                     set IdxLst [readIdx $Str]
@@ -712,25 +706,42 @@ proc mfjProc::recycle {VarName VarVal SubLst {Lvl ""} {OldIdx ""}} {
                             }
                         }
                         if {[llength $StrLst]*[llength $IdxLst] == 1} {
-                            set NewVal [concat $NewVal $Val]
+                            set NewElm [concat $NewElm $Val]
                         } else {
-                            lappend NewVal $Val
+                            lappend NewElm $Val
                         }
                     }
                 }
 
-                # Substitute the recycle in the element
-                regsub {@(-?\d+[:,/&])*-?\d+} $Elm $NewVal Elm
-            }
-            if {$NoEval} {
-                set NewLst [concat $NewLst $Elm]
-            } else {
-
-                # Append the evaluated result
-                if {[catch {set NewLst [concat $NewLst [expr $Elm]]}]} {
-                    error "unable to evaluate element $Msg!"
+                # Eval is required if recycling is not coming alone
+                if {[regexp {^@(-?\d+[:,/&])*-?\d+$} $Elm]} {
+                    set Eval false
+                } else {
+                    set Eval true
                 }
+
+                # Substitute the first recycle in the element
+                regsub {@(-?\d+[:,/&])*-?\d+} $Elm $NewElm Elm
+
+                # Evaluate the experession if no recycling feature
+                # Operators + - * / and TCL math functions are supported
+                if {$Eval && ![regexp {@(-?\d+[:,/&])*-?\d+} $Elm]
+                    && [catch {set Elm [format %g [expr $Elm]]}]} {
+                    error "unable to eval '$Elm' in $Msg!"
+                }
+
+                # Need to break loop after activating recycling-only feature
+                # in level 1+
+                if {!$InLvl && !$Eval && $Lvl} break
             }
+        }
+
+        # Need to assign value after activating recycling-only feature
+        # in level 1+
+        if {!$InLvl && !$Eval && $Lvl} {
+            set NewLst $Elm
+        } else {
+            lappend NewLst $Elm
         }
         incr LstIdx
     }

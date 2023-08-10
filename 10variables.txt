@@ -417,7 +417,7 @@ Specification for varying other variables (sdevice --parameter-names):
   >=3 Value for taking snapshots: 0.3
 
 <GRAMMAR>b
-{`!a & == v0 {c\d} & (n | `s Cu<rrent> Ch<arge> F<requency> V<oltage>)
+{`!a & == v0 {c\d} & (n | `s C<urrent> Ch<arge> F<requency> V<oltage>)
     | == v0 Wavelength & (`n & `> 0) | `n & `>= 0}
 {== v1 {[CV]\w+} & `a | == v1 Frequency & (`!a & `n & `> 0)
     | a = 0 | `i & `>= 0}
