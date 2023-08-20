@@ -163,10 +163,31 @@ foreach grp $ModPar {
                 }
                 vputs -n -i-4 "
                     Auger \{
-                        A= $str    * cm^6/s
+                        A= $str         * cm^6/s
                         B= 0.0000e+00, 0.0000e+00   * cm^6/s
                         C= 0.0000e+00, 0.0000e+00   * cm^6/s
                     \}"
+            } elseif {[lindex $lst 1] eq "Altermatt"} {
+                vputs -n -i-4 "
+                    pmi_Aug_Altermatt \{
+                        Ceeh= 2.8e-31   * cm^6/s
+                        fPR= $fPR
+                    \}\n"
+            } elseif {[lindex $lst 1] eq "Richter"} {
+                vputs -n -i-4 "
+                    pmi_Aug_Richter \{
+                        Ceeh= 2.5e-31   * cm^6/s
+                        Cehh= 8.5e-32   * cm^6/s
+                        CDn= 3.0e-29    * cm^6/s
+                        fPR= $fPR
+                    \}\n"
+            } elseif {[lindex $lst 1] eq "Niewelt"} {
+                vputs -n -i-4 "
+                    pmi_Aug_Niewelt \{
+                        Ceeh= 3.41e-31  * cm^6/s
+                        Cehh= 1.17e-31  * cm^6/s
+                        fPR= $fPR
+                    \}\n"
             }
         } elseif {[lindex $lst 0] eq "Rad"} {
             if {[string is double -strict [lindex $lst 1]]} {

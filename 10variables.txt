@@ -301,9 +301,9 @@ Specification:
 
 <COMMENT>--- Models and parameters variable
 The default models for a semiconductor region: constant mobility, no bandgap
-    narrowing, no Auger, no radiative with SRH recombination enabled.
-The default models for a silicon region: Philips mobility, Schenk BGN,
-    Richter Auger, radiative and SRH recombination.
+    narrowing, no Auger, no radiative with only SRH recombination enabled.
+The default models for a silicon region: Philips unified mobility, Schenk BGN,
+    Niewelt Auger, radiative and SRH recombination.
 The grammar rules are quite challenging to set for models and parameters. It's
     necessary to write them clearly for easy maintenance.
 
@@ -312,18 +312,36 @@ Specifications for models and parameters for regions:
     1 Material model parameter file: 01mdb/silicon.par
     2 Individual model: EA0 | Eg0 | NC300 | NV300 | DC | mt | mu | BGN
         | Aug | Rad | tau | Trap
-    3 Model parameter for EA0, Eg0, NC300, NV300, DC, mt: 3
-      Models for mu or parameter for constant mu: A<rora>, M<asetti>
-      Models for BGN: B<enettWilson>, d<elAlamo>, J<ainRoulston>, S<lotboom>,
-        T<ableBGN>
-      Parameter for Aug, Rad: value or !
+    3 Model parameter for EA0, Eg0, NC300, NV300, DC, mt: value
+      Models for BGN (bandgap narrowing): B<enettWilson>, d<elAlamo>,
+        J<ainRoulston>, S<lotboom>, T<ableBGN>
     4 Same as index 4
+Specification for carrier mobility:
+    0 Materal or region: ri | mat
+    1 Material model parameter file: 01mdb/silicon.par
+    2 Individual model: mu
+    3 Doping dependent models or electron mu [cm^2/(Vs)] for constant mu:
+        A<rora> M<asetti> | 1417
+    4 Optional hole mu [cm^2/(Vs)] for constant mu: 470.5
+Specification for Auger recombination (With PMI Auger models, radiative is
+    already included unless the photon recycling ratio is unit):
+    0 Materal or region: ri | mat
+    1 Material model parameter file: 01mdb/silicon.par
+    2 Individual model: Aug
+    3 Ceeh [cm^6/s] or PMI models or ! (disable Auger): 3.41e-31
+        | A<ltermatt> R<ichter>N<iewelt> | !
+    4 Optional Cehh [cm^6/s] or optional photon recycling ratio: 1.17e-31 | 0.5
+Specification for radiative recombination:
+    0 Materal or region: ri | mat
+    1 Material model parameter file: 01mdb/silicon.par
+    2 Individual model: Rad
+    3 Radiative recombination coefficient [cm^3/s] or !: 4.73e-15 | !
 Specification for lifetime values for SRH recombination:
     0 Materal or region: ri | mat
     1 Material model parameter file: 01mdb/silicon.par
     2 Individual model: SRH
-    3 Electron lifetime [s]: A positive value like 1e-3 or !
-    4 Optional hole lifetime [s]: A positive value like 1e-3
+    3 Electron lifetime [s] or !: 1e-3 | !
+    4 Optional hole lifetime [s]: 1e-3
 Specification for a trap file for SRH recombination:
     0 Materal or region: ri | mat
     1 Material model parameter file: 01mdb/silicon.par
@@ -341,8 +359,8 @@ Specification for a trap file for SRH recombination:
     | == v-1 BGN & `!a & `s B<enettWilson> d<elAlamo> J<ainRoulston>
         S<lotboom> T<ableBGN>
     | == v-1 Aug & (a | n & `> 0 | ( == m0 Silicon & `s EA0 Eg0 NC300 NV300 DC
-        mt mu BGN SRH Trap Rad ! Black Niewelt | `s EA0 Eg0 NC300 NV300 DC
-        mt mu BGN SRH Trap Rad !))
+        mt mu BGN SRH Trap Rad ! A<ltermatt> R<ichter> N<iewelt> | `s EA0 Eg0
+        NC300 NV300 DC mt mu BGN SRH Trap Rad !))
     | == v-1 Rad & (a | n & `> 0
         | `s EA0 Eg0 NC300 NV300 DC mt mu BGN SRH Trap Aug !)
     | == v-1 SRH & (`!a & n & `> 0 | `s !)
@@ -361,8 +379,10 @@ Specification for a trap file for SRH recombination:
     | == v-2 mu & (a | n & `> 0
         | `s EA0 Eg0 NC300 NV300 DC mt BGN SRH Trap Aug Rad)
     | == v-2 BGN & (a | `s EA0 Eg0 NC300 NV300 DC mu mt SRH Trap Aug Rad)
-    | == v-2 Aug & (a | n & `> 0
-        | `s EA0 Eg0 NC300 NV300 DC mt mu BGN SRH Trap Rad)
+    | == v-2 Aug & (n v-1 & (a | n & `> 0 | `s EA0 Eg0 NC300 NV300 DC mt mu BGN
+        SRH Trap Rad) | == v-1 ! & (a | `s EA0 Eg0 NC300 NV300 DC mt mu BGN SRH
+        Trap Rad) | a | n & `>= 0 & `<= 1 | `s EA0 Eg0 NC300 NV300 DC mt mu BGN
+        SRH Trap Rad)
     | == v-2 Rad & (a | `s EA0 Eg0 NC300 NV300 DC mt mu BGN SRH Trap Aug)
     | == v-2 SRH & (a | n & `> 0 | `s EA0 Eg0 NC300 NV300 DC mt mu Trap
         BGN Aug Rad)
@@ -513,11 +533,13 @@ Extract data from 'VarVary', prepare XY plots and make further analysis
 Specification:
     0 A reference to VarVary step to extract data: v#
     1 Optional analysis of extracted data: JV
-    2 Optional value: 1e15
+    2 Optional Dn [cm-3] for lifetime extraction: 1e15
+    3 Optional JOG [mA/cm2] for iVoc extraction: 44
 
 <GRAMMAR>v
 {a | `s CV JV QE SunsVoc SunsJsc QSSPC RAT}
 {== v-1 QSSPC & (a = 1e15 | `n & `> 0) | `a}
+{== v-2 QSSPC & (a = 44 | `n & `> 0) | `a}
 
 <VAR>PPAttr      {{v2 QE} {v5 JV}}
 

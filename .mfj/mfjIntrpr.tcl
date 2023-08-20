@@ -1690,79 +1690,82 @@ proc mfjIntrpr::fmtvsRaw {} {
             # Remove all compiled share objects if version changes
             if {[lindex $arr(FmtSimEnv) 1] ne [lindex $SimEnv 1]} {
                 foreach Elm [glob -nocomplain $::SimArr(PMIDir)/*.so.*] {
+                    vputs -i2 "File '$Elm' deleted!"
                     file delete $Elm
                 }
             }
-        } elseif {$DfltSet ne $arr(FmtDfltSet)} {
+        }
+        if {$DfltSet ne $arr(FmtDfltSet)} {
             set arr(UpdateFmt) true
             vputs -i1 $Msg
             vputs -i2 "Environment variable 'mfjDfltSet' has a value of\
                 '$arr(FmtDfltSet)' different from '$DfltSet'!"
-        } elseif {$arr(FmtRegInfo) ne $::SimArr(RegInfo)} {
+        }
+        if {$arr(FmtRegInfo) ne $::SimArr(RegInfo)} {
             set arr(UpdateFmt) true
             vputs -i1 $Msg
             vputs -i2 "Environment variable 'mfjRegInfo' has a value of\
                 '$arr(FmtRegInfo)' different from '$::SimArr(RegInfo)'!"
-        } else {
-            set Flg false
-            set ModTime $::SimArr(ModTime)
-            foreach Elm $arr(FmtModTime) {
+        }
 
-                # A file name may contain special characters, not suitable
-                # for 'regexp' to perform string match
-                set Lst [list]
-                set FmtFlg false
-                foreach Grp $ModTime {
-                    if {[lindex $Elm 0] eq [lindex $Grp 0]} {
-                        set FmtFlg true
-                        if {[lindex $Elm 1] != [lindex $Grp 1]} {
-                            set arr(UpdateFmt) true
-                            if {!$Flg} {
-                                vputs -i1 $Msg
-                                set Flg true
-                            }
-                            vputs -i2 "File '[lindex $Elm 0]' updated!"
+        set Flg false
+        set ModTime $::SimArr(ModTime)
+        foreach Elm $arr(FmtModTime) {
 
-                            # If PMI files are updated, remove the
-                            # corresponding share objects
-                            if {[string equal -nocase .c\
-                                [file extension [lindex $Elm 0]]]} {
-                                set Obj [glob -nocomplain\
-                                    $::SimArr(PMIDir)/[file rootname\
-                                    [lindex $Elm 0]].so.*]
-                                if {$Obj ne ""} {
-                                    file delete $Obj
-                                }
-                            }
-                        }
-                    } else {
-                        lappend Lst $Grp
-                    }
-
-                    # Update ModTime to remove the matched file
-                    set ModTime $Lst
-
-                    # Output each file removed
-                    if {!$FmtFlg} {
+            # A file name may contain special characters, not suitable
+            # for 'regexp' to perform string match
+            set Lst [list]
+            set FmtFlg false
+            foreach Grp $ModTime {
+                if {[lindex $Elm 0] eq [lindex $Grp 0]} {
+                    set FmtFlg true
+                    if {[lindex $Elm 1] != [lindex $Grp 1]} {
                         set arr(UpdateFmt) true
                         if {!$Flg} {
                             vputs -i1 $Msg
                             set Flg true
                         }
-                        vputs -i2 "File '[lindex $Elm 0]' abandoned!"
+                        vputs -i2 "File '[lindex $Elm 0]' updated!"
+
+                        # If PMI files are updated, remove the
+                        # corresponding share objects
+                        if {[string equal -nocase .c\
+                            [file extension [lindex $Elm 0]]]} {
+                            set Obj [glob -nocomplain [file rootname\
+                                [lindex $Elm 0]].so.*]
+                            if {$Obj ne ""} {
+                                vputs -i2 "File '$Obj' deleted!"
+                                file delete $Obj
+                            }
+                        }
                     }
+                } else {
+                    lappend Lst $Grp
                 }
             }
 
-            # Output the remaining files in ::SimArr(ModTime)
-            foreach Elm $ModTime {
+            # Update ModTime to remove the matched file
+            set ModTime $Lst
+
+            # Output each file removed
+            if {!$FmtFlg} {
                 set arr(UpdateFmt) true
                 if {!$Flg} {
                     vputs -i1 $Msg
                     set Flg true
                 }
-                vputs -i2 "File '[lindex $Elm 0]' added!"
+                vputs -i2 "File '[lindex $Elm 0]' abandoned!"
             }
+        }
+
+        # Output the remaining files in ::SimArr(ModTime)
+        foreach Elm $ModTime {
+            set arr(UpdateFmt) true
+            if {!$Flg} {
+                vputs -i1 $Msg
+                set Flg true
+            }
+            vputs -i2 "File '[lindex $Elm 0]' added!"
         }
         if {!$arr(UpdateFmt)} {
             if {[llength $arr(FmtVarName)] != [llength $VarName]} {

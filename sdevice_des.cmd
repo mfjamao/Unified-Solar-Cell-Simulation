@@ -1238,35 +1238,37 @@ if {!$OptOnly} {
                 }
             }
 
-            # Default Auger model is Richter for a Si region
+            # Default Auger model is Niewelt for a Si region
             set val [list]
+            set fPR 0
             if {[regexp {\sAug} $elm]} {
                 lappend val Auger
             } elseif {[regexp {\{(Aug(\s+[^\}]+)+)\}} $elm -> var]} {
-                if {[lindex $var 1] ne "!"} {
+                if {[string is double -strict [lindex $var 1]]} {
                     lappend val Auger
-                }
-            } else {
-                if {[lindex $grp 0 0] eq "Silicon"} {
-
-                    # 'intrinsicRichter' is available from L-2016.03
-                    regexp {\-(\d+\.\d+)} [lindex $SimEnv 1] -> var
-                    if {$var >= 2016.03} {
-                        lappend val intrinsicRichter
-                    } else {
-                        lappend val pmi_Richter
+                } elseif {[lindex $var 1] ne "!"} {
+                    lappend val pmi_Aug_[lindex $var 1]
+                    if {[string is double -strict [lindex $var 2]]} {
+                        set fPR [lindex $var 2]
                     }
                 }
-            }
-            if {[regexp {\sRad} $elm]} {
-                lappend val Radiative
-            } elseif {[regexp {\{(Rad(\s+[^\}]+)+)\}} $elm -> var]} {
-                if {[lindex $var 1] ne "!"} {
-                    lappend val Radiative
-                }
             } else {
                 if {[lindex $grp 0 0] eq "Silicon"} {
+                    lappend val pmi_Aug_Niewelt
+                }
+            }
+
+            if {![regexp {^pmi_Aug} [lindex $val end]] || $fPR == 1} {
+                if {[regexp {\sRad} $elm]} {
                     lappend val Radiative
+                } elseif {[regexp {\{(Rad(\s+[^\}]+)+)\}} $elm -> var]} {
+                    if {[lindex $var 1] ne "!"} {
+                        lappend val Radiative
+                    }
+                } else {
+                    if {[lindex $grp 0 0] eq "Silicon"} {
+                        lappend val Radiative
+                    }
                 }
             }
             if {[regexp {\{(SRH(\s+[^\}]+)+)\}} $elm -> var]} {
@@ -1631,9 +1633,8 @@ if {$OptOnly} {
     # Thermal equilibrium condition
     set var "Coupled \{Poisson Electron Hole\}"
     vputs -n -i-1 "
-        System(\"rm -f tmp_*\")\n
-        NewCurrentPrefix= \"tmp_\"
-        Coupled (Iterations= 5000) \{Poisson\}
+        Coupled (Iterations= 5000) \{Poisson\}\n
+        NewCurrentPrefix= \"eqm_\"
         Coupled (Iterations= 25) \{Poisson Electron Hole\}
         Plot (FilePrefix= \"$SimArr(EtcDir)/n@node@_Eqm\")\n"
 }
@@ -1724,14 +1725,14 @@ foreach grp $VarVary {
             set arr([lindex $grp 0]) [lindex $grp 1]
             if {[lindex $grp 2] > 1} {
 
-                # Manually realise linear intervals logarithmically
-                # Maximum power point for Suns-Voc is around 4-5% sun
+                # Realise the logarithmic scale (Equidistant logarithmically)
+                # for intensity scaling: MPP for Suns-Voc is around 4-5% sun
                 if {$val == 0} {
                     set txt 0
                     set tmp -1
                     while {$tmp < [lindex $grp 2]} {
-                        append txt "\; [expr exp(log(1e-2)+[incr tmp]\
-                            *(log([lindex $grp 1])-log(1e-2))/[lindex $grp 2])\
+                        append txt "\; [expr exp(log(1e-6)+[incr tmp]\
+                            *(log([lindex $grp 1])-log(1e-6))/[lindex $grp 2])\
                             /[lindex $grp 1]]"
                     }
                 } elseif {[lindex $grp 1] == 0} {
@@ -1739,7 +1740,7 @@ foreach grp $VarVary {
                     set tmp -1
                     while {$tmp < [lindex $grp 2]} {
                         append txt "[expr exp(log($val)+[incr tmp]\
-                            *(log(1e-2)-log($val))/[lindex $grp 2])/$val]\; "
+                            *(log(1e-6)-log($val))/[lindex $grp 2])/$val]\; "
                     }
                     append txt 1
                 } else {
