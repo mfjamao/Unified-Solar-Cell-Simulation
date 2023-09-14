@@ -203,7 +203,7 @@ foreach grp $IntfFld {
         if {[info exists arr(Field)] && [llength $arr(Field)]} {
 
             # Update the original interface field file to n@node@_xxx.plx
-            set str n@node@_[file tail [lindex $elm 0]]
+            set str n@node@_[file rootname [file tail [lindex $elm 0]]].plx
             lset IntfFld $idx $cnt 0 $str
             file rename -force $arr(FFld) $str
         } else {
@@ -282,7 +282,7 @@ set RegIntfTrap [lsort -index 0 $RegIntfTrap]
 # 'IntfSRV': the SRH recombiantion interfaces using SRVs
 # 'IntfTrap': the SRH recombiantion interfaces using trap settings
 # 'IntfCon': only contacts
-# 'IntfTun': the tunnel interfaces
+# 'IntfTun': the tunnel interfaces, skip duplicate check
 foreach elm {IntfSRV IntfTrap IntfCon IntfTun lst} {
     set $elm [list]
 }
@@ -310,8 +310,6 @@ foreach grp $IntfAttr {
         set val [concat $IntfTrap [list $grp]]
         lappend IntfTrap $grp
     } else {
-        set var [concat $IntfTun [list $str]]
-        set val [concat $IntfTun [list $grp]]
         lappend IntfTun $grp
     }
 
@@ -424,14 +422,15 @@ if {[regexp {\sRaytrace\s} $GopAttr] && $Cylind
 
 #--- Pass all global TCL parameters to SCHEME
 foreach var {RegGen RegApp1 RegApp2 RegFld IntfFld RegIntfFld RegIntfTrap
-    IntfAttr IntfSRV IntfTrap IntfCon IntfTun GopAttr GopPP MeshAttr Cylind
+    IntfAttr IntfSRV IntfTrap IntfCon IntfTun GopAttr GopPP Cylind
     OptOnly LPD Dim XMax YMax ZMax RegLen}\
     val [list $RegGen $RegApp1 $RegApp2 $RegFld $IntfFld $RegIntfFld\
     $RegIntfTrap $IntfAttr $IntfSRV $IntfTrap $IntfCon $IntfTun $GopAttr $GopPP\
-    $MeshAttr $Cylind $OptOnly $LPD $Dim $XMax $YMax $ZMax $RegLen] {
+    $Cylind $OptOnly $LPD $Dim $XMax $YMax $ZMax $RegLen] {
     vputs "(define $var [tcl2Scheme $var $val])"
 }
-
+regexp {Mesh\s+([^\}]+)} $OtrAttr -> val
+vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
 )!
 
 ;# Define local scheme procedures for convenience
@@ -589,6 +588,9 @@ foreach var {RegGen RegApp1 RegApp2 RegFld IntfFld RegIntfFld RegIntfTrap
 (define Idx 0)
 (define Flg #f)
 (define Offset #f)
+(define XCutLst '())
+(define YCutLst '())
+(define ZCutLst '())
 
 ;# Old replaces new
 (sdegeo:set-default-boolean "BAB" )
@@ -796,7 +798,25 @@ foreach var {RegGen RegApp1 RegApp2 RegFld IntfFld RegIntfFld RegIntfTrap
                 (else
                     (sdegeo:create-cuboid
                         (apply position P1) (apply position P2) Mat Reg)
+                    (if (and (> (caddr P1) 0) (< (caddr P1) ZMax)
+                        (not (member (caddr P1) ZCutLst)))
+                        (set! ZCutLst (cons (caddr P1) ZCutLst))
+                    )
                 )
+            )
+            (if (= Dim 1)
+                (if (and (> P1 0) (< P1 XMax)
+                    (not (member P1 XCutLst)))
+                    (set! XCutLst (cons P1 XCutLst))
+                )
+                (if (and (> (car P1) 0) (< (car P1) XMax)
+                    (not (member (car P1) XCutLst)))
+                    (set! XCutLst (cons (car P1) XCutLst))
+                )
+            )
+            (if (and (>= Dim 2) (> (cadr P1) 0)
+                (< (cadr P1) YMax) (not (member (cadr P1) YCutLst)))
+                (set! YCutLst (cons (cadr P1) YCutLst))
             )
         )
     ) RegApp1
@@ -1631,6 +1651,16 @@ foreach var {RegGen RegApp1 RegApp2 RegFld IntfFld RegIntfFld RegIntfTrap
             )
         )
     )
+)
+
+;# Enable axis-aligned algorithm in addition to bisectional refinement algorithm
+;# Reduce mesh-induced numeric noise e.g. changing contact width
+(if (= (length XCutLst) 0) (set! XCutLst XMax))
+(if (= (length YCutLst) 0) (set! YCutLst YMax))
+(if (= (length ZCutLst) 0) (set! ZCutLst ZMax))
+(if (= Dim 3)
+    (sdesnmesh:axisaligned "xCuts" XCutLst "yCuts" YCutLst "zCuts" ZCutLst)
+    (sdesnmesh:axisaligned "xCuts" XCutLst "yCuts" YCutLst)
 )
 
 (mfj:display "Saving 'n@node@_bnd.tdr' and 'n@node@_msh.cmd'"

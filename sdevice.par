@@ -2,12 +2,13 @@
 
 # Optical simulation only for raytrace
 if {$OptOnly && [regexp {\sRaytrace\s} $GopAttr]} {
+    regexp {Mesh\s+([^\}]+)} $OtrAttr -> val
     vputs -n -i-2 "
         * Vertex-based PMI at model scope
         pmi_OG1D \{
             node_output= \"n@node@_OG1D.plx\"
-            grid_start= [lindex $MeshAttr 6]
-            scaling= [lindex $MeshAttr 7]
+            grid_start= [lindex $val 6]
+            scaling= [lindex $val 7]
         \}\n"
 }
 
@@ -167,27 +168,12 @@ foreach grp $ModPar {
                         B= 0.0000e+00, 0.0000e+00   * cm^6/s
                         C= 0.0000e+00, 0.0000e+00   * cm^6/s
                     \}"
-            } elseif {[lindex $lst 1] eq "Altermatt"} {
+            } elseif {[lindex $lst 1] ne "" && [lindex $lst 1] ne "!"} {
+                if {![string is double -strict [lindex $lst 2]]} continue
                 vputs -n -i-4 "
-                    pmi_Aug_Altermatt \{
-                        Ceeh= 2.8e-31   * cm^6/s
-                        fPR= $fPR
-                    \}\n"
-            } elseif {[lindex $lst 1] eq "Richter"} {
-                vputs -n -i-4 "
-                    pmi_Aug_Richter \{
-                        Ceeh= 2.5e-31   * cm^6/s
-                        Cehh= 8.5e-32   * cm^6/s
-                        CDn= 3.0e-29    * cm^6/s
-                        fPR= $fPR
-                    \}\n"
-            } elseif {[lindex $lst 1] eq "Niewelt"} {
-                vputs -n -i-4 "
-                    pmi_Aug_Niewelt \{
-                        Ceeh= 3.41e-31  * cm^6/s
-                        Cehh= 1.17e-31  * cm^6/s
-                        fPR= $fPR
-                    \}\n"
+                    pmi_Aug_[lindex $lst 1] \{
+                        fPR= [lindex $lst 2]
+                    \}"
             }
         } elseif {[lindex $lst 0] eq "Rad"} {
             if {[string is double -strict [lindex $lst 1]]} {
@@ -212,12 +198,26 @@ foreach grp $ModPar {
             }
         }
     }
-    if {![regexp {(\s|\{)Aug(\s|\})} $grp]
-        && [lindex $RegGen $idx 0 0] eq "Silicon"} {
-        vputs -n -i-4 "
-                    intrinsicRichter \{
-                        Blow= 0     * cm^-3/s
-                    \}"
+    if {![regexp {\{(BGN(\s+[^\}]+)+)\}} [lrange $grp 2 end]]} {
+        if {[lindex $RegGen $idx 0 0] eq "Silicon"} {
+            if {[string index [lindex $mfjDfltSet 5] 0] eq "!"} {
+                # vputs -n -i-4 "
+                    # SchenkBGN_elec \{
+                        # IsSimplified= 1     * Default simplified Schenk
+                    # \}
+                    # SchenkBGN_hole \{
+                        # IsSimplified= 1     * Default simplified Schenk
+                    # \}"
+            } else {
+                # vputs -n -i-4 "
+                    # SchenkBGN_elec \{
+                        # IsSimplified= -1    * Full Schenk
+                    # \}
+                    # SchenkBGN_hole \{
+                        # IsSimplified= -1    * Full Schenk
+                    # \}"
+            }
+        }
     }
     vputs -n -i-4 "
                 \}\n"

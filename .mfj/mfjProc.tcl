@@ -26,13 +26,13 @@ namespace eval mfjProc {
         y yMoleFraction|1 PD AbsorbedPhotonDensity|cm^-3*s^-1
         Dn ExcessCarrierDensity|cm^-3 n eDensity|cm^-3 p hDensity|cm^-3
         UA AugerRecombination|cm^-3*s^-1 UB RadiativeRecombination|cm^-3*s^-1
-        US SRHRecombination|cm^-3*s^-1 UP PMIRecombination|cm^-3*s^-1
+        US srhRecombination|cm^-3*s^-1 UP PMIRecombination|cm^-3*s^-1
         UT TotalRecombination|cm^-3*s^-1 Gop OpticalGeneration|cm^-3*s^-1
         Eg BandGap|eV BGN BandgapNarrowing|eV ni IntrinsicDensity|cm^-3
         EA ElectronAffinity|eV EC ConductionBandEnergy|eV
         EV ValenceBandEnergy|eV EFe eQuasiFermiEnergy|eV
         EFh hQuasiFermiEnergy|eV NA AcceptorConcentration|cm^-3
-        ND DonorConcentration|cm^-3 UD eAmorphousRecombination|cm^-3*s^-1
+        ND DonorConcentration|cm^-3 UD eGapStatesRecombination|cm^-3*s^-1
         x xMoleFraction|1 Eg_eff EffectiveBandGap|eV
         ni_eff EffectiveIntrinsicDensity|cm^-3
         V ElectrostaticPotential|V q SpaceCharge|cm^-3
@@ -705,6 +705,22 @@ proc mfjProc::recycle {VarName VarVal SubLst {Lvl ""} {OldIdx ""} {InLvl ""}} {
                                 set End [expr [llength $Val]-1]
                             }
                         }
+
+                        # Detect and raise a circular reference error
+                        set MatLst [regexp -inline -all {@(-?\d+[:,/&])*-?\d+}\
+                            $Val]
+                        foreach RefStr $MatLst {
+                            if {[string index $RefStr 0] ne "@"} continue
+                            foreach RefLst [split $RefStr &] {
+                                foreach RefIdx [readIdx [string range $RefLst\
+                                    1 end]] {
+                                    if {$RefIdx eq $Lst} {
+                                        error "circular reference: '@$IdxStr'\
+                                            -> '$Val'"
+                                    }
+                                }
+                            }
+                        }
                         if {[llength $StrLst]*[llength $IdxLst] == 1} {
                             set NewElm [concat $NewElm $Val]
                         } else {
@@ -1004,7 +1020,7 @@ proc mfjProc::readTT {TTArr TTFile {TTRatio 1}} {
                     } elseif {$Key eq "TrapRef"} {
                         set Lst {FromCondBand FromMidBandGap FromValBand}
                     } elseif {$Key eq "TrapDist"} {
-                        set Lst {L<evel> U<niform> E<xpoential> G<aussian>
+                        set Lst {L<evel> U<niform> E<xponential> G<aussian>
                             T<able>}
                     } elseif {$Key eq "Reference"} {
                         set Lst {B<andGap> E<ffectiveBandGap>}
@@ -1392,7 +1408,8 @@ proc mfjProc::iSwitch {Dflt Str Ptn args} {
 # Arguments:
     # VarName     Variable name
     # VarVal      Variable value
-    # GrpID       Combinations of 'b', 'm', 'v', 'r', 'p', 'rr' and 'pp'
+    # GrpID       Combinations of 'b', 'd', 'o', 'm', 'v', 'r', 'p',
+                   # 'rr' and 'pp'
     # LvlIdx      The current level index
     # LvlLen      The total levels
 # Results: Return the splitted list
@@ -1402,8 +1419,17 @@ proc mfjProc::valSplit {VarName VarVal GrpID LvlIdx LvlLen} {
     set GStr [join $GrpID ""]
     set Txt ""
     if {[regexp {b} $GStr]} {
-        set Txt "a varying variable"
+        set Txt "c# or 'MonoScaling' or 'SpecScaling' or 'Wavelength'"
         set BIDLst $::SimArr(BIDLst)        ;# Supported 'b' group ID list
+    }
+    if {[regexp {d} $GStr]} {
+        set Txt "'Mesh' or 'Misc'"
+        set DIDLst $::SimArr(DIDLst)        ;# Supported 'd' group ID list
+    }
+
+    if {[regexp {o} $GStr]} {
+        set Txt "'Spectrum' or 'Monochromatic' or 'Incidence'"
+        set OIDLst $::SimArr(OIDLst)        ;# Supported 'o' group ID list
     }
     if {[regexp {m} $GStr]} {
         if {[string length $Txt]} {
@@ -1418,10 +1444,6 @@ proc mfjProc::valSplit {VarName VarVal GrpID LvlIdx LvlLen} {
         }
         set MatLst [lindex $::SimArr(MatDB) 0]
         set GrpLst [lindex $::SimArr(MatDB) 1]
-    }
-    if {[regexp {o} $GStr]} {
-        set Txt "a varying variable"
-        set OIDLst $::SimArr(OIDLst)        ;# Supported 'o' group ID list
     }
     if {[regexp {v} $GStr]} {
         if {[string length $Txt]} {
@@ -1574,6 +1596,20 @@ proc mfjProc::valSplit {VarName VarVal GrpID LvlIdx LvlLen} {
                         break
                     }
                     incr Idx
+                }
+            } elseif {$GID eq "d"} {
+                set Bool false
+                foreach Elm $DIDLst {
+                    if {[expr "\[regexp -nocase \{^$Elm$\} $Val\]"]} {
+                        if {[string index $Elm 0] eq "M"} {
+                            set Val Mesh
+                        }
+                        if {[string index $Elm 0] eq "O"} {
+                            set Val Other
+                        }
+                        set Bool true
+                        break
+                    }
                 }
             } elseif {$GID eq "m"} {
 
@@ -1745,10 +1781,10 @@ proc mfjProc::valSplit {VarName VarVal GrpID LvlIdx LvlLen} {
 
                             # Format each number to the proper form such as
                             # removing trailing zeroes and decimal point
-                            lappend Tmp [format %.12g $Elm]
+                            lappend Lst [format %.12g $Elm]
                         }
                     }
-                    lappend NewVal p[join $Tmp _]
+                    lappend NewVal p[join $Lst _]
                 }
 
                 # Keep the last found duplicate

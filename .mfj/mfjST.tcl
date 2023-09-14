@@ -987,22 +987,22 @@ proc mfjST::batchvsTcl {} {
         } else {
 
             # SLURM partition or PBS queue is case sensitive
-            if {$arr(BatSched) ne [lindex $arr(TCLSimEnv) 6]} {
+            if {$arr(BatSched) ne [lindex $arr(TCLSimEnv) 4]} {
                 set arr(UpdateBat) true
                 set Msg "Job scheduler '$arr(BatSched)' different\
-                    from '[lindex $arr(TCLSimEnv) 6]'!"
+                    from '[lindex $arr(TCLSimEnv) 4]'!"
 
             }
             if {$arr(BatSched) ne "Local"} {
-                if {$arr(BatMaxTmHr) != [lindex $arr(TCLSimEnv) 7]} {
+                if {$arr(BatMaxTmHr) != [lindex $arr(TCLSimEnv) 5]} {
                     set arr(UpdateBat) true
                     set Msg "Maximum walltime '$arr(BatMaxTmHr)' hrs\
-                        different from '[lindex $arr(TCLSimEnv) 7]'!"
+                        different from '[lindex $arr(TCLSimEnv) 5]'!"
                 }
-                if {$arr(BatMaxMemGB) != [lindex $arr(TCLSimEnv) 8]} {
+                if {$arr(BatMaxMemGB) != [lindex $arr(TCLSimEnv) 6]} {
                     set arr(UpdateBat) true
                     set Msg "Maximum memory '$arr(BatMaxMemGB)' GB\
-                        different from '[lindex $arr(TCLSimEnv) 8]'!"
+                        different from '[lindex $arr(TCLSimEnv) 6]'!"
                 }
                 if {$arr(BatEmail) ne $mfjIntrpr::host(Email)} {
 
@@ -1026,9 +1026,9 @@ proc mfjST::batchvsTcl {} {
     if {$arr(UpdateBat)} {
         set arr(BatEmail) $mfjIntrpr::host(Email)
         set arr(BatSTVer) [lindex $arr(TCLSimEnv) 1]
-        set arr(BatSched) [lindex $arr(TCLSimEnv) 6]
-        set arr(BatMaxTmHr) [lindex $arr(TCLSimEnv) 7]
-        set arr(BatMaxMemGB) [lindex $arr(TCLSimEnv) 8]
+        set arr(BatSched) [lindex $arr(TCLSimEnv) 4]
+        set arr(BatMaxTmHr) [lindex $arr(TCLSimEnv) 5]
+        set arr(BatMaxMemGB) [lindex $arr(TCLSimEnv) 6]
         set arr(BatSTRoot) $STROOT
         set arr(BatSTLicn) $mfjIntrpr::host(STLicn)
         set arr(BatRunNode) $arr(TCLRunNode)

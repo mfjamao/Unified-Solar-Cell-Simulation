@@ -15,14 +15,11 @@ if {[llength [lsort -unique -index 0 $PPAttr]] < [llength $PPAttr]} {
 #--- Get TCL parameters
 !(
 
-foreach var {RegGen VarVary SimEnv VV2Fld SS2Fld PPAttr GopAttr
-    IntfCon IntfSRV RegIntfTrap ModPar mfjDfltSet Dim Cylind OptOnly
-    LoadTDR XMax YMax}\
-    val [list $RegGen $VarVary $SimEnv $VV2Fld $SS2Fld $PPAttr\
-    $GopAttr $IntfCon $IntfSRV $RegIntfTrap $ModPar $mfjDfltSet $Dim\
-    $Cylind $OptOnly $LoadTDR $XMax $YMax] {
+foreach var {RegGen VarVary OtrAttr VV2Fld SS2Fld PPAttr GopAttr
+    IntfCon IntfTun IntfSRV RegIntfTrap ModPar\
+    Dim Cylind OptOnly LoadTDR XMax YMax ZMax} {
     vputs -n -i-3 "
-        set $var \{[regsub -all {\s+} $val " "]\}"
+        set $var \{[regsub -all {\s+} [set $var] " "]\}"
 }
 vputs -n -i-2 "
     array set ValArr \{[array get ValArr]\}
@@ -50,7 +47,8 @@ set h 6.62607015e-34
 set hB [expr {$h/$q}]
 set k 1.380649e-23
 set kB [expr {$k/$q}]
-set T [expr [lindex $SimEnv 4]+273.15]
+regexp {Other\s+(\S+)} $OtrAttr -> T
+set T [expr $T+273.15]
 
 #--- Automatic alternating color, marker and line assignment
 set colorLst {black red darkRed green darkGreen blue darkBlue cyan darkCyan
@@ -60,7 +58,6 @@ set markerLst {circle diamond square circlef diamondf squaref plus cross}
 set markerLen [llength $markerLst]
 set lineLst {solid dot dash dashdot dashdotdot}
 set lineLen [llength $lineLst]
-
 
 #--- Svisual local parameters
 set tm [clock seconds]
@@ -122,21 +119,14 @@ set apPlt AbsorbedPhotonDensity
 # jArea is related to current density, photon flux, ...
 # intArea: affected by IntegrationUnit in Math section
 if {$Dim == 3} {
-    set jArea [expr 1e-8*([lindex $RegGen 0 2 1]-[lindex $RegGen 0 1 1])\
-        *([lindex $RegGen 0 2 2]-[lindex $RegGen 0 1 2])]
+    set jArea [expr 1e-8*$YMax*$ZMax]
     set intArea $jArea
-} elseif {$Dim == 2} {
-    if {$Cylind} {
-        set jArea [expr 1e-8*$PI*pow([lindex $RegGen 0 2 1]\
-            -[lindex $RegGen 0 1 1],2)]
-        set intArea $jArea
-    } else {
-        set jArea [expr 1e-8*([lindex $RegGen 0 2 1]-[lindex $RegGen 0 1 1])]
-        set intArea [expr 1e-4*([lindex $RegGen 0 2 1]-[lindex $RegGen 0 1 1])]
-    }
+} elseif {$Dim == 2 && $Cylind} {
+    set jArea [expr 1e-8*$PI*pow($YMax,2)]
+    set intArea $jArea
 } else {
-    set jArea [expr 1e-8*[lindex $mfjDfltSet 0]]
-    set intArea [expr 1e-4*[lindex $mfjDfltSet 0]]
+    set jArea [expr 1e-8*$YMax]
+    set intArea [expr 1e-4*$YMax]
 }
 vputs -i1 "\njArea= $jArea cm^2, intArea= $intArea cm^2"
 
@@ -314,12 +304,14 @@ foreach pp $PPAttr {
         # Initialise parameters
         set capRAT "n@node@_$pp0: R A T curves"
         set fRAT $SimArr(OutDir)/n@node@_${pp0}_RAT.csv
-        set fTotGop $SimArr(OutDir)/n@node@_${pp0}_1DGop_Total.plx
-        set fSpecGop $SimArr(OutDir)/n@node@_${pp0}_1DGop_Spectral.plx
-        set fGop $SimArr(OutDir)/n@node@_${pp0}_1DGop_Summary.csv
+        set fGopWS $SimArr(OutDir)/n@node@_${pp0}_1DGop_WS.plx
+        set fGopARCWS $SimArr(OutDir)/n@node@_${pp0}_1DGop_ARC_WS.plx
+        set fGopSpec $SimArr(OutDir)/n@node@_${pp0}_1DGop_Spectral.plx
+        set fGopARCSpec $SimArr(OutDir)/n@node@_${pp0}_1DGop_ARC_Spectral.plx
+        set fGopSum $SimArr(OutDir)/n@node@_${pp0}_1DGop_Summary.csv
         create_plot -name PltRAT_$pp0 -1d
 
-        # Calculate monochromatic light intensity
+        # Get monochromatic light intensity
         regexp {\{Monochromatic\s+\S+\s+([^\s\}]+)} $GopAttr -> val
         set pMono [expr $val*$ValArr(MonoScaling)]
         vputs -i2 "Monochromatic intensity: $pMono W*cm^-2"
@@ -349,6 +341,7 @@ foreach pp $PPAttr {
         remove_curves ${pp0}_ww
 
         # Two columns from customSpec: Wavelength [nm] intensity [W*cm^-2]
+        # Wavelengths in ascending order
         set specLst [list]
         if {[regexp {\{Spectrum\s+(\S+)} $GopAttr -> fSpec]} {
             vputs -i2 "Build custom spectrum from '$xLow' to '$xHigh' nm based\
@@ -447,6 +440,8 @@ foreach pp $PPAttr {
                 }
                 vputs
             }
+
+            array unset arr
             if {[regexp {\sARC\s} $GopAttr]} {
                 vputs -i2 "Calculating absorbed photons in the ARC layers"
                 foreach grp $GopAttr {
@@ -458,7 +453,11 @@ foreach pp $PPAttr {
                         $RegGen [lindex $lst 1] 0 1]
                     set idx 0
                     while {$idx < [expr ([llength $grp]-2.)/3]} {
-                        set str [lindex $grp 0]|[lindex $grp [expr $idx*3+2]]
+                        set lst [lrange $grp [expr $idx*3+2] [expr $idx*3+3]]
+                        set str [lindex $grp 0]|[lindex $lst 0]
+                        lappend arr(ARCMat) [lindex $lst 0]
+                        lappend arr(ARCThx|um) [lindex $lst 1]
+                        lappend arr(ARCCurve) ${pp0}_6|$str
                         vputs -i3 "RaytraceInterfaceTMMLayerFlux\
                             A($intf).layer$idx"
                         create_curve -name ${pp0}_N_$str -dataset Data_$pp0\
@@ -476,7 +475,15 @@ foreach pp $PPAttr {
                     }
                 }
             }
+
+            # Create the fraction of shading if exists
+            regexp {\{Incidence\s+(\S+)} $GopAttr -> fShd
+            if {$fShd > 0} {
+                create_curve -name ${pp0}_7|Shading -function\
+                    "$fShd*<${pp0}_A_Inc>/<${pp0}_A_Inc>"
+            }
             remove_curves ${pp0}_A_Inc
+
             set lst [list]
             foreach curve [list_curves -plot PltRAT_$pp0] {
                 if {![regexp {^v\d+_\d\|(OG|FCA)} $curve]} {
@@ -486,14 +493,30 @@ foreach pp $PPAttr {
             vputs -i2 "Create RAT from the sum of $lst"
             create_curve -name ${pp0}_2|RAT -function [join $lst +]
 
-            # Read n@previous@_OG1D.plx
+            # Check each ARC material for its material group and retain
+            # the first semiconductor layer onwards
+            if {[info exists arr(ARCMat)]} {
+                set MatDB [readMatDB datexcodes.txt $iseroot_lib/datexcodes.txt]
+                set len [llength $arr(ARCMat)]
+                for {set i 0} {$i < $len} {incr i} {
+                    set idx [lsearch -regexp [lindex $MatDB 0]\
+                        ^[lindex $arr(ARCMat) $i]$]
+                    if {[lindex $MatDB 1 $idx] eq "Semiconductor"} {
+                        break
+                    }
+                }
+                set arr(ARCMat) [lrange $arr(ARCMat) $i end]
+                set arr(ARCThx|um) [lrange $arr(ARCThx|um) $i end]
+                set arr(ARCCurve) [lrange $arr(ARCCurve) $i end]
+            }
+
+            # Extract depth and wavelength dependent photon absorbance profile
             if {![file exists n@previous@_OG1D.plx]} {
                 vputs -i3 "\nerror: n@previous@_OG1D.plx not found!\n"
                 continue
             }
             set idx 0
             set ogLst [list]
-            array unset arr
             set inf [open n@previous@_OG1D.plx r]
             vputs -i3 "Read n@previous@_OG1D.plx"
             while {[gets $inf line] != -1} {
@@ -518,137 +541,216 @@ foreach pp $PPAttr {
             }
             close $inf
 
-            vputs -i2 "Save spectral 1D optical generation rate\
-                to '$fSpecGop' ascendingly"
+            # Sort wavelengths ascendingly
+            set arr(Lambda|nm) [lsort -real $arr(Lambda|nm)]
 
-            # wavLst: Optical generation rate, Jmono, JOG
-            set wavLst Wavelength|nm
-            set ogLst $arr(Dep|um)
-            set len [llength $ogLst]
-            set ouf [open $fSpecGop w]
+            vputs -i2 "Save spectral 1D optical generation rate\
+                to '$fGopSpec' ascendingly"
+
+            # Summarise Jmono and JOG for each wavelength
+            # ogLst: depth, Gop, cumulative JOG, ROG
+            set capLst Summary
+            set sumLst Sum
+            set ogLst [list]
+            set len [llength $arr(Dep|um)]
+            set ouf [open $fGopSpec w]
             puts $ouf "# Spectral 1D optical generation rate at $pMono|W*cm^-2"
             puts $ouf "# Depth|um, AbsorbedPhotonDensity|cm^-3*s^-1"
-            foreach elm [lsort -real $arr(Lambda|nm)] {
-                puts $ouf "\n\"g([expr 1e-3*$elm])\""
-                puts $ouf "Wavelength = [expr 1e-3*$elm] \[um\]\
+            foreach w $arr(Lambda|nm) {
+                puts $ouf "\n\"g([expr 1e-3*$w])\""
+                puts $ouf "Wavelength = [expr 1e-3*$w] \[um\]\
                     Intensity = $pMono \[W*cm^-2\]"
-                set tmpLst [list]
-                foreach lst $ogLst val $arr($elm) {
-                    puts $ouf [format %.4e\t%.4e [lindex $lst 0] $val]
-                    lappend tmpLst "$lst $val"
+                set lst [list]
+                foreach dep $arr(Dep|um) og $arr($w) {
+                    puts $ouf [format %.4e\t%.4e $dep $og]
+                    lappend lst [list $dep $og]
                 }
 
-                # Calculate cumulative JOG
-                set ogLst [list]
-                lappend ogLst "[lindex $tmpLst 0] 0"
+                # Append cumulative JOG [mA/cm2] with absorbance depth
+                lset lst 0 [concat [lindex $lst 0] 0]
                 for {set i 1} {$i < $len} {incr i} {
-                    set sum [lindex $ogLst [expr $i-1] end]
-                    set sum [expr $sum+([lindex $tmpLst [expr $i-1] end]\
-                        +[lindex $tmpLst $i end])*([lindex $tmpLst $i 0]\
-                        -[lindex $tmpLst [expr $i-1] 0])/2e1*$q]
-                    lappend ogLst "[lindex $tmpLst $i] $sum"
+                    set sum [lindex $lst [expr $i-1] end]
+                    set sum [expr $sum+([lindex $lst [expr $i-1] end-1]\
+                        +[lindex $lst $i end])*([lindex $lst $i 0]\
+                        -[lindex $lst [expr $i-1] 0])/2e1*$q]
+                    lset lst $i [concat [lindex $lst $i] $sum]
                 }
 
-                # Calculate ROG
-                set val [expr 1e3*$q*$pMono/($h*$c0/(1e-9*$elm))]
-                append wavLst " $elm $val $sum"
-                set tmpLst [list]
-                foreach lst $ogLst {
-                    lappend tmpLst "$lst [expr 1e2*[lindex $lst end]/$sum]"
+                # Calculate incident photon density Jmono [mA/cm2]
+                set val [expr 1e3*$q*$pMono/($h*$c0/(1e-9*$w))]
+                append capLst " Wavelength|nm Jmono|mA*cm^-2 JOG|mA*cm^-2"
+                append sumLst " $w $val $sum"
+
+                # Append ROG with absorbance depth
+                if {[llength $ogLst]} {
+                    set newLst [list]
+                    foreach elm $lst grp $ogLst {
+                        set rog [expr 1e2*[lindex $elm end]/$sum]
+                        lappend newLst [concat $grp [lrange $elm 1 end] $rog]
+                    }
+                    set ogLst $newLst
+                } else {
+                    foreach elm $lst {
+                        set rog [expr 1e2*[lindex $elm end]/$sum]
+                        lappend ogLst [concat $elm $rog]
+                    }
                 }
-                set ogLst $tmpLst
             }
             close $ouf
+
+            if {[info exists arr(ARCMat)] && [llength $arr(ARCMat)]} {
+                vputs -i2 "Save spectral 1D optical generation rate with ARC\
+                    to '$fGopARCSpec' ascendingly"
+                set ouf [open $fGopARCSpec w]
+                puts $ouf "# Spectral 1D optical generation rate with ARC at\
+                    $pMono|W*cm^-2"
+                puts $ouf "# Depth|um, AbsorbedPhotonDensity|cm^-3*s^-1"
+                foreach w $arr(Lambda|nm) {
+                    puts $ouf "\n\"g([expr 1e-3*$w])\""
+                    puts $ouf "Wavelength = [expr 1e-3*$w] \[um\]\
+                        Intensity = $pMono \[W*cm^-2\]"
+
+                    # Calculate incident photon flux [cm^-2s^-1]
+                    set val [expr 1e-9*$pMono*$w/$h/$c0]
+                    set thx 0
+                    set lst [list]
+                    foreach elm $arr(ARCThx|um) str $arr(ARCCurve) {
+                        set arc [lindex [probe_curve $str -valueX $w\
+                            -plot PltRAT_$pp0] 0]
+                        set og [expr 1e4*$val*$arc/$elm]
+                        lappend lst $og
+                        puts $ouf [format %.4e\t%.4e $thx $og]
+                        set thx [expr $thx+$elm/2.]
+                        puts $ouf [format %.4e\t%.4e $thx $og]
+                        set thx [expr $thx+$elm/2.]
+                        puts $ouf [format %.4e\t%.4e $thx $og]
+                    }
+                    lappend arr(ARCOG|cm^-3*s^-1) $lst
+                    foreach dep $arr(Dep|um) og $arr($w) {
+                        puts $ouf [format %.4e\t%.4e [expr $dep+$thx] $og]
+                    }
+                }
+                close $ouf
+            }
 
             # Two columns from customSpec: Wavelength [nm] intensity [W*cm^-2]
             if {[llength $specLst]} {
                 vputs -i2 "Calculate weighted average reflectance, absorptance,\
                     optical generation from '$xLow' to '$xHigh' nm"
                 foreach curve [list_curves -plot PltRAT_$pp0] {
-                    if {![regexp {^v\d+_\d\|(R|A.*|OG.+)$} $curve -> str]} {
+                    if {![regexp {^v\d+_\d\|(R|A.*|OG.+|r.+)$} $curve -> str]} {
                         continue
                     }
 
-                    # 'swb' can't display '|'
-                    set str [string map {| _} $str]
+                    # 'swb' can't display a variable name with '|' and '/'
+                    set str [string map {| _ / _} $str]
                     set sum 0
                     foreach w [lindex $specLst 0] p [lindex $specLst 1] {
                         set val [lindex [probe_curve $curve -valueX $w\
-                        -plot PltRAT_$pp0] 0]
+                            -plot PltRAT_$pp0] 0]
                         set sum [expr $sum+$val*1e3*$q*$p/($h*$c0/$w*1e9)]
                     }
                     vputs -i3 "DOE: ${pp0}_J$str [format %.4f $sum]"
                     set gVarArr(${pp0}_J$str) [format %.4f $sum]
                 }
 
-                # Calculate total 1D weighted average absorptance profile
-                vputs -i2 "Calculate total 1D weighted optical generation rate"
+                # Calculate 1D weighted sum of the absorptance profile
+                vputs -i2 "Calculate 1D weighted sum of optical generation rate"
 
-                # Calculate weighted average photons for each depth
-                set idx 0
-                set len [llength $arr(Lambda|nm)]
-                if {$len != [llength [lindex $specLst 1]]} {
+                # Calculate weighted sum of photons for each depth
+                if {[llength $arr(Lambda|nm)]
+                    != [llength [lindex $specLst 1]]} {
                     vputs -i2 "\nerror: $len records !=\
                         [llength [lindex $specLst 1]] wavelengths!\n"
                     continue
                 }
+                set idx 0
                 foreach dep $arr(Dep|um) {
                     set sum 0
-                    for {set i 0} {$i < $len} {incr i} {
-                        if {$xAsc} {
-                            set sum [expr $sum+[lindex\
-                                $arr([lindex $arr(Lambda|nm) $i]) $idx]\
-                                *[lindex $specLst 1 $i]/$pMono]
-                        } else {
-                            set sum [expr $sum+[lindex\
-                                $arr([lindex $arr(Lambda|nm) $i]) $idx]\
-                                *[lindex $specLst 1 end-$i]/$pMono]
-                        }
+                    foreach w $arr(Lambda|nm) p [lindex $specLst 1] {
+                        set sum [expr $sum+[lindex $arr($w) $idx]*$p/$pMono]
                     }
-                    lappend arr(WOG|cm^-3*s^-1) $sum
+                    lappend arr(WSOG|cm^-3*s^-1) $sum
                     incr idx
                 }
-                vputs -i2 "Save total 1D weighted optical generation rate\
-                    to '$fTotGop'"
-                set ouf [open $fTotGop w]
-                puts $ouf "# Total 1D weighted optical generation rate from\
+                vputs -i2 "Save 1D weighted sum of optical generation rate\
+                    to '$fGopWS'"
+                set ouf [open $fGopWS w]
+                puts $ouf "# 1D weighted sum of optical generation rate from\
                     '$xLow' to '$xHigh' nm with a step\n# size of '[expr\
                     abs($xHigh-$xLow)/[lindex $VarVary $vIdx 2]]' nm using\
                     spectrum '$fSpec'"
                 puts $ouf "# Depth|um, AbsorbedPhotonDensity|cm^-3*s^-1"
                 puts $ouf {"AbsorbedPhotonDensity"}
-                set tmpLst [list]
-                foreach dep $arr(Dep|um) val $arr(WOG|cm^-3*s^-1) {
-                    puts $ouf [format %.4e\t%.4e $dep $val]
-                    lappend tmpLst "$dep $val"
+                set lst [list]
+                set len [llength $arr(Dep|um)]
+                foreach dep $arr(Dep|um) og $arr(WSOG|cm^-3*s^-1) {
+                    puts $ouf [format %.4e\t%.4e $dep $og]
+                    lappend lst [concat $dep $og]
                 }
                 close $ouf
 
-                # Calculate cumulative JOG
-                lset tmpLst 0 "[lindex $tmpLst 0] 0"
-                set len [llength $tmpLst]
+                # Append cumulative JOG [mA/cm2] with absorbance depth
+                lset lst 0 [concat [lindex $lst 0] 0]
                 for {set i 1} {$i < $len} {incr i} {
-                    set sum [lindex $tmpLst [expr $i-1] end]
-                    set sum [expr $sum+([lindex $tmpLst [expr $i-1] end-1]\
-                        +[lindex $tmpLst $i end])*([lindex $tmpLst $i 0]\
-                        -[lindex $tmpLst [expr $i-1] 0])/2e1*$q]
-                    lset tmpLst $i "[lindex $tmpLst $i] $sum"
+                    set sum [lindex $lst [expr $i-1] end]
+                    set sum [expr $sum+([lindex $lst [expr $i-1] end-1]\
+                        +[lindex $lst $i end])*([lindex $lst $i 0]\
+                        -[lindex $lst [expr $i-1] 0])/2e1*$q]
+                    lset lst $i [concat [lindex $lst $i] $sum]
+                }
+                set capLst [concat [lindex $capLst 0] WeightedSum Jph|mA*cm^-2\
+                    JOG|mA*cm^-2 [lrange $capLst 1 end]]
+                set sumLst [concat [lindex $sumLst 0] WSOG $intJph $sum\
+                    [lrange $sumLst 1 end]]
+
+                # Append ROG with absorbance depth
+                set newLst [list]
+                foreach elm $lst grp $ogLst {
+                    set rog [expr 1e2*[lindex $elm end]/$sum]
+                    lappend newLst [concat $elm $rog [lrange $grp 1 end]]
+                }
+                set ogLst $newLst
+            }
+
+            if {[info exists arr(ARCMat)] && [llength $arr(ARCMat)]} {
+                vputs -i2 "Save 1D weighted sum of optical generation rate\
+                    with ARC to '$fGopARCWS'"
+                set ouf [open $fGopARCWS w]
+                puts $ouf "# 1D weighted sum of optical generation rate with\
+                    ARC from '$xLow' to '$xHigh' nm with\n# a stepsize of\
+                    '[expr abs($xHigh-$xLow)/[lindex $VarVary $vIdx 2]]' nm\
+                    using spectrum '$fSpec'"
+                puts $ouf "# Depth|um, AbsorbedPhotonDensity|cm^-3*s^-1"
+                puts $ouf {"AbsorbedPhotonDensity"}
+                set thx 0
+                set idx 0
+                foreach elm $arr(ARCThx|um) {
+
+                    # Calculate weighted sum of absorbed photons in ARC
+                    set sum 0
+                    foreach og $arr(ARCOG|cm^-3*s^-1) p [lindex $specLst 1] {
+                        set sum [expr $sum+[lindex $og $idx]*$p/$pMono]
+                    }
+                    puts $ouf [format %.4e\t%.4e $thx $sum]
+                    set thx [expr $thx+$elm/2.]
+                    puts $ouf [format %.4e\t%.4e $thx $sum]
+                    set thx [expr $thx+$elm/2.]
+                    puts $ouf [format %.4e\t%.4e $thx $sum]
+                    incr idx
                 }
 
-                # Calculate ROG
-                set wavLst [concat [lindex $wavLst 0] WOG $intJph $sum\
-                    [lrange $wavLst 1 end]]
-                for {set i 0} {$i < $len} {incr i} {
-                    set lst [lindex $ogLst $i]
-                    lset ogLst $i "[lindex $tmpLst $i] [expr 1e2*[lindex\
-                        $tmpLst $i end]/$sum] [lrange $lst 1 end]"
+                foreach dep $arr(Dep|um) og $arr(WSOG|cm^-3*s^-1) {
+                    puts $ouf [format %.4e\t%.4e [expr $dep+$thx] $og]
                 }
+                close $ouf
             }
 
             # Save 1DGop summary
-            set ouf [open $fGop w]
-            puts $ouf [join $wavLst ,]
-            set len [expr int([llength $wavLst]/3)]
+            set ouf [open $fGopSum w]
+            puts $ouf [join $capLst ,]
+            puts $ouf [join $sumLst ,]\n
+            set len [expr int([llength $sumLst]/3)]
             set str Depth|um
             for {set i 0} {$i < $len} {incr i} {
                 append str ",Gop|cm^-3*s^-1,JOG|mA*cm^-2*s^-1,ROG|%"
@@ -656,8 +758,8 @@ foreach pp $PPAttr {
             puts $ouf $str
             foreach lst $ogLst {
                 set str [format %.4e [lindex $lst 0]]
-                foreach val [lrange $lst 1 end] {
-                    append str ,[format %.4e $val]
+                foreach elm [lrange $lst 1 end] {
+                    append str ,[format %.4e $elm]
                 }
                 puts $ouf $str
             }
@@ -949,6 +1051,9 @@ foreach pp $PPAttr {
                     vputs -i2 "DOE: ${pp0}_Jmpp $tmp"
                     set gVarArr(${pp0}_Jmpp|mA*cm^-2) $tmp
                 }
+            } else {
+                vputs -i2 "\nerror: '$bCon' not a hole contact!\n"
+                continue
             }
         }
 
@@ -1039,21 +1144,27 @@ foreach pp $PPAttr {
 
     } elseif {[lindex $pp 1] eq "QE"} {
 
-        # Find a voltage contact from 'ValArr'
+        # Find a voltage hole contact from 'ValArr'
         set bCon ""
         foreach elm [array names ValArr] {
             if {[regexp {^c\d$} $elm]
                 && [lindex $ValArr($elm) 0] eq "Voltage"} {
-                set bCon $elm
-                break
+                set lst [get_variable_data -dataset Data_$pp0\
+                    "$elm TotalCurrent"]
+
+                # Current is negative on the hole contact
+                if {[lindex $lst 0] < 0} {
+                    set bCon $elm
+                    break
+                }
             }
         }
-        if {[string length $bCon] > 0} {
-            vputs -i2 "Found a voltage contact '$bCon'!"
-            vputs -i2 "Bias voltage at '$bCon': $ValArr($bCon) V"
-        } else {
+        if {$bCon eq ""} {
             vputs -i2 "\nerror: no voltage contact for QE!\n"
             continue
+        } else {
+            vputs -i2 "Found a voltage hole contact '$bCon'!"
+            vputs -i2 "Bias voltage at '$bCon': [lindex $ValArr($bCon) 1] V"
         }
 
         # Verify the current 'VarVary' step
@@ -1132,16 +1243,8 @@ foreach pp $PPAttr {
         # X in nm, Y in mA*cm^-2
         create_curve -name ${pp0}_jSum -dataset Data_$pp0\
             -axisX $xVar -axisY "$bCon TotalCurrent"
-
-        # Check the polarity of contact current at '$bCon'
-        set lst [get_variable_data -dataset Data_$pp0 "$bCon TotalCurrent"]
-        if {1e3*[lindex $lst [expr int([llength $lst]/2)]]/$jArea < $jBias} {
-            create_curve -name ${pp0}_jSig -function\
-                "<${pp0}_jBias>-1e3*<${pp0}_jSum>/$jArea"
-        } else {
-            create_curve -name ${pp0}_jSig -function\
-                "1e3*<${pp0}_jSum>/$jArea-<${pp0}_jBias>"
-        }
+        create_curve -name ${pp0}_jSig -function\
+            "<${pp0}_jBias>-1e3*<${pp0}_jSum>/$jArea"
 
         # X in nm, Y in mA*cm^-2 (J*s^-1*cm^2/(J*s*m/s/m) )
         vputs -i2 "Calculating signal photon current..."
@@ -1533,7 +1636,9 @@ foreach pp $PPAttr {
                             set srh 0
                         }
                     }
-                    if {[regexp {\sTrap\s} $elm]} {
+                    if {[regexp {\{Trap\s} $elm]
+                        || [regexp \\\{r$idx\\s $RegIntfTrap]
+                        || [regexp \\\{r\\d+/$idx\\s+TAT $IntfTun]} {
                         set trap 1
                     }
                     break
@@ -1584,7 +1689,7 @@ foreach pp $PPAttr {
                 create_curve -name ${pp0}_2|J0_SRH|$reg -dataset Data_$pp0\
                     -axisX $xVar -axisY J0_SRH|$reg|fA*cm^-2 -plot PltJ0_$pp0
             }
-            if {[regexp \\\{$reg $RegIntfTrap] || $trap} {
+            if {$trap} {
                 vputs -i3 tau_Trap|$reg
                 create_variable -name tau_Trap|$reg|s -dataset Data_$pp0\
                     -function "<$xVar:Data_$pp0>*$vol\
@@ -1603,7 +1708,8 @@ foreach pp $PPAttr {
 
         vputs -i2 "Plot lifetime and J0 curves at region interfaces"
         foreach grp $IntfSRV {
-            if {![string is double -strict [lindex $grp 2]]} continue
+            if {![string is double -strict [lindex $grp 2]]
+                || [lindex $grp 2] == 0} continue
             set lst [string map {r "" / " "} [lindex $grp 0]]
             set intf [lindex $RegGen [lindex $lst 0] 0 1]/[lindex\
                 $RegGen [lindex $lst 1] 0 1]
@@ -2053,14 +2159,29 @@ foreach pp $PPAttr {
             set_legend_prop -location top_left
 
             # Extract volume of all semiconductors [cm^3]
-            set val [get_variable_data -dataset Data_$pp0\
-                "IntegrSemiconductor $ogPlt"]
-            if {[lindex $val 0] == 0} {
-                set vol [expr 1.*[lindex $val end]/[lindex [get_variable_data\
-                    -dataset Data_$pp0 "AveSemiconductor $ogPlt"] end]]
+            if {[regexp {\{(Mono|Spec)Scaling\s} $VarVary]} {
+                set val [get_variable_data -dataset Data_$pp0\
+                    "IntegrSemiconductor $ogPlt"]
+                if {[lindex $val 0] == 0} {
+                    set vol [expr 1.*[lindex $val end]/[lindex\
+                        [get_variable_data -dataset Data_$pp0\
+                        "AveSemiconductor $ogPlt"] end]]
+                } else {
+                    set vol [expr 1.*[lindex $val 0]/[lindex\
+                        [get_variable_data -dataset Data_$pp0\
+                        "AveSemiconductor $ogPlt"] 0]]
+                }
             } else {
-                set vol [expr 1.*[lindex $val 0]/[lindex [get_variable_data\
-                    -dataset Data_$pp0 "AveSemiconductor $ogPlt"] 0]]
+
+                # Manually calculate total semiconductor volume
+                # Will improve accuracy later
+                if {$Dim == 3} {
+                    set vol [expr 1e-12*$XMax*$YMax*$ZMax]
+                } elseif {$Dim == 2 && $Cylind} {
+                    set vol [expr 1e-12*$XMax*$PI*$YMax*$YMax]
+                } else {
+                    set vol [expr 1e-8*$XMax*$YMax]
+                }
             }
             vputs -i3 "Total semiconductor region volume: $vol cm^3"
             vputs -i2 "Plot excess carrier density curves"
@@ -2140,7 +2261,9 @@ foreach pp $PPAttr {
                             set srh 0
                         }
                     }
-                    if {[regexp {\sTrap\s} $elm]} {
+                    if {[regexp {\{Trap\s} $elm]
+                        || [regexp \\\{r$idx\\s $RegIntfTrap]
+                        || [regexp \\\{r\\d+/$idx\\s+TAT $IntfTun]} {
                         set trap 1
                     }
                     break
@@ -2174,11 +2297,21 @@ foreach pp $PPAttr {
                     -plot PltJLoss_$pp0\
                     -axisX $xVar -axisY JLoss_SRH|$reg|mA*cm^-2
             }
-            if {[regexp \\\{$reg $RegIntfTrap] || $trap} {
+            if {$trap} {
                 vputs -i3 JLoss_Trap|$reg
-                create_variable -name JLoss_Trap|$reg|mA*cm^-2\
-                    -dataset Data_$pp0 -function "1e3*$q/$intArea*<Integr$reg\
-                    eGapStatesRecombination:Data_$pp0>"
+                if {[regexp \\\{r\\d+/$idx\\s+TAT $IntfTun]} {
+
+                    # Trap-assisted tunnelling: JLoss = JTrap + J
+                    # It is not accurate yet. Need better algorithm
+                    create_variable -name JLoss_Trap|$reg|mA*cm^-2\
+                        -dataset Data_$pp0 -function "1e3*($q*<Integr$reg\
+                        eGapStatesRecombination:Data_$pp0>/$intArea+<$bCon\
+                        TotalCurrent:Data_$pp0>/$jArea)"
+                } else {
+                    create_variable -name JLoss_Trap|$reg|mA*cm^-2\
+                        -dataset Data_$pp0 -function "1e3*$q*<Integr$reg\
+                        eGapStatesRecombination:Data_$pp0>/$intArea"
+                }
                 create_curve -name ${pp0}_1|Trap|$reg -dataset Data_$pp0\
                     -plot PltJLoss_$pp0\
                     -axisX $xVar -axisY JLoss_Trap|$reg|mA*cm^-2
@@ -2230,17 +2363,30 @@ foreach pp $PPAttr {
                 create_curve -name ${pp0}_2|tau_SRH|$reg -dataset Data_$pp0\
                     -axisX $xVar -axisY tau_SRH|$reg|s -plot Plttau_$pp0
             }
-            if {[regexp \\\{$reg $RegIntfTrap] || $trap} {
+            if {$trap} {
                 vputs -i3 J0_Trap|$reg
-                create_variable -name J0_Trap|$reg|fA*cm^-2 -dataset Data_$pp0\
-                    -function "<Integr$reg eGapStatesRecombination:Data_$pp0>\
-                    *1e15*$q/$intArea/<$DnPlt Normd_pn:Data_$pp0>"
+                if {[regexp \\\{r\\d+/$idx\\s+TAT $IntfTun]} {
+                    create_variable -name J0_Trap|$reg|fA*cm^-2\
+                        -dataset Data_$pp0 -function "1e15*($q*<Integr$reg\
+                        eGapStatesRecombination:Data_$pp0>/$intArea+<$bCon\
+                        TotalCurrent:Data_$pp0>/$jArea)\
+                        /<$DnPlt Normd_pn:Data_$pp0>"
+                    create_variable -name tau_Trap|$reg|s -dataset Data_$pp0\
+                        -function "<$DnVar:Data_$pp0>*$vol\
+                        /(<Integr$reg eGapStatesRecombination:Data_$pp0>\
+                        +<$bCon TotalCurrent:Data_$pp0>/$q)"
+                } else {
+                    create_variable -name J0_Trap|$reg|fA*cm^-2\
+                        -dataset Data_$pp0 -function "1e15*$q*<Integr$reg\
+                        eGapStatesRecombination:Data_$pp0>/$intArea\
+                        /<$DnPlt Normd_pn:Data_$pp0>"
+                    create_variable -name tau_Trap|$reg|s -dataset Data_$pp0\
+                        -function "<$DnVar:Data_$pp0>*$vol\
+                        /<Integr$reg eGapStatesRecombination:Data_$pp0>"
+                }
                 create_curve -name ${pp0}_1|Trap|$reg -dataset Data_$pp0\
                     -axisX $xVar -axisY J0_Trap|$reg|fA*cm^-2 -plot PltJ0_$pp0
                 vputs -i3 tau_Trap|$reg
-                create_variable -name tau_Trap|$reg|s -dataset Data_$pp0\
-                    -function "<$DnVar:Data_$pp0>*$vol\
-                    /<Integr$reg eGapStatesRecombination:Data_$pp0>"
                 create_curve -name ${pp0}_1|tau_Trap|$reg -dataset Data_$pp0\
                     -axisX $xVar -axisY tau_Trap|$reg|s -plot Plttau_$pp0
             }
@@ -2248,7 +2394,8 @@ foreach pp $PPAttr {
 
         vputs -i2 "Plot JLoss, (J0 and lifetime) curves at region interfaces"
         foreach grp $IntfSRV {
-            if {![string is double -strict [lindex $grp 2]]} continue
+            if {![string is double -strict [lindex $grp 2]]
+                || [lindex $grp 2] == 0} continue
             set lst [string map {r "" / " "} [lindex $grp 0]]
             set intf [lindex $RegGen [lindex $lst 0] 0 1]/[lindex\
                 $RegGen [lindex $lst 1] 0 1]

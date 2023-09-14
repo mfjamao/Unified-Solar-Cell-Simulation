@@ -204,6 +204,22 @@ namespace eval mfjGrm {
                         }
                     }
                 }
+                b {
+                    if {$valIdx == 0} {
+                        set Bool true
+                    } else {
+
+                        # Not required at the moment
+                    }
+                }
+                d {
+                    if {$valIdx == 0} {
+                        set Bool true
+                    } else {
+
+                        # Not required at the moment
+                    }
+                }
                 e {
 
                     # If arguments exist, test the 1st argument instead
@@ -286,87 +302,6 @@ namespace eval mfjGrm {
                         }
                     }
                 }
-                n {
-
-                    # If arguments exist, test the 1st argument instead
-                    # Verification of multiple arguments is possible but
-                    # the rules for input get inconsistent and it is more
-                    # complicated
-                    if {[llength $Arg]} {
-                        set Val [lindex $Arg 0]
-                    }
-                    if {[string is double -strict $Val]} {
-                        set Bool [expr "$Inv true"]
-
-                        # No arguments, update the current element
-                        if {![llength $Arg]} {
-
-                            # Format each number to its proper form
-                            lset varVal $valIdx [format %.12g $Val]
-                        }
-                    } else {
-                        set Bool [expr "$Inv false"]
-                    }
-                    if {!$Bool && $Vital} {
-                        if {$Inv eq ""} {
-                            error "element '$Val' of '$varVal' should\
-                                be a number!"
-                        } else {
-                            error "element '$Val' of '$varVal' should\
-                                NOT be a number!"
-                        }
-                    }
-                }
-                t {
-
-                    # If arguments exist, test the 1st argument instead
-                    if {[llength $Arg]} {
-                        set Val [lindex $Arg 0]
-                    }
-                    if {[string is true -strict $Val]} {
-                        set Bool [expr "$Inv true"]
-                    } else {
-                        set Bool [expr "$Inv false"]
-                    }
-                    if {!$Bool && $Vital} {
-                        if {$Inv eq ""} {
-                            error "element '$Val' of '$varVal' should\
-                                be true!"
-                        } else {
-                            error "element '$Val' of '$varVal' should\
-                                be false!"
-                        }
-                    }
-                }
-
-                # This test does not apply for a previous index
-               s {
-
-                    # Arguments have to be present
-                    if {[llength $Arg] == 0} {
-                        error "No pattern for '$Test', check rule!"
-                    }
-
-                    # Multiple choices
-                    if {[regexp {^\w+,\w+} $Val]} {
-                        set Lst [list]
-                        foreach Elm [split $Val ,] {
-                            if {$Vital} {
-                                lappend Lst [iSwitch !Dflt $Elm $Arg]
-                            } else {
-                                lappend Lst [iSwitch Dflt $Elm $Arg]
-                            }
-                        }
-                        lset varVal $valIdx $Lst
-                    } else {
-                        if {$Vital} {
-                            lset varVal $valIdx [iSwitch !Dflt $Val $Arg]
-                        } else {
-                            lset varVal $valIdx [iSwitch Dflt $Val $Arg]
-                        }
-                    }
-                    set Bool [expr "$Inv true"]
-                }
                 m {
                     if {$valIdx == 0} {
 
@@ -404,6 +339,95 @@ namespace eval mfjGrm {
                                 error "element '$Val' of '$varVal' should\
                                     NOT be a material!"
                             }
+                        }
+                    }
+                }
+                n {
+
+                    # If arguments exist, test the 1st argument instead
+                    # Verification of multiple arguments is possible but
+                    # the rules for input get inconsistent and it is more
+                    # complicated
+                    if {[llength $Arg]} {
+                        set Val [lindex $Arg 0]
+                    }
+                    if {[string is double -strict $Val]} {
+                        set Bool [expr "$Inv true"]
+
+                        # No arguments, update the current element
+                        if {![llength $Arg]} {
+
+                            # Format each number to its proper form
+                            lset varVal $valIdx [format %.12g $Val]
+                        }
+                    } else {
+                        set Bool [expr "$Inv false"]
+                    }
+                    if {!$Bool && $Vital} {
+                        if {$Inv eq ""} {
+                            error "element '$Val' of '$varVal' should\
+                                be a number!"
+                        } else {
+                            error "element '$Val' of '$varVal' should\
+                                NOT be a number!"
+                        }
+                    }
+                }
+                o {
+                    if {$valIdx == 0} {
+                        set Bool true
+                    } else {
+
+                        # Not required at the moment
+                    }
+                }
+
+                # This test does not apply for a previous index
+               s {
+
+                    # Arguments have to be present
+                    if {[llength $Arg] == 0} {
+                        error "No pattern for '$Test', check rule!"
+                    }
+
+                    # Multiple choices
+                    if {[regexp {^\w+,\w+} $Val]} {
+                        set Lst [list]
+                        foreach Elm [split $Val ,] {
+                            if {$Vital} {
+                                lappend Lst [iSwitch !Dflt $Elm $Arg]
+                            } else {
+                                lappend Lst [iSwitch Dflt $Elm $Arg]
+                            }
+                        }
+                        lset varVal $valIdx $Lst
+                    } else {
+                        if {$Vital} {
+                            lset varVal $valIdx [iSwitch !Dflt $Val $Arg]
+                        } else {
+                            lset varVal $valIdx [iSwitch Dflt $Val $Arg]
+                        }
+                    }
+                    set Bool [expr "$Inv true"]
+                }
+                t {
+
+                    # If arguments exist, test the 1st argument instead
+                    if {[llength $Arg]} {
+                        set Val [lindex $Arg 0]
+                    }
+                    if {[string is true -strict $Val]} {
+                        set Bool [expr "$Inv true"]
+                    } else {
+                        set Bool [expr "$Inv false"]
+                    }
+                    if {!$Bool && $Vital} {
+                        if {$Inv eq ""} {
+                            error "element '$Val' of '$varVal' should\
+                                be true!"
+                        } else {
+                            error "element '$Val' of '$varVal' should\
+                                be false!"
                         }
                     }
                 }
@@ -678,16 +702,6 @@ namespace eval mfjGrm {
                                     NOT be a ref to a variable in 'RampAttr'!"
                             }
                         }
-                    }
-                }
-
-                # Only one (?i) required and ignore the following tests
-                b {
-                    if {$valIdx == 0} {
-                        set Bool true
-                    } else {
-
-                        # Not required at the moment
                     }
                 }
                 default {

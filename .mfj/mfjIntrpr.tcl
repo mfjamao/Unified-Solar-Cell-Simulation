@@ -784,22 +784,23 @@ proc mfjIntrpr::valSimEnv {} {
         lset SimEnvGrm 1 [concat [lrange [lindex $SimEnvGrm 1] 0 4] $Lst]
     }
 
+    # Index 4: Job scheduler
     if {$host(JobSched) eq ""} {
-        if {[llength $SimEnvGrm] >= 7
-            && [llength [lindex $SimEnvGrm 6]] >= 6
-            && ![string equal -nocase [lindex $SimEnvGrm 6 5] Local]} {
+        if {[llength $SimEnvGrm] >= 5
+            && [llength [lindex $SimEnvGrm 4]] >= 6
+            && ![string equal -nocase [lindex $SimEnvGrm 4 5] Local]} {
             set UpdateGrm true
-            lset SimEnvGrm 6 {a = Local | s Local}
+            lset SimEnvGrm 4 {a = Local | s Local}
         }
     } else {
         set Lst ""
         foreach Elm $host(JobSched) {
             lappend Lst [string index $Elm 0]<[string range $Elm 1 end]>
         }
-        if {![string equal -nocase [lrange [lindex $SimEnvGrm 6] 5 end]\
-            "$Lst Local"]} {
+        if {[llength $SimEnvGrm] >= 5 && ![string equal -nocase\
+            [lrange [lindex $SimEnvGrm 4] 5 end] "$Lst Local"]} {
             set UpdateGrm true
-            lset SimEnvGrm 6 "a = Local | s $Lst Local"
+            lset SimEnvGrm 4 "a = Local | s $Lst Local"
         }
     }
 
@@ -997,7 +998,7 @@ proc mfjIntrpr::valSimVar {} {
                             [string map {` "" | " "} [lindex $VarGrm 0]]]]
                         set Cnt 0
                         foreach Elm $Grm0 {
-                            if {[regexp {^(b|m|o|p|pp|r|rr|v)$} $Elm]} {
+                            if {[regexp {^(b|d|m|o|p|pp|r|rr|v)$} $Elm]} {
                                 incr Cnt
                             }
                         }
@@ -1682,12 +1683,14 @@ proc mfjIntrpr::fmtvsRaw {} {
     if {!$arr(UpdateFmt)} {
         vputs "Comparing '$::SimArr(FVarFmt)' against '$::SimArr(FVarRaw)'..."
         if {$arr(FmtSimEnv) ne $SimEnv} {
-            set arr(UpdateFmt) true
-            vputs -i1 $Msg
+            if {!$arr(UpdateFmt)} {
+                set arr(UpdateFmt) true
+                vputs -i1 $Msg
+            }
             vputs -i2 "Environment variable 'SimEnv' has a value of\
                 '$arr(FmtSimEnv)' different from '$SimEnv'!"
 
-            # Remove all compiled share objects if version changes
+            # Remove all compiled PMI share objects if version changes
             if {[lindex $arr(FmtSimEnv) 1] ne [lindex $SimEnv 1]} {
                 foreach Elm [glob -nocomplain $::SimArr(PMIDir)/*.so.*] {
                     vputs -i2 "File '$Elm' deleted!"
@@ -1696,19 +1699,22 @@ proc mfjIntrpr::fmtvsRaw {} {
             }
         }
         if {$DfltSet ne $arr(FmtDfltSet)} {
-            set arr(UpdateFmt) true
-            vputs -i1 $Msg
+            if {!$arr(UpdateFmt)} {
+                set arr(UpdateFmt) true
+                vputs -i1 $Msg
+            }
             vputs -i2 "Environment variable 'mfjDfltSet' has a value of\
                 '$arr(FmtDfltSet)' different from '$DfltSet'!"
         }
         if {$arr(FmtRegInfo) ne $::SimArr(RegInfo)} {
-            set arr(UpdateFmt) true
-            vputs -i1 $Msg
+            if {!$arr(UpdateFmt)} {
+                set arr(UpdateFmt) true
+                vputs -i1 $Msg
+            }
             vputs -i2 "Environment variable 'mfjRegInfo' has a value of\
                 '$arr(FmtRegInfo)' different from '$::SimArr(RegInfo)'!"
         }
 
-        set Flg false
         set ModTime $::SimArr(ModTime)
         foreach Elm $arr(FmtModTime) {
 
@@ -1720,10 +1726,9 @@ proc mfjIntrpr::fmtvsRaw {} {
                 if {[lindex $Elm 0] eq [lindex $Grp 0]} {
                     set FmtFlg true
                     if {[lindex $Elm 1] != [lindex $Grp 1]} {
-                        set arr(UpdateFmt) true
-                        if {!$Flg} {
+                        if {!$arr(UpdateFmt)} {
+                            set arr(UpdateFmt) true
                             vputs -i1 $Msg
-                            set Flg true
                         }
                         vputs -i2 "File '[lindex $Elm 0]' updated!"
 
@@ -1749,10 +1754,9 @@ proc mfjIntrpr::fmtvsRaw {} {
 
             # Output each file removed
             if {!$FmtFlg} {
-                set arr(UpdateFmt) true
-                if {!$Flg} {
+                if {!$arr(UpdateFmt)} {
+                    set arr(UpdateFmt) true
                     vputs -i1 $Msg
-                    set Flg true
                 }
                 vputs -i2 "File '[lindex $Elm 0]' abandoned!"
             }
@@ -1760,17 +1764,18 @@ proc mfjIntrpr::fmtvsRaw {} {
 
         # Output the remaining files in ::SimArr(ModTime)
         foreach Elm $ModTime {
-            set arr(UpdateFmt) true
-            if {!$Flg} {
+            if {!$arr(UpdateFmt)} {
+                set arr(UpdateFmt) true
                 vputs -i1 $Msg
-                set Flg true
             }
             vputs -i2 "File '[lindex $Elm 0]' added!"
         }
         if {!$arr(UpdateFmt)} {
             if {[llength $arr(FmtVarName)] != [llength $VarName]} {
-                set arr(UpdateFmt) true
-                vputs -i1 $Msg
+                if {!$arr(UpdateFmt)} {
+                    set arr(UpdateFmt) true
+                    vputs -i1 $Msg
+                }
                 vputs -i2 "Simulation variable # '[llength $arr(FmtVarName)]'\
                     different from '[llength $VarName]'!"
             } else {
@@ -1779,26 +1784,30 @@ proc mfjIntrpr::fmtvsRaw {} {
 
                     # Variables should have the same sequence
                     if {$FVar ne $RVar} {
-                        set arr(UpdateFmt) true
-                        vputs -i1 $Msg
+                        if {!$arr(UpdateFmt)} {
+                            set arr(UpdateFmt) true
+                            vputs -i1 $Msg
+                        }
                         vputs -i2 "Simulation variable '$FVar' different from\
                             '$RVar'!"
-                        break
                     }
                     if {$FVal ne $RVal} {
-                        set arr(UpdateFmt) true
-                        vputs -i1 $Msg
+                        if {!$arr(UpdateFmt)} {
+                            set arr(UpdateFmt) true
+                            vputs -i1 $Msg
+                        }
                         vputs -i2 "Simulation variable '$FVar' has a value of\
                             '$FVal' different from '$RVal'!"
-                        break
                     }
                 }
             }
         }
         if {!$arr(UpdateFmt)} {
             if {[llength $arr(FmtSTName)] != [llength $arr(RawSTName)]} {
-                set arr(UpdateFmt) true
-                vputs -i1 $Msg
+                if {!$arr(UpdateFmt)} {
+                    set arr(UpdateFmt) true
+                    vputs -i1 $Msg
+                }
                 vputs -i2 "ST tool # '[llength $arr(FmtSTName)]' different\
                     from '[llength $arr(RawSTName)]'!"
             } else {
@@ -1806,25 +1815,28 @@ proc mfjIntrpr::fmtvsRaw {} {
                     FLbl $arr(FmtSTLbl) RLbl $arr(RawSTLbl)\
                     FIdx $arr(FmtSTIdx) RIdx $arr(RawSTIdx) {
                     if {$FName ne $RName} {
-                        set arr(UpdateFmt) true
-                        vputs -i1 $Msg
+                        if {!$arr(UpdateFmt)} {
+                            set arr(UpdateFmt) true
+                            vputs -i1 $Msg
+                        }
                         vputs -i2 "ST tool name '$FName' different from\
                             '$RName'!"
-                        break
                     }
                     if {$FLbl ne $RLbl} {
-                        set arr(UpdateFmt) true
-                        vputs -i1 $Msg
+                        if {!$arr(UpdateFmt)} {
+                            set arr(UpdateFmt) true
+                            vputs -i1 $Msg
+                        }
                         vputs -i2 "ST tool label '$FLbl' different from\
                             '$RLbl'!"
-                        break
                     }
                     if {$FIdx != $RIdx} {
-                        set arr(UpdateFmt) true
-                        vputs -i1 $Msg
+                        if {!$arr(UpdateFmt)} {
+                            set arr(UpdateFmt) true
+                            vputs -i1 $Msg
+                        }
                         vputs -i2g "ST tool index '$FIdx' different from\
                             '$RIdx'!"
-                        break
                     }
                 }
             }

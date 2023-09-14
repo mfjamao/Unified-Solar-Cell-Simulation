@@ -28,11 +28,9 @@ Specification (after semicolon):
    1 Choose a simulator_version: L-2016.03
    2 Enable/disable cylindrical coordinate at Y = 0: (!)Cylindrical
    3 Optical only? OptOnly | !OptOnly
-   4 Initial device temperature [oC]: 25
-   5 Bit length for a floating-point number: 64 | 80 | 128 | 256
-   6 Job scheduler: Local | PBS | SLURM
-   7 For PBS and SLURM, max_walltime [hr]: 12
-   8 Max_memory [GB]: 100
+   4 Job scheduler: Local | PBS | SLURM
+   5 For PBS and SLURM, max_walltime [hr]: 12
+   6 Max_memory [GB]: 100
 
 <GRAMMAR>{a = Sentaurus | s Sentaurus}
 {a = U-2022.12 | `s E<-2010.12> F<-2011.09> G<-2012.06> H<-2013.03> I<-2013.12>
@@ -40,13 +38,11 @@ Specification (after semicolon):
     P<-2019.03> Q<-2019.12> R<-2020.09> S<-2021.06> T<-2022.03> U<-2022.12>}
 {a = !Cylindrical | s C<ylindrical> !Cylindrical}
 {a = !OptOnly | s O<ptOnly> !OptOnly}
-{a = 25 | `n & `>= -273.15}
-{a = 64 | s 80 128 256 64}
 {a = Local | s P<BS> Local}
 {== v-1 Local & `a | a = 12 | `i & `>= 1}
 {== v-2 Local & `a | a = 100 | `i & `>= 1}
 
-<VAR>SimEnv      {Sentaurus T-2022.03 !Cylindrical !OptOnly 25 64 PBS 1 10}
+<VAR>SimEnv      {Sentaurus T-2022.03 !Cylindrical !OptOnly PBS 2 10}
 
 <TOOL>ST settings: Tool_label = sde Tool_name = sde
 
@@ -115,8 +111,8 @@ Specifications for regions employing the explicit method:
     | == v1 Pyramid & (a = 1 | `n & `> 0 & `<= 1) | a | `p}
 {(n v1 | != v1 Vertices) & `a | a | `p} ...
 
-<VAR>RegGen      {{iaSi 0.003 50} {Silicon 165 50} {iaSi 0.003 50} {paSi 0.005
-    45} {naSi 5} {Gas 0.1 44.5} {Gas 1} {Gas 4.5}}
+<VAR>RegGen      {{AZO 0.2 1 1} {IZO 0.05 1 1} {CdS 0.02 1 1} {ZnSe 0.005 1 1}
+    {CZTSe 1.1 1 1} {CZTSe 0.5 0.5 0.5} {CZTSe 0.5} {CZTSe 0.5 0.5} {CZTSe 0.5}}
 
 <COMMENT>--- Region and interface fields variable
 Supported constant region fields: B(Boron) P(Phosphorus) Al(Aluminum)
@@ -140,7 +136,13 @@ Specification for interface fields:
     | f v-3 & (a | `f)}
 ...
 
-<VAR>FldAttr     {{r2 P 1.56e+15} {r4 B 1.41e+19} {r5 P 1.45e+19}}
+<VAR>FldAttr     {{r3 P 1e+17} {r4 P 1e+12} {r5 B 1.8e+15} {r6 B 1.8e+15} {r7 B
+    1.8e+15} {r8 B 1.8e+15} {r9 B 1.8e+15} {r4/5
+    03exp/Grading_x1.6um_phi50mV.txt}} {{r3 P 1e+17} {r4 P 1e+12} {r5 B 1.8e+15}
+    {r6 B 1.8e+15} {r7 B 1.8e+15} {r8 B 1.8e+15} {r9 B 1.8e+15} {r4/5
+    03exp/Grading_x1.6um.txt}} {{r3 P 1e+17} {r4 P 1e+12} {r5 B 1.8e+15 x 0.55}
+    {r6 B 1.8e+15 x 0.55} {r7 B 1.8e+15 x 0.55} {r8 B 1.8e+15 x 0.55} {r9 B
+    1.8e+15 x 0.55}}
 
 <COMMENT>--- Interface attributes variable
 Specify three types of region interfaces - SRH, metal contact and tunnelling
@@ -170,7 +172,7 @@ Specification for a tunneling interface:
     1 Tunnelling attributes: eT | hT | cT | TAT
     2 Tunnel setting file or trap file: 03exp/TnlSetting.txt | 03exp/TnlTrap.txt
     3 Length of nonlocal mesh lines [um]: 5e-3
-    4 Permeation or trap density for TAT: 0 | 1e18
+    4 Permeation or trap density ratio for TAT: 0 | 1
     5 B2B for WKB calculation or barrier tunneling type for TAT: N<one> | F<ull>
         | S<imple> | U<psideDown>  | e | h | c
 
@@ -188,10 +190,13 @@ Specification for a tunneling interface:
 {(n v1 | f v1 | == v2 {C\w+} ) & `a | == v1 {c\d} & (a = 1e7 | `n & `> 0) | a}
 {(n v1 | f v1 | == v2 {C\w+} ) & `a | == v1 {c\d} & (a | `n & `> 0) | a}
 
-<VAR>IntfAttr    {{r4/6 c0 Ohmic 0 0 0 10000000} {r5/8 c1 Ohmic 0 0 0 10000000}
-    {r0/1 1e+12 100000} {r4/7 0 10000000} {r5/7 0 10000000} {r1/2 0 430} {r3/2 0
-    430}} {{r4/6 c0 Ohmic 0 0 0 10000000} {r5/8 c1 Ohmic 0 0 0 10000000} {r0/1
-    0} {r4/7 0 10000000} {r5/7 0 10000000} {r1/2 0 430} {r3/2 0 430}}
+<VAR>IntfAttr    {{r0/1 c2 Ohmic 0 0 0 1e7} {r6/10 c1 Ohmic 0 0 0 1e7} {r7/10 c1
+    Ohmic 0 0 0 1e7} {r8/10 c1 Ohmic 0 0 0 1e7} {r9/10 c1 Ohmic 0 0 0 1e7} {r4/5
+    0 8333} {r5/11 0 8333} {r5/12 0 8333} {r5/13 0 8333} {r5/14 0 8333} {r5/6 0
+    8333} {r5/7 0 8333} {r5/8 0 8333} {r5/9 0 8333} {r6/11 0 8333} {r6/13 0
+    8333} {r6/7 0 8333} {r6/8 0 8333} {r7/11 0 8333} {r7/14 0 8333} {r8/12 0
+    8333} {r8/13 0 8333} {r9/12 0 8333} {r9/14 0 8333} {r9/7 0 8333} {r9/8 0
+    8333}}
 
 <COMMENT>--- Optical generation attributes variable
 Specify four types of optical solver E(External), O(OBAM), T(TMM), R(Raytrace).
@@ -272,30 +277,36 @@ Specification for incidence angles and a shading fraction for all solvers:
     | `a}
 ...
 
-<VAR>GopAttr     {{r0/1 External 02opt/Kaneka_1DGop_Spectral.plx} {Spectrum
-    02opt/am15g_IEC60904-3-2008.txt 0.3 1.2 0.01} {Monochromatic 0.3 0.001}}
+<VAR>GopAttr     {{r0/1 OBAM} {Monochromatic 0.3 0.001} {Spectrum
+    02opt/AM1.5g_IEC60904-3_2008.txt 0.3 1.2 0.01}}
 
-<COMMENT>--- Mesh attributes variable
-Specification:
-    0 Maximum element size for region refinement [um]: 10
-    1 Minimum element size for region refinement [um]: 0.05
-    2 Minimum spaces for a region: 8
-    3 Minimum layer thickness for interface refinement [um]: 0.01
-    4 Maximum number of interface layers: 8
-    5 Expansion ratio for interface refinement: 1.5
-    6 Minimum layer size for optical refinement [um]: 0.005
-    7 Expansion ratio for optical refinement: 1.1
+<COMMENT>--- Other default attributes variable
+Specification for mesh refinements:
+    0 ID: Mesh
+    1 Maximum element size for region refinement [um]: 10
+    2 Minimum element size for region refinement [um]: 0.05
+    3 Minimum spaces for a region: 8
+    4 Minimum layer thickness for interface refinement [um]: 0.01
+    5 Maximum number of interface layers: 8
+    6 Expansion ratio for interface refinement: 1.5
+    7 Minimum layer size for optical refinement [um]: 0.005
+    8 Expansion ratio for optical refinement: 1.1
+Specification for other settings:
+    0 ID: Other
+    1 Initial device temperature [°C]: 25
+    2 Bit length for a floating-point number: 64 | 80 | 128 | 256
 
-<GRAMMAR>{a = 10 | `n & `> 0}
-{a = 0.05 | `n & `> 0}
-{a = 8 | `i & `> 1}
-{a = 0.001 | `n & `> 0}
-{a = 8 | `i & `> 1}
-{a = 1.5 | `n & `> 1}
-{a = 0.001 | `n & `> 0}
-{a = 1.1 | `n & `> 1}
+<GRAMMAR>{d}
+{== v0 Mesh && (a = 10 | `n & `> 0) | a = 25 | `n & `>= -273.15}
+{== v0 Mesh && (a = 0.05 | `n & `> 0) | a = 64 | s 80 128 256 64}
+{== v0 Mesh && (a = 8 | `i & `> 1) | `a}
+{== v0 Mesh && (a = 0.001 | `n & `> 0) | `a}
+{== v0 Mesh && (a = 8 | `i & `> 1) | `a}
+{== v0 Mesh && (a = 1.5 | `n & `> 1) | `a}
+{== v0 Mesh && (a = 0.001 | `n & `> 0) | `a}
+{== v0 Mesh && (a = 1.1 | `n & `> 1) | `a}
 
-<VAR>MeshAttr    {10 0.05 8 0.001 8 1.5 0.001 1.1}
+<VAR>OtrAttr     {{Mesh 10 0.05 4 0.001 8 1.5 0.001 1.1} {Other 25 64}}
 
 <TOOL>ST settings: Tool_label = sdevice Tool_name = sdevice
 
@@ -329,7 +340,7 @@ Specification for Auger recombination (With PMI Auger models, radiative is
     1 Material model parameter file: 01mdb/silicon.par
     2 Individual model: Aug
     3 Ceeh [cm^6/s] or PMI models or ! (disable Auger): 3.41e-31
-        | A<ltermatt> R<ichter>N<iewelt> | !
+        | A<ltermatt> R<ichter> N<iewelt> | !
     4 Optional Cehh [cm^6/s] or optional photon recycling ratio: 1.17e-31 | 0.5
 Specification for radiative recombination:
     0 Materal or region: ri | mat
@@ -398,10 +409,12 @@ Specification for a trap file for SRH recombination:
     | == v-5 Trap & (a | `s EA0 Eg0 NC300 NV300 DC mt mu BGN SRH Aug Rad)}
 ...
 
-<VAR>ModPar      {{r2 01mdb/Silicon.par SRH 0.0088} {r1 01mdb/iaSi.par SRH
-    1.28e-11 1.28e-12} {r3 01mdb/iaSi.par SRH 1.28e-11 1.28e-12} {r4
-    01mdb/paSi.par SRH 7.13e-14 3.23e-13} {r5 01mdb/naSi.par SRH 3.93e-13
-    6.03e-14}}
+<VAR>ModPar      {{CTSe 01mdb/CTSe.par} {ZTSe 01mdb/ZTSe.par} {r1 01mdb/AZO.par}
+    {r2 01mdb/IZO.par} {r3 01mdb/CdS.par SRH 1e-15} {r4 01mdb/ZnSe.par SRH
+    1e-15} {r5 01mdb/CZTSe.par SRH 1.5e-08 3e-10 mu 100 50} {r6 01mdb/CZTSe.par
+    SRH 1.5e-08 3e-10 mu 100 50} {r7 01mdb/CZTSe.par SRH 1.5e-08 3e-10 mu 100
+    50} {r8 01mdb/CZTSe.par SRH 1.5e-08 3e-10 mu 100 50} {r9 01mdb/CZTSe.par SRH
+    1.5e-08 3e-10 mu 100 50}}
 
 <COMMENT>--- Variable vary settings
 Specify the following variables for varying - c# contact property (IntfAttr),
@@ -446,8 +459,8 @@ Specification for varying other variables (sdevice --parameter-names):
 {== v1 {[CFV]\w+} & `a | a | `n & `< v1}
 ...
 
-<VAR>VarVary     {{SpecScaling 0.3 0} {MonoScaling 1 1} {Wavelength 1.2 90}
-    {MonoScaling 0 0} {SpecScaling 1 0} {c0 0.8 160}}
+<VAR>VarVary     {{SpecScaling 1 0} {c1 0.55 55} {c1 0 0} {SpecScaling 0.3 0}
+    {MonoScaling 1 1} {Wavelength 1.4 110}}
 
 <COMMENT>--- Extract field during variable varying and from snapshots
 Specify a point pX_Y_Z [um] for extracting 1D structural fields from saved
@@ -523,7 +536,7 @@ Specification for field integration from snapshots:
     mue muh}
 ...
 
-<VAR>GetFld      {{p5_0/160_50 Average Dn}}
+<VAR>GetFld      {}
 
 <TOOL>ST settings: Tool_label = svisual Tool_name = svisual
 
@@ -541,7 +554,7 @@ Specification:
 {== v-1 QSSPC & (a = 1e15 | `n & `> 0) | `a}
 {== v-2 QSSPC & (a = 44 | `n & `> 0) | `a}
 
-<VAR>PPAttr      {{v2 QE} {v5 JV}}
+<VAR>PPAttr      {{v1 JV} {v5 QE}}
 
 <TAIL>--- No variables afterwards
 Put down any notes

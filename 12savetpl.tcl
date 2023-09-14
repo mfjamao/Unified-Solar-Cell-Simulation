@@ -80,7 +80,7 @@ if {[string equal -nocase $SimArr(TplDir) [lindex $argv 0]]} {
 }
 if {[llength $argv]} {
     lset argv end [lindex $argv end]_[clock format [clock seconds] -format\
-        "%Y-%m-%d_%H-%M-%S"]
+        "%Y%m%d%H%M%S"]
     if {[llength $argv] > 1} {
 
         # Directory names should be case-insensitive
@@ -107,7 +107,7 @@ if {[llength $argv]} {
     # 'eval': concat elements, interpret the string and return result
     set SubDir [eval file join $argv]
 } else {
-    set SubDir [clock format [clock seconds] -format "%Y-%m-%d_%H-%M-%S"]
+    set SubDir [clock format [clock seconds] -format "%Y%m%d%H%M%S"]
 }
 set TmpDir $SimArr(TplDir)/$SubDir
 mputs $Ouf "Saving key files to a temp directory './$TmpDir'..."

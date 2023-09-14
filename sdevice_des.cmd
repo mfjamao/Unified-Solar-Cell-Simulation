@@ -413,7 +413,7 @@ Plot {
     *-- Carrier Densities
     eDensity hDensity IntrinsicDensity EffectiveIntrinsicDensity
     *-- Traps
-    eAmorphousTrappedCharge hAmorphousTrappedCharge eInterfaceTrappedCharge
+    eTrappedCharge hTrappedCharge eInterfaceTrappedCharge
     hInterfaceTrappedCharge
     *-- Fields, Potentials and Charge distributions
     SpaceCharge ElectricField/Vector Potential
@@ -422,9 +422,9 @@ Plot {
     current/vector CurrentPotential
     eMobility hMobility
     *-- Generation/Recombination
-    SRHRecombination RadiativeRecombination PMIRecombination
+    srhRecombination RadiativeRecombination PMIRecombination
     AugerRecombination SurfaceRecombination TotalRecombination
-    eAmorphousRecombination hAmorphousRecombination eLifeTime hLifeTime
+    eGapStatesRecombination hGapStatesRecombination eLifeTime hLifeTime
     *-- Optics
     DielectricConstant RefractiveIndex OpticalGeneration OpticalIntensity
     AbsorbedPhotonDensity ComplexRefractiveIndex
@@ -433,7 +433,7 @@ Plot {
     eJouleHeat hJouleHeat ThomsonHeat PeltierHeat
     RecombinationHeat OpticalAbsorptionHeat TotalHeat
     *-- Nonlocal meshes
-    NonLocal eNLLTunnelingGeneration hNLLTunnelingGeneration
+    NonLocal eBarrierTunneling hBarrierTunneling
 }
 
 *--- Refer to Appendix F: Tables 195, 196, 197, 198 in T-2022.03
@@ -444,7 +444,7 @@ CurrentPlot {
         vputs -n -i-2 "
             pmi_OG1D"
     }
-    if {[llength $GopAttr]} {
+    if {[regexp {\{(Mono|Spec)Scaling\s} $VarVary]} {
         vputs -n -i-2 "
             ModelParameter= \"Optics/Excitation/Wavelength\""
     }
@@ -792,6 +792,24 @@ CurrentPlot {
         }
     }
 
+    # Integrate tunnelling events in the involved regions
+    set lst [list]
+    foreach grp $IntfTun {
+        set lst [concat $lst [string map {r "" / " "} [lindex $grp 0]]]
+    }
+    if {[llength $lst]} {
+        vputs -n -i-5 "
+                        eBarrierTunneling ("
+    }
+    foreach elm [lsort -unique $lst] {
+        vputs -n -i-5 "
+                            Integrate (Region= \"[lindex $RegGen $elm 0 1]\")"
+    }
+    if {[llength $lst]} {
+        vputs -n -i-5 "
+                        )"
+    }
+
     # By default, integrate surface recombination along region interfaces
     set flg false
     foreach grp $IntfSRV {
@@ -819,14 +837,18 @@ CurrentPlot {
 !(
 
 # Define global physics options
+regexp {Other\s+(\S+)} $OtrAttr -> val
 vputs -n -i-1 "
     Physics \{
 
         # Default physics for all regions: Constant mobility,
         # no bandgap narrowing with Fermi statistics
-        Temperature= [expr [lindex $SimEnv 4]+273.15] * K
+        Temperature= [expr $val+273.15] * K
         Thermionic * Thermionic emission over interfaces
         Fermi * Enable Fermi statistics
+
+        # HighFieldSaturation not working with the Schenk model
+        # Enable HighFieldSaturation will cause unknown error
         Mobility (HighFieldSaturation)
         EffectiveIntrinsicDensity (NoBandGapNarrowing)\n"
 
@@ -1183,14 +1205,15 @@ if {!$OptOnly} {
                     lappend lst "TrapVolume= [lindex $arr(TrapVolume) $idx]"
                     lappend lst "PhononEnergy= [lindex $arr(PhononEnergy) $idx]"
                 }
+                if {[info exists arr(Conc)]} {
+                    set tmp [format %g [expr 1.*[lindex $arr(Conc) $idx]\
+                        *[lindex $elm 4]]]
+                }
                 if {[lindex $arr(TrapDist) $idx] eq "Level"} {
-                    set tmp [format %g [lindex $arr(Conc) $idx]]
-                    lappend lst "Level Conc= $tmp"
                     lappend lst "EnergyMid= [lindex $arr(EnergyMid) $idx]"
                 } elseif {[lindex $arr(TrapDist) $idx] eq "Table"} {
                     lappend lst "Table= ([lindex $arr(Table) $idx])"
                 } else {
-                    set tmp [format %g [lindex $arr(Conc) $idx]]
                     lappend lst "[lindex $arr(TrapDist) $idx] Conc= $tmp"
                     lappend lst "EnergyMid= [lindex $arr(EnergyMid) $idx]"
                     lappend lst "EnergySig= [lindex $arr(EnergySig) $idx]"
@@ -1223,18 +1246,36 @@ if {!$OptOnly} {
             } else {
                 if {[lindex $grp 0 0] eq "Silicon"} {
                     vputs -n -i-5 "
-                        Mobility (PhuMob (Phosphorus) HighFieldSaturation)"
+                        Mobility (
+                            PhuMob (Phosphorus) HighFieldSaturation
+                        )"
                 }
             }
             if {[regexp {\{(BGN(\s+[^\}]+)+)\}} $elm -> var]} {
                 vputs -n -i-5 "
-                        EffectiveIntrinsicDensity\
-                            (BandGapNarrowing([lindex $var 1]))"
+                        EffectiveIntrinsicDensity (
+                            BandGapNarrowing([lindex $var 1])
+                        )"
             } else {
                 if {[lindex $grp 0 0] eq "Silicon"} {
+
+                    # Set Schenk model for Si and enable LocalModelOnly
+                    # to suppress the quantization corrections
+                    # Turn off everything in density gradient model
+                    # except band-edge shift
+                    # vputs -n -i-5 "
+                        # eQuantumPotential (
+                            # LocalModel= SchenkBGN_elec LocalModelOnly
+                        # )
+                        # hQuantumPotential (
+                            # LocalModel= SchenkBGN_hole LocalModelOnly
+                        # )"
+
+                    # Use Schenk BGN model yet assuming no injection
                     vputs -n -i-5 "
-                        EffectiveIntrinsicDensity\
-                            (BandGapNarrowing (tableBGN) NoFermi)"
+                        EffectiveIntrinsicDensity (
+                            BandGapNarrowing (TableBGN) NoFermi
+                        )"
                 }
             }
 
@@ -1338,8 +1379,10 @@ if {!$OptOnly} {
                 vputs -n -i-5 "
                         )"
             }
-            vputs -n -i-3 "
-                Recombination ($val)"
+            if {$val ne ""} {
+                vputs -n -i-4 "
+                    Recombination ($val)"
+            }
             break
         }
 
@@ -1520,24 +1563,24 @@ Math {
         * ExtendedPrecision(128) and RhsMin=1e-25 for ExtendedPrecision(256)
         * Slightly increase Iterations, for example, from 15 to 20."
 
-    set idx [lsearch [lindex $mfjDfltSet end-3] [lindex $SimEnv 5]]
+    regexp {Other\s+\S+\s+([^\}]+)} $OtrAttr -> val
+    set idx [lsearch [lindex $mfjDfltSet end-3] $val]
     if {$idx == -1} {
-        error "'[lindex $SimEnv 5]' not found in\
-            '[lindex $mfjDfltSet end-3]'!"
+        error "'$val' not found in '[lindex $mfjDfltSet end-3]'!"
     }
     vputs -n -i-1 "
         Digits= [lindex $mfjDfltSet end-2 $idx]
         RhsMin= [lindex $mfjDfltSet end-1 $idx]
         Iterations= [lindex $mfjDfltSet end $idx]"
-    if {[lindex $SimEnv 5] == 64} {
+    if {$val == 64} {
         vputs -n -i-2 "
             * CheckRhsAfterUpdate * May help improve convergence"
-    } elseif {[lindex $SimEnv 5] == 80} {
+    } elseif {$val == 80} {
         vputs -n -i-2 "
             ExtendedPrecision"
     } else {
         vputs -n -i-2 "
-            ExtendedPrecision([lindex $SimEnv 5])"
+            ExtendedPrecision($val)"
     }
     if {$Dim == 2 && $Cylind} {
         vputs -n -i-2 "
@@ -1618,7 +1661,8 @@ Math {
 
 vputs -n -i-1 "
     *--- Refer to Table 337 in T-2022.03
-    Solve \{"
+    Solve \{
+        System(\"rm -f *n@node@_des.plt\")\n"
 
 if {$OptOnly} {
 
@@ -1631,11 +1675,15 @@ if {$OptOnly} {
 } else {
 
     # Thermal equilibrium condition
-    set var "Coupled \{Poisson Electron Hole\}"
+    # Schenk implementation in Sentaurus is bad.
+    # Eg_eff and nieff do not change and Schenk doesn't work with QSSPC
+    # set var {Coupled {Poisson Electron Hole
+        # eQuantumPotential hQuantumPotential}}
+    set var {Coupled {Poisson Electron Hole}}
     vputs -n -i-1 "
-        Coupled (Iterations= 5000) \{Poisson\}\n
+        Coupled (LineSearchDamping=0.01 Iterations= 5000) \{Poisson\}\n
         NewCurrentPrefix= \"eqm_\"
-        Coupled (Iterations= 25) \{Poisson Electron Hole\}
+        Coupled (Iterations= 100) \{Poisson Electron Hole\}
         Plot (FilePrefix= \"$SimArr(EtcDir)/n@node@_Eqm\")\n"
 }
 
