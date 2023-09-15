@@ -15,7 +15,7 @@ if {[llength [lsort -unique -index 0 $PPAttr]] < [llength $PPAttr]} {
 #--- Get TCL parameters
 !(
 
-foreach var {RegGen VarVary OtrAttr VV2Fld SS2Fld PPAttr GopAttr
+foreach var {RegGen VarVary DfltAttr VV2Fld SS2Fld PPAttr GopAttr
     IntfCon IntfTun IntfSRV RegIntfTrap ModPar\
     Dim Cylind OptOnly LoadTDR XMax YMax ZMax} {
     vputs -n -i-3 "
@@ -47,8 +47,8 @@ set h 6.62607015e-34
 set hB [expr {$h/$q}]
 set k 1.380649e-23
 set kB [expr {$k/$q}]
-regexp {Other\s+(\S+)} $OtrAttr -> T
-set T [expr $T+273.15]
+regexp {\{Other\s+([^\}]+)} $DfltAttr -> lst
+set T [expr [lindex $lst 0]+273.15]
 
 #--- Automatic alternating color, marker and line assignment
 set colorLst {black red darkRed green darkGreen blue darkBlue cyan darkCyan

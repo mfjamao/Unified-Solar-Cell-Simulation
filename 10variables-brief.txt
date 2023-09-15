@@ -1,29 +1,27 @@
-SimEnv      {Sentaurus T-2022.03 !Cylindrical !OptOnly pbs 2 10}
+SimEnv      {Sentaurus T-2022.03 !Cylindrical !OptOnly}
 
-RegGen      {{AZO 0.2 1 1} {IZO 0.05 1 1} {CdS 0.02 1 1} {ZnSe 0.005 1 1}
-    {CZTSe 1.1 1 1} {CZTSe 0.5 0.5 0.5} {CZTSe 0.5} {CZTSe 0.5 0.5} {CZTSe 0.5}}
+RegGen      {{iaSi 0.006 50} {Silicon 165 50} {iaSi @0/1 50} {paSi 0.02 45}
+    {naSi 5} {Gas 0.1 44.5} {Gas 1} {Gas 4.5}}
 
-FldAttr     {{r3 P 1e+17} {r4 P 1e+12} {r5:9 B 1.8e+15}
-    {r4/5 03exp/Grading_x1.6um_phi50mV.txt}}
-    {{r3 P 1e+17} {r4 P 1e+12} {r5:9 B 1.8e+15} {r4/5 03exp/Grading_x1.6um.txt}}
-    {{r3 P 1e+17} {r4 P 1e+12} {r5:9 B 1.8e+15 x 0.55}}
+FldAttr     {{r2 P 1.56e+15} {r4 B 1.41e+19} {r5 P 1.45e+19}}
 
-IntfAttr    {{r0/1 c2} {r6:9/10 c1}
-    {r4/5&5/6:9,11:14&6/7,8,11,13&7/14,11&8/12,13&9/7,8,14,12 0 8333}}
+IntfAttr    {{r4/6 c0} {r5/8 c1} {r0/1 1e+12 1e5} {r4,5/7 0 1e7} {r1,3/2 0 190}}
+    2/1,2=0,0
 
-GopAttr     {{r0/1 obam} {Monochromatic 0.3 0.001}
-    {Spectrum 02opt/am1.5g_IEC60904-3_2008.txt 0.3 1.2 0.01}}
+GopAttr     {{r0/1 External 02opt/HJT_165um_a-Si-i_6nm_Spectral.plx} {Spectrum
+    02opt/am1.5g_IEC60904-3_2008.txt 0.3 1.2 0.01} {Monochromatic 0.3 0.001}}
 
-OtrAttr     {{Mesh 10 0.05 4 0.001 8 1.5 0.001 1.1} {Other 25 64}}
+DfltAttr    {{Mesh 10 0.05 8 0.001 8 1.5 0.001 1.1} {Numeric 64} {Other 25}}
 
-ModPar      {{CTSe 01mdb/CTSe.par} {ZTSe 01mdb/ZTSe.par} {r1 01mdb/AZO.par}
-    {r2 01mdb/IZO.par} {r3 01mdb/CdS.par SRH 1e-15}
-    {r4 01mdb/ZnSe.par SRH 1e-15}
-    {r5:9 01mdb/CZTSe.par SRH 15e-09 3e-10 mu 100 50}}
+ModPar      {{r2 01mdb/Si_298.15K_2022Green.par SRH 0.0088 Aug Niewelt 0.55}
+    {r1,3 01mdb/a-Si-i_2015Ling.par SRH ! Trap 03exp/Traps/Bulk_a-Si-i_2015Ling.txt}
+    {r4 01mdb/a-Si-p_2015Ling.par SRH ! Trap 03exp/Traps/Bulk_a-Si-p_2015Ling.txt}
+    {r5 01mdb/a-Si-n_2015Ling.par SRH ! Trap 03exp/Traps/Bulk_a-Si-n_2015Ling.txt}}
 
-VarVary     {{SpecScaling 1} {c1 0.55 55} {c1 0} {SpecScaling 0.3}
-    {MonoScaling 1 1} {Wavelength 1.4 110}}
+VarVary     {{specscaling 0.3} {monoscaling 1 1} {wavelength 1.2 90}
+    {monoscaling 0} {specscaling 1} {c0 0.8 160}}
 
-GetFld      {}
+GetFld      {{p5_0/160_50 Average Dn} {p0_20&0_48 1 2 Band}}
 
-PPAttr      {{v1 JV} {v5 QE}}
+PPAttr      {{v2 QE} {v5 JV}}
+

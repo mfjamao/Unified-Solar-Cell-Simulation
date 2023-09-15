@@ -837,13 +837,13 @@ CurrentPlot {
 !(
 
 # Define global physics options
-regexp {Other\s+(\S+)} $OtrAttr -> val
+regexp {\{Other\s+([^\}]+)} $DfltAttr -> lst
 vputs -n -i-1 "
     Physics \{
 
         # Default physics for all regions: Constant mobility,
         # no bandgap narrowing with Fermi statistics
-        Temperature= [expr $val+273.15] * K
+        Temperature= [expr [lindex $lst 0]+273.15] * K
         Thermionic * Thermionic emission over interfaces
         Fermi * Enable Fermi statistics
 
@@ -1563,24 +1563,24 @@ Math {
         * ExtendedPrecision(128) and RhsMin=1e-25 for ExtendedPrecision(256)
         * Slightly increase Iterations, for example, from 15 to 20."
 
-    regexp {Other\s+\S+\s+([^\}]+)} $OtrAttr -> val
-    set idx [lsearch [lindex $mfjDfltSet end-3] $val]
+    regexp {\{Numeric\s+([^\}]+)} $DfltAttr -> lst
+    set idx [lsearch [lindex $mfjDfltSet end-3] [lindex $lst 0]]
     if {$idx == -1} {
-        error "'$val' not found in '[lindex $mfjDfltSet end-3]'!"
+        error "'[lindex $lst 0]' not found in '[lindex $mfjDfltSet end-3]'!"
     }
     vputs -n -i-1 "
         Digits= [lindex $mfjDfltSet end-2 $idx]
         RhsMin= [lindex $mfjDfltSet end-1 $idx]
         Iterations= [lindex $mfjDfltSet end $idx]"
-    if {$val == 64} {
+    if {[lindex $lst 0] == 64} {
         vputs -n -i-2 "
             * CheckRhsAfterUpdate * May help improve convergence"
-    } elseif {$val == 80} {
+    } elseif {[lindex $lst 0] == 80} {
         vputs -n -i-2 "
             ExtendedPrecision"
     } else {
         vputs -n -i-2 "
-            ExtendedPrecision($val)"
+            ExtendedPrecision([lindex $lst 0])"
     }
     if {$Dim == 2 && $Cylind} {
         vputs -n -i-2 "

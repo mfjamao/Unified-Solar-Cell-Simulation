@@ -38,10 +38,10 @@ array set SimArr {
     RhsMin {1e-10 1e-12 1e-15 1e-25} Iter {10 12 15 20}
     ModTime "" RegInfo "" RegLvl 0 RegMat "" RegIdx "" DimLen "" MatDB ""
     ConLst "" ConLen "" VarLen ""
-    VarName {SimEnv RegGen FldAttr IntfAttr GopAttr OtrAttr ModPar VarVary GetFld PPAttr}
+    VarName {SimEnv RegGen FldAttr IntfAttr GopAttr DfltAttr ModPar VarVary GetFld PPAttr}
     Prefix "# ---" ESuffix {unsw.edu.au unsw.edu.au}
     BIDLst {{c\d} {(\w+/)?\w+/\w+(/[\deE.+-]+)?} {S\w*} {M\w*} {W\w*}}
-    DIDLst {{M\w*} {O\w*}}
+    DIDLst {{M\w*} {N\w*} {O\w*}}
     OIDLst {{Spec\w*} {Mono\w*} {Inci\w*}}
     FST .mfj/mfjST.tcl FSTStat .status STHosts {katana tyrion}
     STPaths {/srv/scratch/z3505796/apps/sentaurus

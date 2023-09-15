@@ -2,13 +2,13 @@
 
 # Optical simulation only for raytrace
 if {$OptOnly && [regexp {\sRaytrace\s} $GopAttr]} {
-    regexp {Mesh\s+([^\}]+)} $OtrAttr -> val
+    regexp {\{Mesh\s+([^\}]+)} $DfltAttr -> lst
     vputs -n -i-2 "
         * Vertex-based PMI at model scope
         pmi_OG1D \{
             node_output= \"n@node@_OG1D.plx\"
-            grid_start= [lindex $val 6]
-            scaling= [lindex $val 7]
+            grid_start= [lindex $lst 6]
+            scaling= [lindex $lst 7]
         \}\n"
 }
 

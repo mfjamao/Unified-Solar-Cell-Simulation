@@ -278,6 +278,17 @@ foreach grp $IntfFld {
 set RegIntfFld [lsort -index 0 $RegIntfFld]
 set RegIntfTrap [lsort -index 0 $RegIntfTrap]
 
+# Set the default mesh, numeric, and other settings for 'DfltAttr'
+if {![regexp {\{Mesh\s} $DfltAttr]} {
+    lappend DfltAttr [list Mesh 10 0.05 8 0.001 8 1.5 0.001 1.1]
+}
+if {![regexp {\{Numeric\s} $DfltAttr]} {
+    lappend DfltAttr [list Numeric 64]
+}
+if {![regexp {\{Other\s} $DfltAttr]} {
+    lappend DfltAttr [list Other 25]
+}
+
 # Seperate interfaces from 'IntfAttr' and check duplicates
 # 'IntfSRV': the SRH recombiantion interfaces using SRVs
 # 'IntfTrap': the SRH recombiantion interfaces using trap settings
@@ -422,14 +433,11 @@ if {[regexp {\sRaytrace\s} $GopAttr] && $Cylind
 
 #--- Pass all global TCL parameters to SCHEME
 foreach var {RegGen RegApp1 RegApp2 RegFld IntfFld RegIntfFld RegIntfTrap
-    IntfAttr IntfSRV IntfTrap IntfCon IntfTun GopAttr GopPP Cylind
-    OptOnly LPD Dim XMax YMax ZMax RegLen}\
-    val [list $RegGen $RegApp1 $RegApp2 $RegFld $IntfFld $RegIntfFld\
-    $RegIntfTrap $IntfAttr $IntfSRV $IntfTrap $IntfCon $IntfTun $GopAttr $GopPP\
-    $Cylind $OptOnly $LPD $Dim $XMax $YMax $ZMax $RegLen] {
-    vputs "(define $var [tcl2Scheme $var $val])"
+    DfltAttr IntfAttr IntfSRV IntfTrap IntfCon IntfTun GopAttr GopPP Cylind
+    OptOnly LPD Dim XMax YMax ZMax RegLen} {
+    vputs "(define $var [tcl2Scheme $var [set $var]])"
 }
-regexp {Mesh\s+([^\}]+)} $OtrAttr -> val
+regexp {\{Mesh\s+([^\}]+)} $DfltAttr -> val
 vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
 )!
 

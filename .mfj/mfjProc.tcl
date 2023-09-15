@@ -1423,7 +1423,7 @@ proc mfjProc::valSplit {VarName VarVal GrpID LvlIdx LvlLen} {
         set BIDLst $::SimArr(BIDLst)        ;# Supported 'b' group ID list
     }
     if {[regexp {d} $GStr]} {
-        set Txt "'Mesh' or 'Misc'"
+        set Txt "'Mesh' or 'Numeric' or 'Misc'"
         set DIDLst $::SimArr(DIDLst)        ;# Supported 'd' group ID list
     }
 
@@ -1603,6 +1603,9 @@ proc mfjProc::valSplit {VarName VarVal GrpID LvlIdx LvlLen} {
                     if {[expr "\[regexp -nocase \{^$Elm$\} $Val\]"]} {
                         if {[string index $Elm 0] eq "M"} {
                             set Val Mesh
+                        }
+                        if {[string index $Elm 0] eq "N"} {
+                            set Val Numeric
                         }
                         if {[string index $Elm 0] eq "O"} {
                             set Val Other
