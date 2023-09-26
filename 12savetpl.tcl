@@ -151,11 +151,9 @@ mputs $Ouf "\nCreate a Tar/GZip archive './$TmpDir.tgz'"
 # Delete files if "tar: file changed as we read it" error occurs
 if {[catch {exec tar -czf $Dir.tgz $Dir} ErrMsg]} {
     mputs $Ouf $ErrMsg
-    mputs $Ouf "Remove the temp directory: './$TmpDir'"
-    exec rm -fr $Dir
     mputs $Ouf "\Remove the Tar/GZip archive: './$TmpDir.tgz'"
-    exec rm -fr $Dir.tgz
-    mputs $Ouf "\nSimulation not saved! Try again!\n"
+    exec rm -f $Dir.tgz
+    mputs $Ouf "\nTar/GZip failed! Try Tar/GZip manually!\n"
     close $Ouf
     exit 1
 } else {

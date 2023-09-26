@@ -337,7 +337,7 @@ Specification for Auger recombination (With PMI Auger models, radiative is
     2 Individual model: Aug
     3 Ceeh [cm^6/s] or PMI models or ! (disable Auger): 3.41e-31
         | A<ltermatt> R<ichter> N<iewelt> | !
-    4 Optional Cehh [cm^6/s] or optional photon recycling ratio: 1.17e-31 | 0.5
+    4 Optional Cehh [cm^6/s] or optional photon recycling ratio: 1.17e-31 | 0
 Specification for radiative recombination:
     0 Materal or region: ri | mat
     1 Material model parameter file: 01mdb/silicon.par
