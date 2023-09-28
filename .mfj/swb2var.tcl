@@ -32,11 +32,11 @@ vputs -n -w ""
 
 vputs "\n[clock format [clock seconds] -format "%Y-%b-%d %A %H:%M:%S"]\
     \t'$::env(USER)@$::env(HOSTNAME)'"
-vputs -n "TCL: [info nameofexecutable], version: [info tclversion], >= 8.4? "
+vputs -n "Tcl: [info nameofexecutable], version: [info tclversion], >= 8.4? "
 if {[info tclversion] >= 8.4} {
     vputs "Yes!"
 } else {
-    vputs -c "\nTCL version 8.4 or above is required!\n"
+    vputs -c "\nTcl version 8.4 or above is required!\n"
     exit 1
 }
 

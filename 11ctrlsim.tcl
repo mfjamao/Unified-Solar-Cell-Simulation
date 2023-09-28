@@ -185,11 +185,11 @@ if {!$SimArr(Append)} {
 }
 vputs "\n[clock format [clock seconds] -format "%Y-%b-%d %A %H:%M:%S"]\
     \t'$::env(USER)@$::env(HOSTNAME)'"
-vputs -n "TCL: [info nameofexecutable], version: [info tclversion], >= 8.4? "
+vputs -n "Tcl: [info nameofexecutable], version: [info tclversion], >= 8.4? "
 if {[info tclversion] >= 8.4} {
     vputs -c "Yes!"
 } else {
-    vputs "TCL version 8.4 or above is required!"
+    vputs "Tcl version 8.4 or above is required!"
     exit 1
 }
 

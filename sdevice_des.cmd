@@ -1,6 +1,6 @@
 !(
 
-#--- Get TCL global variables
+#--- Get Tcl global variables
 #include ".mfj/varSim.tcl"
 
 # Check 'VarVary' for optical requirement

@@ -635,21 +635,22 @@ proc mfjIntrpr::readHost {} {
 }
 
 # mfjIntrpr::actConvFeat
-    # Check arr(RawVarVal) and arr(RawVarGLst) to activate the override and
-    # then recycle features if necessary.
+    # Check arr(RawVarVal) and arr(RawVarGLst) to activate the overwriting and
+    # then reuse features if necessary.
 proc mfjIntrpr::actConvFeat {} {
     variable arr
 
-    vputs "Activate overriding in multiple-level variables if any..."
+    vputs "Activate overwriting in multiple-level variables if any..."
     set NewLst [list]
     set Sum 0
     foreach SimName $arr(RawVarName) SimVal $arr(RawVarVal) {
 
         # Only check variables with multiple levels
         if {[regexp ^(\\w+)<mfj>$ $SimName -> VarName]} {
-            set NewVal [override $VarName $SimVal]
+            set NewVal [overwrite $VarName $SimVal]
             if {[lindex $NewVal 0]} {
-                vputs -v2 -i1 "$VarName: [lindex $NewVal 0] overrides detected!"
+                vputs -v2 -i1 "$VarName: [lindex $NewVal 0] overwriting\
+                    features detected!"
                 vputs -v2 -c "Before: \{$SimVal\}"
                 vputs -v2 -c "After: \{[lindex $NewVal 1]\}\n"
                 incr Sum [lindex $NewVal 0]
@@ -661,13 +662,13 @@ proc mfjIntrpr::actConvFeat {} {
     }
     if {$Sum} {
         set arr(RawVarVal) $NewLst
-        vputs -i1 "Totally $Sum overriding features activated!"
+        vputs -i1 "Totally $Sum overwriting features activated!"
     } else {
-        vputs -i1 "No override found!"
+        vputs -i1 "No overwriting feature found!"
     }
     vputs
 
-    vputs "Activate recycling in all variables if any..."
+    vputs "Activate reuse in all variables if any..."
     set Sum 0
     foreach Var [list RawVarName RawVarName] Val [list RawVarGLst RawVarVal] {
         set NewLst [list]
@@ -676,7 +677,7 @@ proc mfjIntrpr::actConvFeat {} {
             regexp ^(\\w+)(<mfj>)?$ $SimName -> VarName Flg
             set Cnt [regexp -all {@(-?\d+[:,/&])*-?\d+} $SimVal]
             if {$Cnt} {
-                vputs -v2 -i1 "$VarName: $Cnt recycles detected!"
+                vputs -v2 -i1 "$VarName: $Cnt reuse features detected!"
                 vputs -v2 -c "Before: \{$SimVal\}"
 
                 # No multiple levels for grammar rules
@@ -685,20 +686,20 @@ proc mfjIntrpr::actConvFeat {} {
                     set Lvl 0
                     foreach LvlVal $SimVal {
 
-                        # Activate recycling only feature in level 1+:
+                        # Activate reuse only feature in level 1+:
                         # Set reference to the previous levels
                         if {[regexp {^@(-?\d+[:,/&])*-?\d+$} $LvlVal]} {
-                            set LvlVal [recycle $VarName $SimVal\
+                            set LvlVal [reuse $VarName $SimVal\
                                 $LvlVal $Lvl $Lvl !InLvl]
                         }
 
-                        # Activate recycling feature within each level:
+                        # Activate reuse feature within each level:
                         # Set reference within the current level
-                        lappend NewVal [recycle $VarName $LvlVal $LvlVal $Lvl]
+                        lappend NewVal [reuse $VarName $LvlVal $LvlVal $Lvl]
                         incr Lvl
                     }
                 } else {
-                    set NewVal [recycle $VarName $SimVal $SimVal]
+                    set NewVal [reuse $VarName $SimVal $SimVal]
                 }
                 vputs -v2 -c "After: \{$NewVal\}\n"
                 set Update true
@@ -713,9 +714,9 @@ proc mfjIntrpr::actConvFeat {} {
         }
     }
     if {$Sum} {
-        vputs -i1 "Totally $Sum recycling features activated!"
+        vputs -i1 "Totally $Sum reuse features activated!"
     } else {
-        vputs -i1 "No recycling found!"
+        vputs -i1 "No reuse feature found!"
     }
     vputs
 }
@@ -1125,7 +1126,7 @@ proc mfjIntrpr::valSimVar {} {
         }
     }
 
-    # Include key TCL files, datexcodes.txt, Molefraction.txt and PMI files
+    # Include key Tcl files, datexcodes.txt, Molefraction.txt and PMI files
     foreach Elm [concat 11ctrlsim.tcl datexcodes.txt Molefraction.txt\
         [glob -nocomplain .mfj/mfj*.tcl $::SimArr(PMIDir)/*.\[cC\]]] {
         lappend ::SimArr(ModTime) [list $Elm [file mtime $Elm]]
@@ -1862,10 +1863,10 @@ proc mfjIntrpr::fmtvsRaw {} {
     }
 }
 
-# mfjIntrpr::fmtvsTCL
+# mfjIntrpr::fmtvsTcl
     # Compare ::SimArr(FVarFmt) against ::SimArr(FVarEnv) and ::SimArr(FVarSim)
     # and set arr(UpdateFmt) to be true if there is any difference
-proc mfjIntrpr::fmtvsTCL {} {
+proc mfjIntrpr::fmtvsTcl {} {
     variable arr
 
     # Fmt related variables should be updated here
@@ -1874,19 +1875,19 @@ proc mfjIntrpr::fmtvsTCL {} {
             '$::SimArr(FVarSim)'..."
 
         # Re-run all the tools for major changes
-        if {$arr(FmtSimEnv) ne $mfjST::arr(TCLSimEnv)} {
+        if {$arr(FmtSimEnv) ne $mfjST::arr(TclSimEnv)} {
             set arr(UpdateFmt) true
             set Msg "Environment variable 'SimEnv' has a value of\
-                '$arr(FmtSimEnv)' different from '$mfjST::arr(TCLSimEnv)'!"
+                '$arr(FmtSimEnv)' different from '$mfjST::arr(TclSimEnv)'!"
         } else {
-            if {[llength $arr(FmtSTLbl)] != [llength $mfjST::arr(TCLSTLbl)]} {
+            if {[llength $arr(FmtSTLbl)] != [llength $mfjST::arr(TclSTLbl)]} {
                 set arr(UpdateFmt) true
                 set Msg "ST tool # '[llength $arr(FmtSTLbl)]' different\
-                    from '[llength $mfjST::arr(TCLSTLbl)]'!"
+                    from '[llength $mfjST::arr(TclSTLbl)]'!"
             } else {
-                foreach FLbl $arr(FmtSTLbl) TLbl $mfjST::arr(TCLSTLbl)\
-                    FName $arr(FmtSTName) TName $mfjST::arr(TCLSTName)\
-                    FIdx $arr(FmtSTIdx) TIdx $mfjST::arr(TCLSTIdx) {
+                foreach FLbl $arr(FmtSTLbl) TLbl $mfjST::arr(TclSTLbl)\
+                    FName $arr(FmtSTName) TName $mfjST::arr(TclSTName)\
+                    FIdx $arr(FmtSTIdx) TIdx $mfjST::arr(TclSTIdx) {
                     if {$FLbl ne $TLbl} {
                         set arr(UpdateFmt) true
                         set Msg "ST tool label '$FLbl' different from '$TLbl'!"
@@ -1908,13 +1909,13 @@ proc mfjIntrpr::fmtvsTCL {} {
 
         if {!$arr(UpdateFmt)} {
             if {[llength $arr(FmtVarName)]\
-                != [llength $mfjST::arr(TCLVarName)]} {
+                != [llength $mfjST::arr(TclVarName)]} {
                 set arr(UpdateFmt) true
                 set Msg "Simulation variable # '[llength $arr(FmtVarName)]'\
-                    different from '[llength $mfjST::arr(TCLVarName)]'!"
+                    different from '[llength $mfjST::arr(TclVarName)]'!"
             } else {
                 foreach FVar $arr(FmtVarName) FVal $arr(FmtVarVal)\
-                    TVar $mfjST::arr(TCLVarName) TVal $mfjST::arr(TCLVarVal) {
+                    TVar $mfjST::arr(TclVarName) TVal $mfjST::arr(TclVarVal) {
 
                     # Variables should have the same sequence
                     if {$FVar ne $TVar} {
@@ -1947,12 +1948,12 @@ proc mfjIntrpr::fmtvsTCL {} {
     if {$arr(UpdateFmt)} {
 
         # Perform an efficient update of all related variables
-        set arr(FmtSimEnv) $mfjST::arr(TCLSimEnv)
-        set arr(FmtSTName) $mfjST::arr(TCLSTName)
-        set arr(FmtSTLbl) $mfjST::arr(TCLSTLbl)
-        set arr(FmtSTIdx) $mfjST::arr(TCLSTIdx)
-        set arr(FmtVarName) $mfjST::arr(TCLVarName)
-        set arr(FmtVarVal) $mfjST::arr(TCLVarVal)
+        set arr(FmtSimEnv) $mfjST::arr(TclSimEnv)
+        set arr(FmtSTName) $mfjST::arr(TclSTName)
+        set arr(FmtSTLbl) $mfjST::arr(TclSTLbl)
+        set arr(FmtSTIdx) $mfjST::arr(TclSTIdx)
+        set arr(FmtVarName) $mfjST::arr(TclVarName)
+        set arr(FmtVarVal) $mfjST::arr(TclVarVal)
     }
 }
 
@@ -2283,7 +2284,7 @@ proc mfjIntrpr::raw2Fmt {} {
 # mfjIntrpr::tcl2Raw
     # Reverse the actions in raw2Fmt to update the raw variable file
 proc mfjIntrpr::tcl2Raw {} {
-    foreach Elm {readFmt fmtvsTCL updateFmt readRaw rawvsFmt updateRaw
+    foreach Elm {readFmt fmtvsTcl updateFmt readRaw rawvsFmt updateRaw
         updateBrf} {
         if {[catch $Elm ErrMsg]} {
             vputs -c "\nError in proc '$Elm':\n$ErrMsg\n"

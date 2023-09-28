@@ -31,6 +31,7 @@ Specification (after semicolon):
    4 Job scheduler: Local | PBS | SLURM
    5 For PBS and SLURM, max_walltime [hr]: 12
    6 Max_memory [GB]: 100
+   7 Number of CPUs: 4
 
 <GRAMMAR>{a = Sentaurus | s Sentaurus}
 {a = U-2022.12 | `s E<-2010.12> F<-2011.09> G<-2012.06> H<-2013.03> I<-2013.12>
@@ -39,10 +40,11 @@ Specification (after semicolon):
 {a = !Cylindrical | s C<ylindrical> !Cylindrical}
 {a = !OptOnly | s O<ptOnly> !OptOnly}
 {a = Local | s P<BS> Local}
-{== v-1 Local & `a | a = 12 | `i & `>= 1}
-{== v-2 Local & `a | a = 100 | `i & `>= 1}
+{== v-1 Local & `a | a = 1 | `i & `>= 1}
+{== v-2 Local & `a | a = 20 | `i & `>= 1}
+{== v-3 Local & `a | a = 4 | `i & `>= 1}
 
-<VAR>SimEnv      {Sentaurus T-2022.03 !Cylindrical !OptOnly Local}
+<VAR>SimEnv      {Sentaurus T-2022.03 !Cylindrical !OptOnly PBS 1 5 8}
 
 <TOOL>ST settings: Tool_label = sde Tool_name = sde
 
@@ -406,11 +408,12 @@ Specification for a trap file for SRH recombination:
 ...
 
 <VAR>ModPar      {{r2 01mdb/Si_298.15K_2022Green.par SRH 0.0088 Aug Niewelt
-    0.55} {r1 01mdb/a-Si-i_2015Ling.par SRH ! Trap
-    03exp/Traps/Bulk_a-Si-i_2015Ling.txt} {r3 01mdb/a-Si-i_2015Ling.par SRH !
-    Trap 03exp/Traps/Bulk_a-Si-i_2015Ling.txt} {r4 01mdb/a-Si-p_2015Ling.par SRH
-    ! Trap 03exp/Traps/Bulk_a-Si-p_2015Ling.txt} {r5 01mdb/a-Si-n_2015Ling.par
-    SRH ! Trap 03exp/Traps/Bulk_a-Si-n_2015Ling.txt}}
+    0.55} {r1 01mdb/a-Si-i_2015Ling.par Trap
+    03exp/Traps/Bulk_a-Si-i_2015Ling.txt SRH !} {r3 01mdb/a-Si-i_2015Ling.par
+    Trap 03exp/Traps/Bulk_a-Si-i_2015Ling.txt SRH !} {r4
+    01mdb/a-Si-p_2015Ling.par Trap 03exp/Traps/Bulk_a-Si-p_2015Ling.txt SRH !}
+    {r5 01mdb/a-Si-n_2015Ling.par Trap 03exp/Traps/Bulk_a-Si-n_2015Ling.txt SRH
+    !}}
 
 <COMMENT>--- Variable vary settings
 Specify the following variables for varying - c# contact property (IntfAttr),

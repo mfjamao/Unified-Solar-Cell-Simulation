@@ -541,16 +541,16 @@ proc mfjProc::readIdx {IdxStr {MaxIdx ""}} {
     return $IdxLst
 }
 
-# mfjProc::override
-    # Searching for the override features (i,j:k/i,j:k&l,m:n/l,m:n=). If found,
-    # replace the feature with the subsequent element and retain the rest.
+# mfjProc::overwrite
+    # Searching for the overwriting features (i,j:k/i,j:k&l,m:n/l,m:n=).
+    # If found, replace it with the subsequent elements and retain the rest.
     # Easy2Read form: {i,j:k/i,j:k&l,m:n/l,m:n= Val1 Val2 ...}
     # Compact form: i,j:k/i,j:k&l,m:n/l,m:n=Val1,Val2,...
 # Arguments
     # VarName     Variable name
     # VarVal      Variable value
 # Result: Return the number of occurances and the updated list
-proc mfjProc::override {VarName VarVal} {
+proc mfjProc::overwrite {VarName VarVal} {
     set VarMsg "variable '$VarName'"
     set Cnt 0
     set LvlIdx 1
@@ -559,7 +559,7 @@ proc mfjProc::override {VarName VarVal} {
         set LvlMsg "level '$LvlIdx'"
         set Msg "$LvlMsg of $VarMsg"
 
-        # Check the string for the overriding pattern and treat a list in the
+        # Check the string for the overwriting pattern and treat a list in the
         # Easy2Read form as a string as well
         # Negative index is allowed by changing '\d+' to '-?\d+'
         if {[regexp {^((-?\d+[:,/&])*-?\d+)=(.+)$} $OldVal\
@@ -571,8 +571,31 @@ proc mfjProc::override {VarName VarVal} {
                 set IdxLst [concat $IdxLst [readIdx $Elm]]
             }
 
+            # Check the consistency of the reference level
+            set Lst [list]
+            set RefLvl -1
+            foreach Elm $IdxLst {
+                if {[string index $Elm 0] eq "-"} {
+                    set Lvl [expr $LvlIdx+[lindex $Elm 0]]
+                } else {
+                    set Lvl [lindex $Elm 0]
+                }
+                lappend Lst [lrange $Elm 1 end]
+                set Elm [join $Elm /]
+                if {$RefLvl == -1} {
+                    if {$Lvl < 0 || $Lvl >= $LvlIdx} {
+                        error "level reference '$Elm' out of range for $Msg!"
+                    }
+                    set RefLvl $Lvl
+                } else {
+                    if {$RefLvl != $Lvl} {
+                        error "inconsistent level reference '$Elm' for $Msg!"
+                    }
+                }
+            }
+
             # Replace '-0' with 'end' and '-#' with 'end-#'
-            set IdxLst [string map {-0 end - end-} $IdxLst]
+            set IdxLst [string map {-0 end - end-} $Lst]
             set IdxLen [llength $IdxLst]
 
             # Convert a comma-seperated string to a value list
@@ -587,7 +610,7 @@ proc mfjProc::override {VarName VarVal} {
                     for $Msg!"
                 set ValLst [lrange $ValLst 0 [incr IdxLen -1]]
             }
-            set NewVal [lindex $VarVal 0]
+            set NewVal [lindex $NewLst $RefLvl]
             foreach Idx $IdxLst Val $ValLst {
                 if {[catch {lset NewVal $Idx $Val}]} {
                     error "index '$Idx' invalid for $Msg!"
@@ -597,7 +620,7 @@ proc mfjProc::override {VarName VarVal} {
             incr Cnt
         } else {
 
-            # This level has no overriding pattern
+            # This level has no overwriting pattern
             lappend NewLst $OldVal
         }
         incr LvlIdx
@@ -605,9 +628,9 @@ proc mfjProc::override {VarName VarVal} {
     return [list $Cnt $NewLst]
 }
 
-# mfjProc::recycle
-    # Recursively searching for the recycle features (@i,j:k/i,j:k&l,m:n/l,m:n).
-    # If found, replace the element with the corresponding feature.
+# mfjProc::reuse
+    # Recursively searching for the reuse features (@i,j:k/i,j:k&l,m:n/l,m:n).
+    # If found, reuse the previous elements.
 # Arguments
     # VarName     Variable name
     # VarVal      Variable value
@@ -616,7 +639,7 @@ proc mfjProc::override {VarName VarVal} {
     # OldIdx      Optional, trace the index of the SubLst (default: "")
     # InLvl       Optional, restrict reference within a level (default: true)
 # Result: Return the updated list.
-proc mfjProc::recycle {VarName VarVal SubLst {Lvl ""} {OldIdx ""} {InLvl ""}} {
+proc mfjProc::reuse {VarName VarVal SubLst {Lvl ""} {OldIdx ""} {InLvl ""}} {
 
     # Validate arguments
     # All levels should not be negative integers
@@ -654,7 +677,7 @@ proc mfjProc::recycle {VarName VarVal SubLst {Lvl ""} {OldIdx ""} {InLvl ""}} {
             set Msg "'$Elm' of $VarMsg (index $NewIdx)"
         }
 
-        # Replace each recycling feature and evaluate the final expression
+        # Replace each reuse feature and evaluate the final expression
         # Negative index is allowed with the pattern '-?\d+'
         while {[regexp {@((-?\d+[:,/&])*-?\d+)} $Elm -> IdxStr]} {
             if {[llength $Elm] > 1  || [regexp {^\{.+\}$} $Elm]} {
@@ -729,30 +752,30 @@ proc mfjProc::recycle {VarName VarVal SubLst {Lvl ""} {OldIdx ""} {InLvl ""}} {
                     }
                 }
 
-                # Eval is required if recycling is not coming alone
+                # Eval is required if reuse is not coming alone
                 if {[regexp {^@(-?\d+[:,/&])*-?\d+$} $Elm]} {
                     set Eval false
                 } else {
                     set Eval true
                 }
 
-                # Substitute the first recycle in the element
+                # Substitute the first reuse in the element
                 regsub {@(-?\d+[:,/&])*-?\d+} $Elm $NewElm Elm
 
-                # Evaluate the experession if no recycling feature
-                # Operators + - * / and TCL math functions are supported
+                # Evaluate the experession if no reuse feature
+                # Operators + - * / and Tcl math functions are supported
                 if {$Eval && ![regexp {@(-?\d+[:,/&])*-?\d+} $Elm]
                     && [catch {set Elm [format %g [expr $Elm]]}]} {
                     error "unable to eval '$Elm' in $Msg!"
                 }
 
-                # Need to break loop after activating recycling-only feature
+                # Need to break loop after activating reuse-only feature
                 # in level 1+
                 if {!$InLvl && !$Eval && $Lvl} break
             }
         }
 
-        # Need to assign value after activating recycling-only feature
+        # Need to assign value after activating reuse-only feature
         # in level 1+
         if {!$InLvl && !$Eval && $Lvl} {
             set NewLst $Elm
@@ -1291,7 +1314,7 @@ proc mfjProc::str2List {VarInfo StrList {Level 0}} {
         set SubLen [llength $SubLst]
         if {$SubLen == 0} {
 
-            # In TCL, a string of spaces are treated as an empty list
+            # In Tcl, a string of spaces are treated as an empty list
             lappend FmtLst [list]
         } elseif {$SubLen > 1 || [regexp {^\{.*\}$} $SubLst]} {
 
@@ -2484,7 +2507,7 @@ proc mfjProc::buildTree {VarName VarVal STIdxLst {ColMode ""} {NodeTree ""}} {
 }
 
 # mfjProc::tcl2Scheme
-    # Properly convert a TCL value (number, string or boolean) to the
+    # Properly convert a Tcl value (number, string or boolean) to the
     # corresponding SCHEME value. In case the value is a nested list,
     # the recursive mechanism is exploited. Additionally, all empty strings
     # are treated as empty SCHEME lists
@@ -2535,10 +2558,10 @@ proc mfjProc::tcl2Scheme {VarName VarVal {Level 0}} {
             set SLst [string map {' \"} $SLst]
         }
 
-        # There is no boolean type in TCL. Roughly, these strings like true,
+        # There is no boolean type in Tcl. Roughly, these strings like true,
         # false, yes, no, on, off are boolean. Strictly speaking, positive
         # integers have the boolean value of true, which are ignored here
-        # '#t' in some TCL intepreters may become '{#t}', which would cause
+        # '#t' in some Tcl intepreters may become '{#t}', which would cause
         # strange conversion in the above steps. It is better to do it here
         regsub -nocase -all {\"(true|yes|on)\"} $SLst #t SLst
         regsub -nocase -all {\"(false|no|off)\"} $SLst #f SLst

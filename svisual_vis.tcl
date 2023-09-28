@@ -1,6 +1,6 @@
 !(
 
-#--- Get TCL global variables
+#--- Get Tcl global variables
 #include ".mfj/varSim.tcl"
 
 # Alert users to remove/combine duplicate vv#
@@ -12,7 +12,7 @@ if {[llength [lsort -unique -index 0 $PPAttr]] < [llength $PPAttr]} {
 )!
 
 #setdep @previous@
-#--- Get TCL parameters
+#--- Get Tcl parameters
 !(
 
 foreach var {RegGen VarVary DfltAttr VV2Fld SS2Fld PPAttr GopAttr
@@ -1511,7 +1511,8 @@ foreach pp $PPAttr {
             -dataset Data_$pp0 -plot Plttau_$pp0\
             -axisX $xVar -axisY2 [lindex $VarVary $vIdx 0]
 
-        # Note: ln() is log() in TCL. No error using ln() in -function though
+        # Note: Natural log function is log() in Tcl. expr will report error
+        # using ln() but no error using ln() in -function though
         # Refer to available functions in Table 34, SVisual T-2022.03
         vputs -i2 "Plot the implied Voc curve kBTln((NA+Dn)Dn/nie/nie)"
         create_variable -name $jVar -dataset Data_$pp0\

@@ -1,9 +1,9 @@
 !(
 
-#--- Get TCL environment variables (double quotes are required!)
+#--- Get Tcl environment variables (double quotes are required!)
 #include ".mfj/varEnv.tcl"
 
-#--- Get TCL global variables
+#--- Get Tcl global variables
 #include ".mfj/varSim.tcl"
 
 # Load 'SimArr' in 11ctrlsim.tcl
@@ -431,7 +431,7 @@ if {[regexp {\sRaytrace\s} $GopAttr] && $Cylind
 (sde:clear)
 !(
 
-#--- Pass all global TCL parameters to SCHEME
+#--- Pass all global Tcl parameters to SCHEME
 foreach var {RegGen RegApp1 RegApp2 RegFld IntfFld RegIntfFld RegIntfTrap
     DfltAttr IntfAttr IntfSRV IntfTrap IntfCon IntfTun GopAttr GopPP Cylind
     OptOnly LPD Dim XMax YMax ZMax RegLen} {
