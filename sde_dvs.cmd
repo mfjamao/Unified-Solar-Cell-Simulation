@@ -135,6 +135,11 @@ foreach grp $FldAttr {
                 } elseif {[llength $elm] == 2
                     && [file isfile [lindex $elm 0]]} {
                     lappend elm [lindex $mfjDfltSet 1]
+                } elseif {[llength $elm] == 2
+                    && ![regexp {^(x|y|Ab)} [lindex $elm 0]]} {
+
+                    # Dopants are default to be active
+                    lset elm 0 [lindex $elm 0]ActiveConcentration
                 }
                 lappend lst $elm
             }
@@ -159,6 +164,11 @@ foreach grp $FldAttr {
             append elm " 1 [lindex $mfjDfltSet 1]"
         } elseif {[llength $elm] == 2 && [file isfile [lindex $elm 0]]} {
             lappend elm [lindex $mfjDfltSet 1]
+        } elseif {[llength $elm] == 2
+            && ![regexp {^(x|y|Ab)} [lindex $elm 0]]} {
+
+            # Dopants are default to be active
+            lset elm 0 [lindex $elm 0]ActiveConcentration
         }
         lappend lst $elm
     }
