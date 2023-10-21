@@ -62,21 +62,11 @@ if {![regexp {^[123]$} $Dim]} {
 
 # Define two boolean values for easy reference later
 set SimEnv [str2List "" $SimEnv]
-if {[string index [lindex $SimEnv 2] 0] eq "!"} {
-    set Cylind false
-} else {
-    set Cylind true
-}
-if {[string index [lindex $SimEnv 3] 0] eq "!"} {
-    set OptOnly false
-} else {
-    set OptOnly true
-}
 
 # Extract simulation max size (Dummy layers are ignored)
 # Extract the number of regions 'RegLen'
 set RegLen [llength $RegGen]
-if {$OptOnly} {
+if {[lindex $SimEnv 3] eq "Optical"} {
 
     # No dummy layers except the top one
     set XMax [lindex $RegGen end 2 0]
@@ -96,7 +86,7 @@ if {$OptOnly} {
         set YMax [format %g [lindex $mfjDfltSet 0]]
         set ZMax 0
     } elseif {$Dim == 2} {
-        if {$Cylind} {
+        if {[lindex $SimEnv 2] eq "Cylindrical"} {
             set XMax [lindex $RegGen end-1 1 0]
         } else {
             set XMax [lindex $RegGen end-2 1 0]
@@ -138,7 +128,8 @@ foreach grp $FldAttr {
         if {[string is double -strict [lindex $grp 0]]} {
             lappend elm [lindex $grp 0]
         } else {
-            if {[llength $elm]} {
+            if {[llength $elm] && [lindex $grp 0] ne "Active"
+                && [lindex $grp 0] ne "!Active"} {
                 if {[file isfile $elm]} {
                     append elm " 1 [lindex $mfjDfltSet 1]"
                 } elseif {[llength $elm] == 2
@@ -151,6 +142,11 @@ foreach grp $FldAttr {
             # Translate abbreviations to Sentaurus scalar data names
             if {[file isfile [lindex $grp 0]]} {
                 set elm [lindex $grp 0]
+            } elseif {[lindex $grp 0] eq "Active"} {
+                lset elm 0 [lindex $elm 0]ActiveConcentration
+            } elseif {[lindex $grp 0] eq "!Active"} {
+
+                # Do nothing
             } else {
                 set elm [lindex [split\
                     $mfjProc::tabArr([lindex $grp 0]) |] 0]
@@ -357,7 +353,7 @@ if {[regexp {\{AbsorbedPhotonDensity\s} $RegFld]
 }
 
 # Disable LoadTDR for optical only simulation
-if {$OptOnly} {
+if {[lindex $SimEnv 3] eq "Optical"} {
     set LoadTDR false
 }
 
@@ -406,7 +402,7 @@ foreach grp $GopAttr {
 }
 
 # 'LPD' for raytrace should be 1 in optical only simulation
-if {$OptOnly} {
+if {[lindex $SimEnv 3] eq "Optical"} {
     if {$LPD == 0} {
         error "no optical solver specified!"
     } else {
@@ -420,7 +416,7 @@ if {$OptOnly} {
 }
 
 # 'Cylindrical' for raytrace is available from M-2016.12
-if {[regexp {\sRaytrace\s} $GopAttr] && $Cylind
+if {[regexp {\sRaytrace\s} $GopAttr] && [lindex $SimEnv 2] eq "Cylindrical"
     && [string compare M-2016.12 [lindex $SimEnv 1]] == 1} {
     error "M-2016.12 and above required for raytrace with cylindrical!"
 }
@@ -432,9 +428,9 @@ if {[regexp {\sRaytrace\s} $GopAttr] && $Cylind
 !(
 
 #--- Pass all global Tcl parameters to SCHEME
-foreach var {RegGen RegApp1 RegApp2 RegFld IntfFld RegIntfFld RegIntfTrap
-    DfltAttr IntfAttr IntfSRV IntfTrap IntfCon IntfTun GopAttr GopPP Cylind
-    OptOnly LPD Dim XMax YMax ZMax RegLen} {
+foreach var {SimEnv RegGen RegApp1 RegApp2 RegFld IntfFld RegIntfFld RegIntfTrap
+    DfltAttr IntfAttr IntfSRV IntfTrap IntfCon IntfTun GopAttr GopPP
+    LPD Dim XMax YMax ZMax RegLen} {
     vputs "(define $var [tcl2Scheme $var [set $var]])"
 }
 regexp {\{Mesh\s+([^\}]+)} $DfltAttr -> val
@@ -1360,7 +1356,8 @@ vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
         (set! Pos (map mfj:half (map + P1 P2)))
 
         ;# Refine if it is an illumination interface and electrical simulation
-        (if (and (not OptOnly) (member (caddr PP) Var))
+        (if (and (not (string=? (cadddr SimEnv) "Optical"))
+            (member (caddr PP) Var))
             (let Next ((X (car P1)))
                 (set-car! Pos (+ X Val))
                 (set! BID ((mfj:compose car find-body-id)
@@ -1424,11 +1421,11 @@ vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
                     Lst "\n")
                 (sdegeo:set-contact Lst "TOpt")
 
-                ;# If 'OptOnly', bottom contact is defined at X = XMax
+                ;# If 'Optical', bottom contact is defined at X = XMax
                 (mfj:display (make-string 4 #\space) "BOpt:\n"
                     (make-string 8 #\space))
                 (set! Lst '())
-                (if OptOnly
+                (if (string=? (caddr SimEnv) "Optical")
 
                     ;# Visit all faces of all bodies to define 'BOpt'
                     (for-each
@@ -1575,10 +1572,10 @@ vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
                     Lst "\n")
                 (sdegeo:set-contact Lst "TOpt")
 
-                ;# If 'OptOnly', bottom contact is defined at X = XMax
+                ;# If 'Optical', bottom contact is defined at X = XMax
                 (mfj:display (make-string 4 #\space) "BOpt:\n")
                 (set! Lst '())
-                (if OptOnly
+                (if (string=? (cadddr SimEnv) "Optical")
 
                     ;# Visit all edges of all bodies to define 'BOpt'
                     (for-each
@@ -1635,8 +1632,9 @@ vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
                                     "Right edge: " Var " -> " Val "\n")
                             )
                         )
-                        (if (and (not Cylind) (gvector:parallel?
-                            (gvector:from-to Var Val) (gvector 1 0 0))
+                        (if (and (string=? (caddr SimEnv) "!Cylindrical")
+                            (gvector:parallel? (gvector:from-to Var Val)
+                            (gvector 1 0 0))
                             (= (position:y Var) 0))
                             (begin
                                 (set! LFLst (cons E LFLst))
@@ -1646,7 +1644,7 @@ vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
                         )
                     ) (entity:edges (get-body-list))
                 )
-                (if (not Cylind)
+                (if (string=? (caddr SimEnv) "!Cylindrical")
                     (begin
                         (mfj:display (make-string 8 #\space)
                             "LOpt entity list: " LFLst "\n")

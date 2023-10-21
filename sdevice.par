@@ -1,7 +1,7 @@
 !(
 
 # Optical simulation only for raytrace
-if {$OptOnly && [regexp {\sRaytrace\s} $GopAttr]} {
+if {[lindex $SimEnv 3] eq "Optical" && [regexp {\sRaytrace\s} $GopAttr]} {
     regexp {\{Mesh\s+([^\}]+)} $DfltAttr -> lst
     vputs -n -i-2 "
         * Vertex-based PMI at model scope
@@ -15,7 +15,7 @@ if {$OptOnly && [regexp {\sRaytrace\s} $GopAttr]} {
 # From M-2016.12 onwards, it is necessary to set thermionic formula to 1
 # if thermionic model is enabled with Fermi statistics
 # Default formula 0 causes very high Jsc with OBAM
-if {!$OptOnly} {
+if {[lindex $SimEnv 3] eq "Electrical"} {
     set val [expr $RegLen-1]
     for {set i 0} {$i < $val} {incr i} {
         for {set j [expr $i+1]} {$j < $RegLen} {incr j} {

@@ -9,6 +9,7 @@ package require Tcl 8.4
 
 namespace eval mfjGrm {
     variable version 1.0
+    variable varName ""
     variable varVal ""
     variable valIdx ""
     variable grmStr ""
@@ -25,6 +26,7 @@ namespace eval mfjGrm {
         # DfltVal       Default value if a test is fulfilled
     # Result: Return a boolean result
     proc grmEval {Test Arguments DfltVal} {
+        variable varName
         variable varVal
         variable valIdx
 
@@ -33,6 +35,9 @@ namespace eval mfjGrm {
 
         # Regular expression for a position (n_n_n)
         set RE_p (${RE_n}_){0,2}$RE_n
+
+        # Regular expression for 'xx' or 'yy' or 'zz'
+        set RE_c $RE_n/$RE_n
 
         # Replace a potential reference with the specified element in arguments
         set Lst [list]
@@ -183,6 +188,46 @@ namespace eval mfjGrm {
                 set Inv ""
             }
 
+            # Extract boundaries for tests: 'p', 'r', 'x', 'y', 'z'
+            if {$varName ne "RegGen" && [regexp {[prxyz]} $Test]} {
+
+                # Get values from global array 'SimArr'.
+                # Remove regions of negative ID from 'RegInfo'
+                set RegInfo [list]
+                foreach Reg [lindex $::SimArr(RegInfo) $::SimArr(RegLvl)] {
+                    if {[lindex $Reg 0 end] >= 0} {
+                        lappend RegInfo $Reg
+                    }
+                }
+                set DimLen $::SimArr(DimLen)
+                set RegEnd [llength $RegInfo]
+                incr RegEnd -1
+
+                # Extract the boundaries of the simulation domain (including
+                # dummy gaseous layers)
+                set XMin [lindex $RegInfo 0 1 0]
+                set XMax [lindex $RegInfo end 2 0]
+                set YMin 0
+                set YMax 0
+                set ZMin 0
+                set ZMax 0
+                if {[llength [lindex $RegInfo end 1]] > 1} {
+                    set YMax [lindex $RegInfo end 2 1]
+                }
+                if {[llength [lindex $RegInfo end 1]] == 2} {
+                    if {[lindex $RegInfo end-1 1 0] < 0} {
+                        set YMin [lindex $RegInfo end-1 1 1]
+                    } else {
+                        set YMin 0
+                    }
+                }
+                if {[llength [lindex $RegInfo end 1]] == 3} {
+                    set YMin [lindex $RegInfo end 1 1]
+                    set ZMin [lindex $RegInfo end-1 1 2]
+                    set ZMax [lindex $RegInfo end 2 2]
+                }
+            }
+
             switch -- $Test {
 
                 # This test does not apply for the previous elements
@@ -206,6 +251,8 @@ namespace eval mfjGrm {
                 }
                 b {
                     if {$valIdx == 0} {
+
+                        # skip index 0 for group ID
                         set Bool true
                     } else {
 
@@ -214,6 +261,8 @@ namespace eval mfjGrm {
                 }
                 d {
                     if {$valIdx == 0} {
+
+                        # skip index 0 for group ID
                         set Bool true
                     } else {
 
@@ -305,7 +354,7 @@ namespace eval mfjGrm {
                 m {
                     if {$valIdx == 0} {
 
-                        # skip index 0 for subgroup ID 'b', 'm', 'p', 'r', 'v'
+                        # skip index 0 for group ID
                         set Bool true
                     } else {
 
@@ -375,6 +424,18 @@ namespace eval mfjGrm {
                 }
                 o {
                     if {$valIdx == 0} {
+
+                        # skip index 0 for group ID
+                        set Bool true
+                    } else {
+
+                        # Not required at the moment
+                    }
+                }
+                q {
+                    if {$valIdx == 0} {
+
+                        # skip index 0 for group ID
                         set Bool true
                     } else {
 
@@ -383,7 +444,7 @@ namespace eval mfjGrm {
                 }
 
                 # This test does not apply for a previous index
-               s {
+                s {
 
                     # Arguments have to be present
                     if {[llength $Arg] == 0} {
@@ -431,10 +492,133 @@ namespace eval mfjGrm {
                         }
                     }
                 }
+                v {
+                    if {$valIdx == 0} {
+
+                        # Skip index 0 for group ID
+                        set Bool true
+                    } else {
+                        if {[llength $Arg]} {
+
+                            # If arguments exist, test the 1st argument instead
+                            set Val [lindex $Arg 0]
+
+                            # Rough check for a previous index
+                            if {[regexp {^[vV](\d+)$} $Val]} {
+                                set Bool [expr "$Inv true"]
+                            } else {
+                                set Bool [expr "$Inv false"]
+                            }
+                        } else {
+                            if {[regexp {^[vV](\d+)$} $Val -> VStr]} {
+
+                                # No multiple levels for 'RampAttr'
+                                if {[llength $::SimArr(VarLen)] == 1} {
+                                    if {[catch {set Idx [readIdx $VStr\
+                                        [expr $::SimArr(VarLen)-1]]}]} {
+                                        error "'$Val' index out of range!"
+                                    }
+                                } else {
+                                    foreach Len $::SimArr(VarLen) {
+                                        if {[catch {set Idx [readIdx $VStr\
+                                            [incr Len -1]]}]} {
+                                            error "'$Val' index out of range!"
+                                        }
+                                    }
+                                }
+                                set Bool [expr "$Inv true"]
+
+                                # Update the current element
+                                lset varVal $valIdx v$VStr]
+                            } else {
+                                set Bool [expr "$Inv false"]
+                            }
+                        }
+                        if {!$Bool && $Vital} {
+                            if {$Inv eq ""} {
+                                error "element '$Val' of '$varVal' should\
+                                    be a ref to a variable in 'RampAttr'!"
+                            } else {
+                                error "element '$Val' of '$varVal' should\
+                                    NOT be a ref to a variable in 'RampAttr'!"
+                            }
+                        }
+                    }
+                }
+                p {
+                    if {$valIdx == 0} {
+
+                        # Skip index 0 for group ID
+                        set Bool true
+                    } else {
+                        if {[llength $Arg]} {
+
+                            # If arguments exist, test the 1st argument instead
+                            set Val [lindex $Arg 0]
+
+                            # Rough check for a previous index
+                            if {[regexp ^\[pP\]($RE_p)$ $Val]} {
+                                set Bool [expr "$Inv true"]
+                            } else {
+                                set Bool [expr "$Inv false"]
+                            }
+                        } else {
+                            if {[regexp ^\[pP\]($RE_p)$ $Val -> PStr]} {
+                                set PLst [split $PStr _]
+                                if {$varName ne "RegGen"} {
+
+                                    # Verify coordinates and their numbers
+                                    # should match 'DimLen'
+                                    if {[llength $PLst] != $DimLen} {
+                                        error "element '$Val' of '$varVal'\
+                                            should have the same number of\
+                                            coordinates as variable 'RegGen'!"
+                                    }
+                                    foreach Elm $PLst\
+                                        Min [list $XMin $YMin $ZMin]\
+                                        Max [list $XMax $YMax $ZMax] {
+                                        if {$Elm ne ""} {
+
+                                            # Make sure each point is within
+                                            # simulation domain
+                                            if {$Elm < $Min || $Elm > $Max} {
+                                                error "element '$Val' of\
+                                                    '$varVal' beyond simulation\
+                                                    domain($Min $Max)!"
+                                            }
+                                        }
+                                    }
+                                }
+                                set Lst [list]
+                                foreach Elm $PLst {
+
+                                    # Format each number to the proper form like
+                                    # removing trailing zeroes and decimal point
+                                    lappend Lst [format %.12g $Elm]
+                                }
+                                set Bool [expr "$Inv true"]
+
+                                # Update the current element
+                                lset varVal $valIdx p[join $Lst _]
+                            } else {
+                                set Bool [expr "$Inv false"]
+                            }
+                        }
+                        if {!$Bool && $Vital} {
+                            if {$Inv eq ""} {
+                                error "element '$Val' of '$varVal' should\
+                                    be a point!"
+                            } else {
+                                error "element '$Val' of '$varVal' should\
+                                    NOT be a point!"
+                            }
+                        }
+                    }
+                }
                 pp {
                     if {$valIdx == 0} {
 
-                        # skip index 0 for subgroup ID 'b', 'm', 'p', 'r', 'v'
+                        # skip index 0 for group ID
                         set Bool true
                     } else {
 
@@ -458,6 +642,40 @@ namespace eval mfjGrm {
                                     error "two points should have the same\
                                         number of coordinates in element\
                                         '$Val' of $varVal!"
+                                }
+                                if {$varName ne "RegGen"} {
+                                    if {[llength [lindex $PPLst 0]]
+                                        != $DimLen} {
+                                        error "element '$Val' of '$varVal'\
+                                            should have the same number of\
+                                            coordinates as variable\
+                                            'RegGen'!"
+                                    }
+
+                                    # sort axis values in 'pp' ascendingly
+                                    # make sure the interface or box is within
+                                    # simulation domain and defined correctly
+                                    set Idx 0
+                                    foreach Elm1 [lindex $PPLst 0]\
+                                        Elm2 [lindex $PPLst 1]\
+                                        Min [list $XMin $YMin $ZMin]\
+                                        Max [list $XMax $YMax $ZMax] {
+                                        if {$Elm1 ne ""} {
+
+                                            # Sort each number
+                                            set Tmp [lsort -real\
+                                                [list $Elm1 $Elm2]]
+                                            lset PPLst 0 $Idx [lindex $Tmp 0]
+                                            lset PPLst 1 $Idx [lindex $Tmp 1]
+                                            if {[lindex $Tmp 0] < $Min
+                                                || [lindex $Tmp 1] > $Max} {
+                                                error "element '$Val' of\
+                                                    '$varVal' beyond\
+                                                    domain($Min $Max)!"
+                                            }
+                                        }
+                                        incr Idx
+                                    }
                                 }
                                 set Idx 0
                                 set Cnt 0
@@ -493,55 +711,10 @@ namespace eval mfjGrm {
                         }
                     }
                 }
-                p {
-                    if {$valIdx == 0} {
-
-                        # Skip index 0 for subgroup ID 'b', 'm', 'p', 'r', 'v'
-                        set Bool true
-                    } else {
-                        if {[llength $Arg]} {
-
-                            # If arguments exist, test the 1st argument instead
-                            set Val [lindex $Arg 0]
-
-                            # Rough check for a previous index
-                            if {[regexp ^\[pP\]($RE_p)$ $Val]} {
-                                set Bool [expr "$Inv true"]
-                            } else {
-                                set Bool [expr "$Inv false"]
-                            }
-                        } else {
-                            if {[regexp ^\[pP\]($RE_p)$ $Val -> PStr]} {
-                                set Tmp [list]
-                                foreach Elm [split $PStr _] {
-
-                                    # Format each number to the proper form like
-                                    # removing trailing zeroes and decimal point
-                                    lappend Tmp [format %.12g $Elm]
-                                }
-                                set Bool [expr "$Inv true"]
-
-                                # Update the current element
-                                lset varVal $valIdx p[join $Tmp _]
-                            } else {
-                                set Bool [expr "$Inv false"]
-                            }
-                        }
-                        if {!$Bool && $Vital} {
-                            if {$Inv eq ""} {
-                                error "element '$Val' of '$varVal' should\
-                                    be a point!"
-                            } else {
-                                error "element '$Val' of '$varVal' should\
-                                    NOT be a point!"
-                            }
-                        }
-                    }
-                }
                 r {
                     if {$valIdx == 0} {
 
-                        # Skip index 0 for subgroup ID 'b', 'm', 'p', 'r', 'v'
+                        # Skip index 0 for group ID
                         set Bool true
                     } else {
                         if {[llength $Arg]} {
@@ -600,7 +773,7 @@ namespace eval mfjGrm {
                 rr {
                     if {$valIdx == 0} {
 
-                        # Skip index 0 for subgroup ID 'b', 'm', 'p', 'r', 'v'
+                        # Skip index 0 for group ID
                         set Bool true
                     } else {
 
@@ -651,56 +824,274 @@ namespace eval mfjGrm {
                         }
                     }
                 }
-                v {
-                    if {$valIdx == 0} {
+                x {
+                    if {[llength $Arg]} {
 
-                        # Skip index 0 for subgroup ID 'b', 'm', 'p', 'r', 'v'
-                        set Bool true
-                    } else {
-                        if {[llength $Arg]} {
+                        # If arguments exist, test the 1st argument instead
+                        set Val [lindex $Arg 0]
 
-                            # If arguments exist, test the 1st argument instead
-                            set Val [lindex $Arg 0]
-
-                            # Rough check for a previous index
-                            if {[regexp {^[vV](\d+)$} $Val]} {
-                                set Bool [expr "$Inv true"]
-                            } else {
-                                set Bool [expr "$Inv false"]
-                            }
+                        # Rough check for a previous index
+                        if {[regexp ^\[xX\]$RE_n$ $Val]} {
+                            set Bool [expr "$Inv true"]
                         } else {
-                            if {[regexp {^[vV](\d+)$} $Val -> VStr]} {
-
-                                # No multiple levels for 'RampAttr'
-                                if {[llength $::SimArr(VarLen)] == 1} {
-                                    if {[catch {set Idx [readIdx $VStr\
-                                        [expr $::SimArr(VarLen)-1]]}]} {
-                                        error "'$Val' index out of range!"
-                                    }
-                                } else {
-                                    foreach Len $::SimArr(VarLen) {
-                                        if {[catch {set Idx [readIdx $VStr\
-                                            [incr Len -1]]}]} {
-                                            error "'$Val' index out of range!"
-                                        }
-                                    }
-                                }
-                                set Bool [expr "$Inv true"]
-
-                                # Update the current element
-                                lset varVal $valIdx v$VStr]
-                            } else {
-                                set Bool [expr "$Inv false"]
-                            }
+                            set Bool [expr "$Inv false"]
                         }
-                        if {!$Bool && $Vital} {
-                            if {$Inv eq ""} {
-                                error "element '$Val' of '$varVal' should\
-                                    be a ref to a variable in 'RampAttr'!"
-                            } else {
-                                error "element '$Val' of '$varVal' should\
-                                    NOT be a ref to a variable in 'RampAttr'!"
+                    } else {
+                        if {[regexp ^\[xX\]($RE_n)$ $Val -> CStr]} {
+
+                            # Make sure X is within simulation domain
+                            if {$CStr < $XMin || $CStr > $XMax} {
+                                error "element '$Val' of '$varVal' beyond\
+                                    simulation domain($XMin $XMax)!"
                             }
+                            set Bool [expr "$Inv true"]
+
+                            # Update the current element
+                            lset varVal $valIdx x[format %.12g $CStr]
+                        } else {
+                            set Bool [expr "$Inv false"]
+                        }
+                    }
+                    if {!$Bool && $Vital} {
+                        if {$Inv eq ""} {
+                            error "element '$Val' of '$varVal' should\
+                                be an X coordinate!"
+                        } else {
+                            error "element '$Val' of '$varVal' should\
+                                NOT be an X coordinate!"
+                        }
+                    }
+                }
+                xx {
+                    if {[llength $Arg]} {
+
+                        # If arguments exist, test the 1st argument instead
+                        set Val [lindex $Arg 0]
+
+                        # Rough check for a previous index
+                        if {[regexp ^\[xX\]$RE_c$ $Val]} {
+                            set Bool [expr "$Inv true"]
+                        } else {
+                            set Bool [expr "$Inv false"]
+                        }
+                    } else {
+                        if {[regexp ^\[xX\]($RE_c)$ $Val -> CStr]} {
+                            set CLst [lsort -real [split $CStr /]]
+                            set Lst [list]
+                            foreach Elm $CLst {
+
+                                # Make sure X is within simulation domain
+                                if {$Elm < $XMin || $Elm > $XMax} {
+                                    error "element '$Val' of '$varVal' beyond\
+                                        simulation domain($XMin $XMax)!"
+                                }
+                                lappend Lst [format %.12g $Elm]
+                            }
+                            if {[lindex $CLst 0] == [lindex $CLst 1]} {
+                                error "X coordinates in element '$Val' of\
+                                    '$varVal' should be different!"
+                            }
+                            set Bool [expr "$Inv true"]
+
+                            # Update the current element
+                            lset varVal $valIdx x[join $Lst /]
+                        } else {
+                            set Bool [expr "$Inv false"]
+                        }
+                    }
+                    if {!$Bool && $Vital} {
+                        if {$Inv eq ""} {
+                            error "element '$Val' of '$varVal' should\
+                                be two X coordinates!"
+                        } else {
+                            error "element '$Val' of '$varVal' should\
+                                NOT be two X coordinates!"
+                        }
+                    }
+                }
+                y {
+                    if {[llength $Arg]} {
+
+                        # If arguments exist, test the 1st argument instead
+                        set Val [lindex $Arg 0]
+
+                        # Rough check for a previous index
+                        if {[regexp ^\[yY\]$RE_n$ $Val]} {
+                            set Bool [expr "$Inv true"]
+                        } else {
+                            set Bool [expr "$Inv false"]
+                        }
+                    } else {
+                        if {[regexp ^\[yY\]($RE_n)$ $Val -> CStr]} {
+                            if {$DimLen == 1} {
+                                error "element '$Val' of '$varVal': no Y\
+                                    coordinate allowed for 1D!"
+                            }
+
+                            # Make sure Y is within simulation domain
+                            if {$CStr < $YMin || $CStr > $YMax} {
+                                error "element '$Val' of '$varVal' beyond\
+                                    simulation domain($YMin $YMax)!"
+                            }
+                            set Bool [expr "$Inv true"]
+
+                            # Update the current element
+                            lset varVal $valIdx y[format %.12g $CStr]
+                        } else {
+                            set Bool [expr "$Inv false"]
+                        }
+                    }
+                    if {!$Bool && $Vital} {
+                        if {$Inv eq ""} {
+                            error "element '$Val' of '$varVal' should\
+                                be an Y coordinate!"
+                        } else {
+                            error "element '$Val' of '$varVal' should\
+                                NOT be an Y coordinate!"
+                        }
+                    }
+                }
+                yy {
+                    if {[llength $Arg]} {
+
+                        # If arguments exist, test the 1st argument instead
+                        set Val [lindex $Arg 0]
+
+                        # Rough check for a previous index
+                        if {[regexp ^\[yY\]$RE_c$ $Val]} {
+                            set Bool [expr "$Inv true"]
+                        } else {
+                            set Bool [expr "$Inv false"]
+                        }
+                    } else {
+                        if {[regexp ^\[yY\]($RE_c)$ $Val -> CStr]} {
+                            if {$DimLen == 1} {
+                                error "element '$Val' of '$varVal': no Y\
+                                    coordinates allowed for 1D!"
+                            }
+                            set CLst [lsort -real [split $CStr /]]
+                            set Lst [list]
+                            foreach Elm $CLst {
+
+                                # Make sure Y is within simulation domain
+                                if {$Elm < $YMin || $Elm > $YMax} {
+                                    error "element '$Val' of '$varVal' beyond\
+                                        simulation domain($YMin $YMax)!"
+                                }
+                                lappend Lst [format %.12g $Elm]
+                            }
+                            if {[lindex $CLst 0] == [lindex $CLst 1]} {
+                                error "Y coordinates in element '$Val' of\
+                                    '$varVal' should be different!"
+                            }
+                            set Bool [expr "$Inv true"]
+
+                            # Update the current element
+                            lset varVal $valIdx y[join $Lst /]
+                        } else {
+                            set Bool [expr "$Inv false"]
+                        }
+                    }
+                    if {!$Bool && $Vital} {
+                        if {$Inv eq ""} {
+                            error "element '$Val' of '$varVal' should\
+                                be two Y coordinates!"
+                        } else {
+                            error "element '$Val' of '$varVal' should\
+                                NOT be two Y coordinates!"
+                        }
+                    }
+                }
+                z {
+                    if {[llength $Arg]} {
+
+                        # If arguments exist, test the 1st argument instead
+                        set Val [lindex $Arg 0]
+
+                        # Rough check for a previous index
+                        if {[regexp ^\[zZ\]$RE_n$ $Val]} {
+                            set Bool [expr "$Inv true"]
+                        } else {
+                            set Bool [expr "$Inv false"]
+                        }
+                    } else {
+                        if {[regexp ^\[zZ\]($RE_n)$ $Val -> CStr]} {
+                            if {$DimLen != 3} {
+                                error "element '$Val' of '$varVal': no Z\
+                                    coordinate allowed for ${DimLen}D!"
+                            }
+
+                            # Make sure Z is within simulation domain
+                            if {$CStr < $ZMin || $CStr > $ZMax} {
+                                error "element '$Val' of '$varVal' beyond\
+                                    simulation domain($ZMin $ZMax)!"
+                            }
+                            set Bool [expr "$Inv true"]
+
+                            # Update the current element
+                            lset varVal $valIdx z[format %.12g $CStr]
+                        } else {
+                            set Bool [expr "$Inv false"]
+                        }
+                    }
+                    if {!$Bool && $Vital} {
+                        if {$Inv eq ""} {
+                            error "element '$Val' of '$varVal' should\
+                                be a Z coordinate!"
+                        } else {
+                            error "element '$Val' of '$varVal' should\
+                                NOT be a Z coordinate!"
+                        }
+                    }
+                }
+                zz {
+                    if {[llength $Arg]} {
+
+                        # If arguments exist, test the 1st argument instead
+                        set Val [lindex $Arg 0]
+
+                        # Rough check for a previous index
+                        if {[regexp ^\[zZ\]$RE_c$ $Val]} {
+                            set Bool [expr "$Inv true"]
+                        } else {
+                            set Bool [expr "$Inv false"]
+                        }
+                    } else {
+                        if {[regexp ^\[zZ\]($RE_c)$ $Val -> CStr]} {
+                            if {$DimLen != 3} {
+                                error "element '$Val' of '$varVal': no Z\
+                                    coordinates allowed for ${DimLen}D!"
+                            }
+                            set CLst [lsort -real [split $CStr /]]
+                            set Lst [list]
+                            foreach Elm $CLst {
+
+                                # Make sure Z is within simulation domain
+                                if {$Elm < $ZMin || $Elm > $ZMax} {
+                                    error "element '$Val' of '$varVal' beyond\
+                                        simulation domain($ZMin $ZMax)!"
+                                }
+                                lappend Lst [format %.12g $Elm]
+                            }
+                            if {[lindex $CLst 0] == [lindex $CLst 1]} {
+                                error "Z coordinates in element '$Val' of\
+                                    '$varVal' should be different!"
+                            }
+                            set Bool [expr "$Inv true"]
+
+                            # Update the current element
+                            lset varVal $valIdx z[join $Lst /]
+                        } else {
+                            set Bool [expr "$Inv false"]
+                        }
+                    }
+                    if {!$Bool && $Vital} {
+                        if {$Inv eq ""} {
+                            error "element '$Val' of '$varVal' should\
+                                be two Z coordinates!"
+                        } else {
+                            error "element '$Val' of '$varVal' should\
+                                NOT be two Z coordinates!"
                         }
                     }
                 }
@@ -718,12 +1109,12 @@ namespace eval mfjGrm {
         }
         if {$Bool} {
             if {$Test eq "s"} {
-                vputs -v5 -c " -> '[lindex $varVal $valIdx]'"
+                # vputs -v5 -c " -> '[lindex $varVal $valIdx]'"
             } else {
-                vputs -v5 -c " -> 'true'"
+                # vputs -v5 -c " -> 'true'"
             }
         } else {
-            vputs -v5 -c " -> 'false'"
+            # vputs -v5 -c " -> 'false'"
         }
         return $Bool
     }
@@ -850,10 +1241,10 @@ namespace eval mfjGrm {
                         }
                     }
                     if {[lindex $ruleChk end 1]} {
-                        vputs -n -i3 -v5 "Check '$Str'"
+                        # vputs -n -i3 -v5 "Check '$Str'"
                         return [grmEval $Test $Arg $Dflt]
                     } else {
-                        vputs -i3 -v5 "Ignore '$Str'"
+                        # vputs -i3 -v5 "Ignore '$Str'"
                         return false
                     }
                 }
@@ -927,10 +1318,12 @@ namespace eval mfjGrm {
     # applyGrm
         # Some variables contain settings for input values
     # Arguments:
+        # VarName         Variable name
         # VarVal          Variable value
         # VarGrm          Variable grammar
     # Result: Return the formatted list
-    proc applyGrm {VarVal VarGrm} {
+    proc applyGrm {VarName VarVal VarGrm} {
+        variable varName
         variable varVal
         variable valIdx
         variable grmStr
@@ -958,6 +1351,7 @@ namespace eval mfjGrm {
         }
 
         # Validate each element against the format rule
+        set varName $VarName
         set varVal $VarVal
         set valIdx 0
         foreach grmStr $VarGrm {

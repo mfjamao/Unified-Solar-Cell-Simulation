@@ -15,13 +15,13 @@ if {[llength [lsort -unique -index 0 $PPAttr]] < [llength $PPAttr]} {
 #--- Get Tcl parameters
 !(
 
-foreach var {RegGen VarVary DfltAttr VV2Fld SS2Fld PPAttr GopAttr
-    IntfCon IntfTun IntfSRV RegIntfTrap ModPar\
-    Dim Cylind OptOnly LoadTDR XMax YMax ZMax} {
-    vputs -n -i-3 "
+foreach var {SimEnv RegGen VarVary DfltAttr VV2Fld SS2Fld PPAttr GopAttr
+    IntfCon IntfTun IntfSRV RegIntfTrap ModPar ProcSeq
+    Dim LoadTDR XMax YMax ZMax} {
+    vputs -n -i-2 "
         set $var \{[regsub -all {\s+} [set $var] " "]\}"
 }
-vputs -n -i-2 "
+vputs -n -i-1 "
     array set ValArr \{[array get ValArr]\}
     array set SimArr \{[array get SimArr]\}"
 
@@ -121,7 +121,7 @@ set apPlt AbsorbedPhotonDensity
 if {$Dim == 3} {
     set jArea [expr 1e-8*$YMax*$ZMax]
     set intArea $jArea
-} elseif {$Dim == 2 && $Cylind} {
+} elseif {$Dim == 2 && [lindex $SimEnv 2] eq "Cylindrical"} {
     set jArea [expr 1e-8*$PI*pow($YMax,2)]
     set intArea $jArea
 } else {
@@ -137,7 +137,7 @@ set RE_n {[+-]?(\.\d+|\d+(\.\d*)?)([eE][+-]?\d+)?}
 set RE_p (${RE_n}_){0,2}$RE_n
 
 # Process all saved snapshots at once according to SS2Fld
-if {!$OptOnly && [regexp \\\{p$RE_p\\s $SS2Fld]} {
+if {[lindex $SimEnv 3] ne "Optical" && [regexp \\\{p$RE_p\\s $SS2Fld]} {
     foreach tdr [glob -d $SimArr(EtcDir) n@previous@_*_des.tdr] {
         set pCnt -1
         regexp {/n@previous@_(\w+)_des.tdr$} $tdr -> fID
@@ -281,9 +281,9 @@ foreach pp $PPAttr {
     vputs -i2 "Save raw data to '$fRaw'"
     export_variables -dataset Data_$pp0 -overwrite -filename $fRaw
 
-    # OptOnly section
+    # Optical simulation section
     #================
-    if {[lindex $pp 1] eq "RAT" && $OptOnly} {
+    if {[lindex $pp 1] eq "RAT" && [lindex $SimEnv 3] eq "Optical"} {
 
         # Verify the current 'VarVary' step
         if {[lindex $VarVary $vIdx 0] ne "Wavelength"} {
@@ -364,7 +364,7 @@ foreach pp $PPAttr {
             vputs -i2 "Calculate illuminated photons numerically"
             create_curve -name ${pp0}_N_Inc -dataset Data_$pp0\
                 -axisX $xVar -axisY "RaytracePhoton Input"
-            if {$Dim != 3 && !$Cylind} {
+            if {$Dim != 3 && [lindex $SimEnv 2] eq "!Cylindrical"} {
                 set_curve_prop ${pp0}_N_Inc -yScale 1e4
             }
             create_curve -name ${pp0}_D_Inc -function\
@@ -385,7 +385,7 @@ foreach pp $PPAttr {
             create_curve -name ${pp0}_NR -dataset Data_$pp0\
                 -axisX $xVar -axisY "RaytraceContactFlux\
                 A(TOpt([lindex $RegGen 0 0 1]/OutDevice))"
-            if {$Dim != 3 && !$Cylind} {
+            if {$Dim != 3 && [lindex $SimEnv 2] eq "!Cylindrical"} {
                 create_curve -name ${pp0}_0|R -function\
                     "1e4*<${pp0}_NR>/<${pp0}_A_Inc>"
             } else {
@@ -396,7 +396,7 @@ foreach pp $PPAttr {
             create_curve -name ${pp0}_NT -dataset Data_$pp0\
                 -axisX $xVar -axisY "RaytraceContactFlux\
                 A(BOpt([lindex $RegGen end 0 1]/OutDevice))"
-            if {$Dim != 3 && !$Cylind} {
+            if {$Dim != 3 && [lindex $SimEnv 2] eq "!Cylindrical"} {
                 create_curve -name ${pp0}_1|T -function\
                     "1e4*<${pp0}_NT>/<${pp0}_A_Inc>"
             } else {
@@ -463,7 +463,7 @@ foreach pp $PPAttr {
                         create_curve -name ${pp0}_N_$str -dataset Data_$pp0\
                             -axisX $xVar -axisY "RaytraceInterfaceTMMLayerFlux\
                             A($intf).layer$idx"
-                        if {$Dim != 3 && !$Cylind} {
+                        if {$Dim != 3 && [lindex $SimEnv 2] eq "!Cylindrical"} {
                             create_curve -name ${pp0}_6|$str -function\
                                 "1e4*<${pp0}_N_$str>/<${pp0}_A_Inc>"
                         } else {
@@ -917,7 +917,7 @@ foreach pp $PPAttr {
         continue
     }
 
-    # Other than OptOnly simulations
+    # Electrical simulations
     #===============================
     if {[lindex $pp 1] eq "JV" || [lindex $pp 1] eq "CV"} {
 
@@ -2181,7 +2181,7 @@ foreach pp $PPAttr {
                 # Will improve accuracy later
                 if {$Dim == 3} {
                     set vol [expr 1e-12*$XMax*$YMax*$ZMax]
-                } elseif {$Dim == 2 && $Cylind} {
+                } elseif {$Dim == 2 && [lindex $SimEnv 2] eq "Cylindrical"} {
                     set vol [expr 1e-12*$XMax*$PI*$YMax*$YMax]
                 } else {
                     set vol [expr 1e-8*$XMax*$YMax]

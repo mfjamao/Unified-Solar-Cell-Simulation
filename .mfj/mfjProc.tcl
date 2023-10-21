@@ -21,8 +21,9 @@ namespace eval mfjProc {
 
     # Refer to Tables 162 and 163 in sdevice manual
     array set tabArr {
-        B BoronActiveConcentration|cm^-3 P PhosphorusActiveConcentration|cm^-3
-        Al AluminumActiveConcentration|cm^-3 x xMoleFraction|1
+        Al Aluminum|cm^-3 As Arsenic|cm^-3 B Boron|cm^-3 C Carbon|cm^-3
+        F Fluorine|cm^-3 Ge Germanium|cm^-3 In Indium|cm^-3 N Nitrogen|cm^-3
+        P Phosphorus|cm^-3 Sb Antimony|cm^-3 x xMoleFraction|1
         y yMoleFraction|1 PD AbsorbedPhotonDensity|cm^-3*s^-1
         Dn ExcessCarrierDensity|cm^-3 n eDensity|cm^-3 p hDensity|cm^-3
         UA AugerRecombination|cm^-3*s^-1 UB RadiativeRecombination|cm^-3*s^-1
@@ -31,16 +32,15 @@ namespace eval mfjProc {
         Eg BandGap|eV BGN BandgapNarrowing|eV ni IntrinsicDensity|cm^-3
         EA ElectronAffinity|eV EC ConductionBandEnergy|eV
         EV ValenceBandEnergy|eV EFe eQuasiFermiEnergy|eV
-        EFh hQuasiFermiEnergy|eV NA AcceptorConcentration|cm^-3
-        ND DonorConcentration|cm^-3 UD eGapStatesRecombination|cm^-3*s^-1
-        x xMoleFraction|1 Eg_eff EffectiveBandGap|eV
+        EFh hQuasiFermiEnergy|eV Band BandDiagram|eV
+        NA AcceptorConcentration|cm^-3 ND DonorConcentration|cm^-3
+        UD eGapStatesRecombination|cm^-3*s^-1 Eg_eff EffectiveBandGap|eV
         ni_eff EffectiveIntrinsicDensity|cm^-3
         V ElectrostaticPotential|V q SpaceCharge|cm^-3
         UT TotalRecombination|cm^-3*s^-1 eBT eBarrierTunneling|cm^-3*s^-1
         hBT hBarrierTunneling|cm^-3*s^-1 eQt eTrappedCharge|cm^-3
         hQt hTrappedCharge|cm^-3 E Abs(ElectricField-V)|V/cm
         UI SurfaceRecombination|cm^-2*s^-1 Dop DopingConcentration|cm^-3
-        Band BandDiagram|eV
     }
     namespace export {[a-z]*}
 }
@@ -485,7 +485,7 @@ proc mfjProc::readIdx {IdxStr {MaxIdx ""}} {
                 set MLst [lsearch -all -regexp $RegMat (?i)^$Idx1]
                 if {$MLst eq ""} {
                     error "material '$Idx1' in '$IdxStr' NOT found in\
-                        variable 'RegDim'!"
+                        variable 'RegGen'!"
                 } elseif {[llength $MLst] > 1} {
                     set Tmp [list]
                     foreach Elm $MLst {
@@ -541,8 +541,8 @@ proc mfjProc::readIdx {IdxStr {MaxIdx ""}} {
     return $IdxLst
 }
 
-# mfjProc::overwrite
-    # Searching for the overwriting features (i,j:k/i,j:k&l,m:n/l,m:n=).
+# mfjProc::replace
+    # Searching for the replacing features (i,j:k/i,j:k&l,m:n/l,m:n=).
     # If found, replace it with the subsequent elements and retain the rest.
     # Easy2Read form: {i,j:k/i,j:k&l,m:n/l,m:n= Val1 Val2 ...}
     # Compact form: i,j:k/i,j:k&l,m:n/l,m:n=Val1,Val2,...
@@ -550,7 +550,7 @@ proc mfjProc::readIdx {IdxStr {MaxIdx ""}} {
     # VarName     Variable name
     # VarVal      Variable value
 # Result: Return the number of occurances and the updated list
-proc mfjProc::overwrite {VarName VarVal} {
+proc mfjProc::replace {VarName VarVal} {
     set VarMsg "variable '$VarName'"
     set Cnt 0
     set LvlIdx 1
@@ -559,7 +559,7 @@ proc mfjProc::overwrite {VarName VarVal} {
         set LvlMsg "level '$LvlIdx'"
         set Msg "$LvlMsg of $VarMsg"
 
-        # Check the string for the overwriting pattern and treat a list in the
+        # Check the string for the replacing pattern and treat a list in the
         # Easy2Read form as a string as well
         # Negative index is allowed by changing '\d+' to '-?\d+'
         if {[regexp {^((-?\d+[:,/&])*-?\d+)=(.+)$} $OldVal\
@@ -598,8 +598,8 @@ proc mfjProc::overwrite {VarName VarVal} {
             set IdxLst [string map {-0 end - end-} $Lst]
             set IdxLen [llength $IdxLst]
 
-            # Convert a comma-seperated string to a value list
-            set ValLst [lrange [string map {, " "} $ValStr] 0 end]
+            # Convert a |-seperated string to a value list
+            set ValLst [lrange [string map {| " "} $ValStr] 0 end]
             set ValLen [llength $ValLst]
 
             # Check whether 'ValLst' tallies with 'IdxLst'
@@ -620,7 +620,7 @@ proc mfjProc::overwrite {VarName VarVal} {
             incr Cnt
         } else {
 
-            # This level has no overwriting pattern
+            # This level has no replacing pattern
             lappend NewLst $OldVal
         }
         incr LvlIdx
@@ -1424,35 +1424,63 @@ proc mfjProc::iSwitch {Dflt Str Ptn args} {
     }
 }
 
-# mfjProc::valSplit
-    # Some variables contain settings for multiple materials, regions,
-    # interfaces, points, etc. It is necessary to split the value into
+# mfjProc::groupValues
+    # Some variables contain values for multiple materials, regions,
+    # interfaces, points, etc. It is necessary to split the values into
     # multiple sublists based on the predefined group ID
 # Arguments:
     # VarName     Variable name
     # VarVal      Variable value
-    # GrpID       Combinations of 'b', 'd', 'o', 'm', 'v', 'r', 'p',
-                   # 'rr' and 'pp'
+    # GrpID       Combinations of 'm', 'p', 'pp', 'r', 'rr'
+                  # 'b', 'd', 'o', 'q', 'v'
     # LvlIdx      The current level index
     # LvlLen      The total levels
-# Results: Return the splitted list
-proc mfjProc::valSplit {VarName VarVal GrpID LvlIdx LvlLen} {
+# Results: Return the grouped list
+proc mfjProc::groupValues {VarName VarVal GrpID LvlIdx LvlLen} {
 
     # Validate arguments
     set GStr [join $GrpID ""]
     set Txt ""
     if {[regexp {b} $GStr]} {
-        set Txt "c# or 'MonoScaling' or 'SpecScaling' or 'Wavelength'"
+        if {[string length $Txt]} {
+            append Txt\
+                " or c# or 'MonoScaling' or 'SpecScaling' or 'Wavelength'"
+        } else {
+            set Txt "c# or 'MonoScaling' or 'SpecScaling' or 'Wavelength'"
+        }
         set BIDLst $::SimArr(BIDLst)        ;# Supported 'b' group ID list
     }
     if {[regexp {d} $GStr]} {
-        set Txt "'Mesh' or 'Numeric' or 'Misc'"
+        if {[string length $Txt]} {
+            append Txt " or 'Mesh' or 'Numeric' or 'Other'"
+        } else {
+            set Txt "'Mesh' or 'Numeric' or 'Other'"
+        }
         set DIDLst $::SimArr(DIDLst)        ;# Supported 'd' group ID list
     }
-
     if {[regexp {o} $GStr]} {
-        set Txt "'Spectrum' or 'Monochromatic' or 'Incidence'"
+        if {[string length $Txt]} {
+            append Txt " or 'Spectrum' or 'Monochromatic' or 'Incidence'"
+        } else {
+            set Txt "'Spectrum' or 'Monochromatic' or 'Incidence'"
+        }
         set OIDLst $::SimArr(OIDLst)        ;# Supported 'o' group ID list
+    }
+    if {[regexp {q} $GStr]} {
+        if {[string length $Txt]} {
+            append Txt " or 'Calibrate' or 'Diffuse' or 'Etch' or 'Implant'"
+        } else {
+            set Txt "'Calibrate' or 'Diffuse' or 'Etch' or 'Implant'"
+        }
+        set QIDLst $::SimArr(QIDLst)        ;# Supported 'q' group ID list
+    }
+    if {[regexp {v} $GStr]} {
+        if {[string length $Txt]} {
+            append Txt " or ref to a varying variable"
+        } else {
+            set Txt "a ref to a varying variable"
+        }
+        set VarLen $::SimArr(VarLen)
     }
     if {[regexp {m} $GStr]} {
         if {[string length $Txt]} {
@@ -1467,14 +1495,6 @@ proc mfjProc::valSplit {VarName VarVal GrpID LvlIdx LvlLen} {
         }
         set MatLst [lindex $::SimArr(MatDB) 0]
         set GrpLst [lindex $::SimArr(MatDB) 1]
-    }
-    if {[regexp {v} $GStr]} {
-        if {[string length $Txt]} {
-            append Txt " or ref to a varying variable"
-        } else {
-            set Txt "a ref to a varying variable"
-        }
-        set VarLen $::SimArr(VarLen)
     }
     if {[regexp {ppp} $GStr]} {
         if {[string length $Txt]} {
@@ -1515,19 +1535,46 @@ proc mfjProc::valSplit {VarName VarVal GrpID LvlIdx LvlLen} {
         }
     }
 
+    # Extract boundaries of simulation domain for GID 'p', 'r'
     # Get values from global array 'SimArr'.
     # Remove regions of negative ID from 'RegInfo'
-    set RegInfo [list]
-    foreach Reg [lindex $::SimArr(RegInfo) $::SimArr(RegLvl)] {
-        if {[lindex $Reg 0 end] >= 0} {
-            lappend RegInfo $Reg
+    if {[regexp {[pr]} $GStr]} {
+        set RegInfo [list]
+        foreach Reg [lindex $::SimArr(RegInfo) $::SimArr(RegLvl)] {
+            if {[lindex $Reg 0 end] >= 0} {
+                lappend RegInfo $Reg
+            }
+        }
+        # set RegMat [lindex $::SimArr(RegMat) $::SimArr(RegLvl)]
+        # set RegIdx [lindex $::SimArr(RegIdx) $::SimArr(RegLvl)]
+        set DimLen $::SimArr(DimLen)
+        set RegEnd [llength $RegInfo]
+        incr RegEnd -1
+
+        # Extract the boundaries of the simulation domain (including
+        # dummy gaseous layers)
+        set XMin [lindex $RegInfo 0 1 0]
+        set XMax [lindex $RegInfo end 2 0]
+        set YMin 0
+        set YMax 0
+        set ZMin 0
+        set ZMax 0
+        if {[llength [lindex $RegInfo end 1]] > 1} {
+            set YMax [lindex $RegInfo end 2 1]
+        }
+        if {[llength [lindex $RegInfo end 1]] == 2} {
+            if {[lindex $RegInfo end-1 1 0] < 0} {
+                set YMin [lindex $RegInfo end-1 1 1]
+            } else {
+                set YMin 0
+            }
+        }
+        if {[llength [lindex $RegInfo end 1]] == 3} {
+            set YMin [lindex $RegInfo end 1 1]
+            set ZMin [lindex $RegInfo end-1 1 2]
+            set ZMax [lindex $RegInfo end 2 2]
         }
     }
-    set RegMat [lindex $::SimArr(RegMat) $::SimArr(RegLvl)]
-    set RegIdx [lindex $::SimArr(RegIdx) $::SimArr(RegLvl)]
-    set DimLen $::SimArr(DimLen)
-    set RegEnd [llength $RegInfo]
-    incr RegEnd -1
 
     # Set regular exppression strings for a material or regions
     # Use {} here to preserve a string as it is
@@ -1557,8 +1604,10 @@ proc mfjProc::valSplit {VarName VarVal GrpID LvlIdx LvlLen} {
     foreach Val $VarVal {
         foreach GID $GrpID {
 
-            # Check whether an element is a group ID. For 'm', attach more info
-            # For 'v', 'p' and 'r', update numbers; For 'b', update case
+            # Check whether an element is a group ID.
+            # For 'b', 'd', 'o', 'q': update case
+            # For 'm': attach more info
+            # For 'p', 'r' and 'v': update numbers
             if {$GID eq "b"} {
 
                 # Special treatment for the first two elements in 'BIDLst'
@@ -1602,14 +1651,19 @@ proc mfjProc::valSplit {VarName VarVal GrpID LvlIdx LvlLen} {
                     } elseif {$Idx == 1} {
                         set Bool true
                     } else {
-                        if {[string index $Elm 0] eq "S"} {
-                            set Val SpecScaling
-                        }
-                        if {[string index $Elm 0] eq "M"} {
-                            set Val MonoScaling
-                        }
-                        if {[string index $Elm 0] eq "W"} {
-                            set Val Wavelength
+                        switch -- [string index $Elm 0] {
+                            M {
+                                set Val MonoScaling
+                            }
+                            S {
+                                set Val SpecScaling
+                            }
+                            W {
+                                set Val Wavelength
+                            }
+                            default {
+                                error "unknown group ID '$Elm'!"
+                            }
                         }
                         set Bool true
                     }
@@ -1624,14 +1678,78 @@ proc mfjProc::valSplit {VarName VarVal GrpID LvlIdx LvlLen} {
                 set Bool false
                 foreach Elm $DIDLst {
                     if {[expr "\[regexp -nocase \{^$Elm$\} $Val\]"]} {
-                        if {[string index $Elm 0] eq "M"} {
-                            set Val Mesh
+                        switch -- [string index $Elm 0] {
+                            M {
+                                set Val Mesh
+                            }
+                            N {
+                                set Val Numeric
+                            }
+                            O {
+                                set Val Other
+                            }
+                            default {
+                                error "unknown group ID '$Elm'!"
+                            }
                         }
-                        if {[string index $Elm 0] eq "N"} {
-                            set Val Numeric
+                        set Bool true
+                        break
+                    }
+                }
+            } elseif {$GID eq "o"} {
+                set Bool false
+                foreach Elm $OIDLst {
+                    if {[expr "\[regexp -nocase \{^$Elm$\} $Val\]"]} {
+                        switch -- [string index $Elm 0] {
+                            I {
+                                set Val Incidence
+                            }
+                            M {
+                                set Val Monochromatic
+                            }
+                            S {
+                                set Val Spectrum
+                            }
+                            default {
+                                error "unknown group ID '$Elm'!"
+                            }
                         }
-                        if {[string index $Elm 0] eq "O"} {
-                            set Val Other
+                        set Bool true
+                        break
+                    }
+                }
+            } elseif {$GID eq "q"} {
+                set Bool false
+                foreach Elm $QIDLst {
+                    if {[expr "\[regexp -nocase \{^$Elm$\} $Val\]"]} {
+                        switch -- [string range $Elm 0 2] {
+                            Cal {
+                                set Val calibrate
+                            }
+                            Dep {
+                                set Val deposit
+                            }
+                            Dif {
+                                set Val diffuse
+                            }
+                            Etc {
+                                set Val etch
+                            }
+                            Imp {
+                                set Val implant
+                            }
+                            Mas {
+                                set Val mask
+                            }
+                            Sav {
+                                set Val save
+                            }
+                            Tra {
+                                set Val transform
+                            }
+                            default {
+                                error "unknown group ID '$Val'!"
+                            }
                         }
                         set Bool true
                         break
@@ -1639,7 +1757,7 @@ proc mfjProc::valSplit {VarName VarVal GrpID LvlIdx LvlLen} {
                 }
             } elseif {$GID eq "m"} {
 
-                # Group ID 'm' is used in variable 'RegDim' only for valSplit
+                # Group ID 'm' is used in variable 'RegDim' only for groupValues
                 if {[regexp -nocase ^($RE_n|p$RE_p|p$RE_p/$RE_p)$ $Val]} {
                     set Bool false
                 } else {
@@ -1671,23 +1789,6 @@ proc mfjProc::valSplit {VarName VarVal GrpID LvlIdx LvlLen} {
                         }
                     } else {
                         set Bool false
-                    }
-                }
-            } elseif {$GID eq "o"} {
-                set Bool false
-                foreach Elm $OIDLst {
-                    if {[expr "\[regexp -nocase \{^$Elm$\} $Val\]"]} {
-                        if {[string index $Elm 0] eq "S"} {
-                            set Val Spectrum
-                        }
-                        if {[string index $Elm 0] eq "M"} {
-                            set Val Monochromatic
-                        }
-                        if {[string index $Elm 0] eq "I"} {
-                            set Val Incidence
-                        }
-                        set Bool true
-                        break
                     }
                 }
             } elseif {$GID eq "p"} {
@@ -1756,43 +1857,15 @@ proc mfjProc::valSplit {VarName VarVal GrpID LvlIdx LvlLen} {
                 continue
             }
 
-            # Additional checks for group ID 'p', 'pp', 'r', 'rr'
-            if {[regexp {p|r} $GrpID]} {
-
-                # Extract the boundaries of the simulation domain (including
-                # dummy gaseous layers)
-                set XMin [lindex $RegInfo 0 1 0]
-                set XMax [lindex $RegInfo end 2 0]
-                set YMin 0
-                set YMax 0
-                set ZMin 0
-                set ZMax 0
-                if {[llength [lindex $RegInfo end 1]] > 1} {
-                    set YMax [lindex $RegInfo end 2 1]
-                }
-                if {[llength [lindex $RegInfo end 1]] == 2} {
-                    if {[lindex $RegInfo end-1 1 0] < 0} {
-                        set YMin [lindex $RegInfo end-1 1 1]
-                    } else {
-                        set YMin 0
-                    }
-                }
-                if {[llength [lindex $RegInfo end 1]] == 3} {
-                    set YMin [lindex $RegInfo end 1 1]
-                    set ZMin [lindex $RegInfo end-1 1 2]
-                    set ZMax [lindex $RegInfo end 2 2]
-                }
-            }
-
             if {[regexp ^\[pP\]($RE_p&)*$RE_p$ $Val]} {
                 set NewVal [list]
                 foreach Str [split [string range $Val 1 end] &] {
                     set PLst [split $Str _]
 
                     # Verify coordinates and their numbers should match 'DimLen'
-                    if {[llength $PLst] != $::SimArr(DimLen)} {
+                    if {[llength $PLst] != $DimLen} {
                         error "element 'p$Str' of $VarMsg should have the\
-                            same number of coordinates as variable 'RegDim'!"
+                            same number of coordinates as variable 'RegGen'!"
                     }
                     set Lst [list]
                     foreach Elm $PLst Min [list $XMin $YMin $ZMin]\
@@ -1820,13 +1893,13 @@ proc mfjProc::valSplit {VarName VarVal GrpID LvlIdx LvlLen} {
                 || [regexp ^\[pP\]($RE_n/\[+-\]&)*$RE_n/\[+-\]$ $Val]} {
                 set NewVal [list]
                 foreach Str [split [string range $Val 1 end] &] {
-                    if {$::SimArr(DimLen) > 1} {
+                    if {$DimLen > 1} {
                         set PPLst [list]
                         foreach PLst [split [split $Str _] /] {
-                            if {[llength $PLst] != $::SimArr(DimLen)} {
+                            if {[llength $PLst] != $DimLen} {
                                 error "element 'p$Str' of $VarMsg should have\
                                     the same number of coordinates as\
-                                    variable 'RegDim'!"
+                                    variable 'RegGen'!"
                             }
                             set Tmp [list]
                             foreach Elm $PLst {
@@ -1866,7 +1939,7 @@ proc mfjProc::valSplit {VarName VarVal GrpID LvlIdx LvlLen} {
                         }
 
                         # 'pp' should be two points
-                        if {$Cnt == $::SimArr(DimLen)} {
+                        if {$Cnt == $DimLen} {
                             error "element 'p$Str' of $VarMsg should be two\
                                 points!"
                         }
@@ -2331,7 +2404,7 @@ proc mfjProc::readMatDB {FMat args} {
     set Idx 0
     foreach Elm $FMat {
         if {[iFileExists Elm]} {
-            vputs -v4 -i1 "Materials found in '$Elm': "
+            vputs -v4 -i3 "Materials found in '$Elm': "
             set Inf [open $Elm r]
             set Begin false
             set ReadMat false
@@ -2351,10 +2424,10 @@ proc mfjProc::readMatDB {FMat args} {
                         foreach Mat $Mats {
                             if {[regexp {^[\w.]+$} $Mat]} {
                                 lappend Lst [list $Mat $Grp]
-                                vputs -v4 -i2 [format "%3s %-24s%s" $Idx $Mat\
+                                vputs -v4 -i4 [format "%3s %-24s%s" $Idx $Mat\
                                     $Grp]
                             } else {
-                                vputs -i1 "Skip material name '$Mat', which\
+                                vputs -i3 "Skip material name '$Mat', which\
                                     has characters beyond 'a-zA-Z0-9_.'!"
                             }
                             incr Idx
@@ -2394,6 +2467,7 @@ proc mfjProc::readMatDB {FMat args} {
 
 # mfjProc::buildTree
     # Build a SWB node tree according to the column or full combination mode
+    # Key nodes are a list of the last nodes of all tools
 # Arguments:
     # VarName             Variable names
     # VarVal              Variable values
@@ -2999,6 +3073,73 @@ proc mfjProc::curve2CSV {CName XTitle YTitle PName FCSV {TLyr 0} {BLyr 0}} {
     }
     close $Ouf
     file rename -force $FCSV.[pid] $FCSV
+}
+
+# mfjProc::plx2CSV
+    # Convert a .plx file to a CSV file
+# Arguments
+    # FPlx        The file name of a .plx file
+    # FCSV        The file name of the converted CSV file
+    # Remove      A switch determining whether to remove the .plx file or not
+# Result: Return 1 for success
+proc mfjProc::plx2CSV {FPlx {FCSV ""} {Remove ""}} {
+
+    # Verify arguments
+    if {![file exists $FPlx]} {
+        error "$FPlx not found!"
+    }
+    if {$FCSV eq ""} {
+        set FCSV [file rootname $FPlx].csv
+    }
+    if {[string index $Remove 0] eq "!"} {
+        set Remove false
+    } else {
+        set Remove true
+    }
+
+    # Read the .plx file
+    set Inf [open $FPlx r]
+    set XCol [list]
+    set YCols [list]
+    set Col [list]
+    set Title Depth
+    while {[gets $Inf Line] != -1} {
+        if {[llength $Line] == 2 && [string is double [lindex $Line 0]]
+            && [string is double [lindex $Line 1]]} {
+            if {[llength $Title] == 2} {
+                lappend XCol [lindex $Line 0]
+            }
+            lappend Col [lindex $Line 1]
+        } elseif {[regexp {^"(\S+)"$} $Line -> Tmp]} {
+            lappend Title $Tmp
+            if {[llength $Col]} {
+                lappend YCols $Col
+            }
+            set Col [list]
+        }
+    }
+    if {[llength $Col]} {
+        lappend YCols $Col
+    }
+    close $Inf
+
+    # Write to the corresponding csv file
+    set Ouf [open $FCSV w]
+    puts $Ouf [join $Title ,]
+    set Len [llength $XCol]
+    set YLen [llength $YCols]
+    for {set i 0} {$i < $Len} {incr i} {
+        puts -nonewline $Ouf [lindex $XCol $i]
+        for {set j 0} {$j < $YLen} {incr j} {
+            puts -nonewline $Ouf ,[lindex $YCols $j $i]
+        }
+        puts $Ouf ""
+    }
+    close $Ouf
+
+    if {$Remove} {
+        file delete $FPlx
+    }
 }
 
 # mfjProc::cut1D

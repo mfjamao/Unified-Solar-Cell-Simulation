@@ -308,7 +308,7 @@ if {[regexp {\sRaytrace\s} $GopAttr]} {
             \{Name= \"FOpt\" reflectivity= 1.0\}
             \{Name= \"NOpt\" reflectivity= 1.0\}"
     } else {
-        if {!$Cylind} {
+        if {[lindex $SimEnv 2] eq "!Cylindrical"} {
             vputs -n -i-3 "
                 \{Name= \"LOpt\" reflectivity= 1.0\}"
         }
@@ -440,7 +440,7 @@ Plot {
 CurrentPlot {
     !(
 
-    if {$OptOnly && [regexp {\sRaytrace\s} $GopAttr]} {
+    if {[lindex $SimEnv 3] eq "Optical" && [regexp {\sRaytrace\s} $GopAttr]} {
         vputs -n -i-2 "
             pmi_OG1D"
     }
@@ -558,7 +558,7 @@ CurrentPlot {
             vputs -n -i-5 "
                         )"
         } elseif {[regexp {^(n|p|ni_eff)$} $elm]} {
-            if {$OptOnly} continue
+            if {[lindex $SimEnv 3] eq "Optical"} continue
             vputs -n -i-5 "
                         [lindex [split $mfjProc::tabArr($elm) |] 0] ("
 
@@ -640,7 +640,7 @@ CurrentPlot {
             vputs -n -i-5 "
                         )"
         } elseif {[regexp {^(UA|UB|US|UP|UD|UT)$} $elm]} {
-            if {$OptOnly} continue
+            if {[lindex $SimEnv 3] eq "Optical"} continue
             vputs -n -i-5 "
                         [lindex [split $mfjProc::tabArr($elm) |] 0] (
                             Integrate (Semiconductor)"
@@ -852,7 +852,7 @@ vputs -n -i-1 "
         Mobility (HighFieldSaturation)
         EffectiveIntrinsicDensity (NoBandGapNarrowing)\n"
 
-if {!$OptOnly && [regexp {\s[ceh]T\s} $IntfTun]} {
+if {[lindex $SimEnv 3] ne "Optical" && [regexp {\s[ceh]T\s} $IntfTun]} {
     set idx 0
     foreach grp $IntfTun {
         if {[regexp {^[ceh]T$} [lindex $grp 1]]} {
@@ -897,7 +897,7 @@ if {[regexp {\{(Mono|Spec)Scaling\s} $VarVary]} {
     # FCA calculation is enabled only for pure optical simulation
     vputs -n -i-1 "
             OpticalGeneration ("
-    if {$OptOnly} {
+    if {[lindex $SimEnv 3] eq "Optical"} {
         vputs -n -i-1 "
                 QuantumYield (EffectiveAbsorption)"
     } else {
@@ -1103,7 +1103,7 @@ if {[regexp {\{(Mono|Spec)Scaling\s} $VarVary]} {
             ) * end of OpticalSolver
             ComplexRefractiveIndex (
                 WavelengthDep (real imag)"
-        if {$OptOnly} {
+        if {[lindex $SimEnv 3] eq "Optical"} {
             vputs -n -i-1 "
                 CarrierDep (imag)"
         }
@@ -1118,7 +1118,7 @@ vputs -i-1 "
     \} * end of global physics"
 
 # Redefine physics options for individual semiconductor region
-if {!$OptOnly} {
+if {[lindex $SimEnv 3] ne "Optical"} {
     foreach grp $RegGen {
         if {[lindex $grp 0 2] ne "Semiconductor"} continue
         vputs -n -i-3 "
@@ -1582,7 +1582,7 @@ Math {
         vputs -n -i-2 "
             ExtendedPrecision([lindex $lst 0])"
     }
-    if {$Dim == 2 && $Cylind} {
+    if {$Dim == 2 && [lindex $SimEnv 2] eq "Cylindrical"} {
         vputs -n -i-2 "
             Cylindrical (yAxis= 0)"
     }
@@ -1591,7 +1591,8 @@ Math {
             ImplicitACSystem"
     }
 
-    if {!$OptOnly && [regexp {\s(c|e|h|TA)T\s} $IntfTun]} {
+    if {[lindex $SimEnv 3] ne "Optical"
+        && [regexp {\s(c|e|h|TA)T\s} $IntfTun]} {
         set idx 0
         foreach grp $IntfTun {
             if {[regexp {^(c|e|h|TA)T$} [lindex $grp 1]]} {
@@ -1664,7 +1665,7 @@ vputs -n -i-1 "
     Solve \{
         System(\"rm -f *n@node@_des.plt\")\n"
 
-if {$OptOnly} {
+if {[lindex $SimEnv 3] eq "Optical"} {
 
     # Optical simulation only
     set var Optics
@@ -1779,8 +1780,8 @@ foreach grp $VarVary {
                     set txt 0
                     set tmp -1
                     while {$tmp < [lindex $grp 2]} {
-                        append txt "\; [expr exp(log(1e-6)+[incr tmp]\
-                            *(log([lindex $grp 1])-log(1e-6))/[lindex $grp 2])\
+                        append txt "\; [expr exp(log(1e-5)+[incr tmp]\
+                            *(log([lindex $grp 1])-log(1e-5))/[lindex $grp 2])\
                             /[lindex $grp 1]]"
                     }
                 } elseif {[lindex $grp 1] == 0} {
@@ -1788,7 +1789,7 @@ foreach grp $VarVary {
                     set tmp -1
                     while {$tmp < [lindex $grp 2]} {
                         append txt "[expr exp(log($val)+[incr tmp]\
-                            *(log(1e-6)-log($val))/[lindex $grp 2])/$val]\; "
+                            *(log(1e-5)-log($val))/[lindex $grp 2])/$val]\; "
                     }
                     append txt 1
                 } else {

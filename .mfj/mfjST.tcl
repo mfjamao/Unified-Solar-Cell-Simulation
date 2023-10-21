@@ -13,12 +13,9 @@ namespace eval mfjST {
     # Define a big array to handle all data exchange
     variable arr
     array set arr {
-        StartIdx 0 TclSimEnv "" TclDfltSet "" TclModTime "" TclRegInfo ""
-        TclSTName "" TclSTLbl "" TclSTIdx "" TclCMILst ""
-        TclVarName "" TclVarVal ""
-        TclSWBIdx "" TclSWBName "" TclSWBVal "" TclKeyNode "" TclRunNode ""
-        GTreeSTName "" GTreeSTLbl ""
-        GTreeSWBIdx "" GTreeSWBName "" GTreeSWBVal ""
+        StartIdx -1 Tcl|VarLst "" TclRsvd|VarLst "" TclEnv|VarLst ""
+        TclST|VarLst "" Tcl|STLst "" TclWB|STLst "" TclWB|VarLst ""
+        TclKeyNode "" TclRunNode "" TclCMILst "" GTr|VarLst "" GTr|STLst ""
         GTreeLine0 "# Copyright (C) 1994-2016 Synopsys Inc."
         GTreeSTVer "" GTreeColMode ColMode GTreeNode4All !Node4All
         BatSTRoot "" BatSTVer "" BatSTLicn "" BatSTLib "" BatSTPDir ""
@@ -54,49 +51,60 @@ proc mfjST::valPath {} {
 }
 
 # mfjST::readTcl
-    # Read ::SimArr(FVarSim) and ::SimArr(FVarEnv) and update the following
-    # variables in arr:
-    # TclSimEnv TclSTName TclSTLbl TclSTIdx TclVarName TclVarVal
-    # TclSWBName TclSWBVal UpdateTcl
+    # Read ::SimArr(FVarSim) and ::SimArr(FVarEnv) and update the corresponding
+    # variables in arr
 proc mfjST::readTcl {} {
     variable arr
     vputs "Reading the variable Tcl files '$::SimArr(FVarEnv)' and\
         '$::SimArr(FVarSim)'..."
     if {[file isfile $::SimArr(FVarEnv)] && [file isfile $::SimArr(FVarSim)]} {
+
+        # No multiple levels in ::SimArr(FVarEnv)
         set Inf [open $::SimArr(FVarEnv) r]
         set Lines ""
-        vputs -v3 -i1 "Environment variables:"
+        set LineIdx 0
+        set Flg true
+        vputs -v3 -i1 "Reserved variables:"
         while {[gets $Inf Line] != -1} {
 
             # Read lines after reading an empty or comment line
             if {![regexp {\S} $Line] || [regexp {^\s*#} $Line]} {
-                if {[string length $Lines]} {
-                    if {[regexp {^mfj(DfltSet|ModTime|RegInfo|STName)$}\
-                        [lindex $Lines 1] -> Var]} {
-                        set arr(Tcl$Var) [lindex $Lines 2]
-                        vputs -v3 -i2 "arr(Tcl$Var): \{$arr(Tcl$Var)\}"
-                    } elseif {[lindex $Lines 1] eq "SimEnv"} {
-                        set arr(TclSimEnv) [lindex $Lines 2]
-                        vputs -v3 -i2 "arr(TclSimEnv): \{$arr(TclSimEnv)\}"
+                if {[llength $Lines] == 3} {
+                    set Var [lindex $Lines 1]
+                    if {[regexp {^mfj\w+$} $Var]} {
+                        lappend arr(TclRsvd|VarLst) $Var
                     } else {
-                        vputs -v3 -i2 "Unknown variable '[lindex $Lines 1]'!"
+                        if {$Flg} {
+                            vputs -v3 -i1 "Environment variables:"
+                            set Flg false
+                        }
+                        lappend arr(TclEnv|VarLst) $Var
+                        lappend arr(Tcl|VarLst) $Var
                     }
+                    set Val [lindex $Lines 2]
+                    set arr(TclVal|$Var) $Val
+                    set arr(TclLvl|$Var) 1
+                    vputs -v3 -i2 "$Var: \{$arr(TclVal|$Var)\}"
                     set Lines ""
+                } elseif {[llength $Lines] > 0} {
+                    error "unknown command '$Lines' at line '$LineIdx'!"
                 }
             } else {
                 append Lines " [string trim $Line]"
             }
+            incr LineIdx
         }
         close $Inf
 
-        vputs -v3 -i1 "Simulation variables:"
-        set VarName [list]
-        set VarVal [list]
-        set VarIdx 0
-        set SwbName [list]
-        set SwbVal [list]
-        set SwbIdx 0
+        if {[info exists arr(TclVal|mfjSTLst)]} {
+            set arr(Tcl|STLst) $arr(TclVal|mfjSTLst)
+        } else {
+            error "variable 'mfjSTLst' missing in '$::SimArr(FVarEnv)'!"
+        }
+        set Idx 0
+        set LineIdx 0
         set Lines ""
+        set WBFlg true
         set Inf [open $::SimArr(FVarSim) r]
         while {[gets $Inf Line] != -1} {
 
@@ -105,27 +113,44 @@ proc mfjST::readTcl {} {
 
                 # Extract tool label
                 if {[regexp {^\s*#} $Line]
-                    && [regexp -nocase $arr(STDfltID) $Line -> ToolLbl]} {
-                    lappend arr(TclSTLbl) $ToolLbl
-                    lappend arr(TclSTIdx) $VarIdx
-                    lappend arr(TclSWBIdx) $SwbIdx
-                    vputs -v3 -i1 "ST tool label: '$ToolLbl'\tindex:\
-                        '$VarIdx'\tSWB index: '$SwbIdx'"
+                    && [regexp -nocase $arr(STDfltID) $Line -> Lbl]} {
+                    set Tool [lindex $arr(Tcl|STLst) $Idx]
+                    if {$WBFlg} {
+                        if {$Tool eq "sprocess"
+                            && [string equal -nocase Process\
+                            [lindex $arr(TclVal|SimEnv) 3]]} {
+                            set WBFlg false
+                        }
+                        lappend arr(TclWB|STLst) $Tool
+                        set arr(TclWB$Tool|VarLst) [list]
+                    }
+                    set arr(TclLbl|$Tool) $Lbl
+                    set arr(Tcl$Tool|VarLst) [list]
+                    vputs -v3 -i1 "ST tool: '$Tool'\tlabel: '$Lbl'"
+                    incr Idx
                 }
-                if {[string length $Lines]} {
-                    set Name [lindex $Lines 1]
-                    set Tmp [lindex $VarName end]
-                    if {[regexp -nocase \\w+<mfj> $Name]
-                        || "$Name<mfj>" ne $Tmp} {
-                        lappend VarName $Name
-                        lappend VarVal [lindex $Lines 2]
-                        incr VarIdx
-                        vputs -v3 -i2 "$Name: \{[lindex $Lines 2]\}"
-                        if {[regexp -nocase ^\\w+<mfj> $Name]
-                            || [string index $::SimArr(Node4All) 0] ne "!"} {
-                            lappend SwbName $Name
-                            lappend SwbVal [lindex $Lines 2]
-                            incr SwbIdx
+                if {[lindex $Lines 0] eq "set"} {
+                    if {[regexp {^(\w+)<(\d+)>$} [lindex $Lines 1]\
+                        -> Var Len]} {
+                        if {$WBFlg} {
+                            lappend arr(TclWB|VarLst) $Var
+                            lappend arr(TclWB$Tool|VarLst) $Var
+                        }
+                        lappend arr(Tcl|VarLst) $Var
+                        lappend arr(TclST|VarLst) $Var
+                        lappend arr(Tcl$Tool|VarLst) $Var
+                        set arr(TclVal|$Var) [lindex $Lines 2]
+                        set arr(TclLvl|$Var) $Len
+                        vputs -v3 -i2 "$Var<$Len>: '\{$arr(TclVal|$Var)\}'"
+                    } else {
+                        set Var [lindex $Lines 1]
+                        if {$Var ne [lindex $arr(Tcl|VarLst) end]} {
+                            lappend arr(Tcl|VarLst) $Var
+                            lappend arr(TclST|VarLst) $Var
+                            lappend arr(Tcl$Tool|VarLst) $Var
+                            set arr(TclVal|$Var) [lindex $Lines 2]
+                            set arr(TclLvl|$Var) 1
+                            vputs -v3 -i2 "$Var: '\{$arr(TclVal|$Var)\}'"
                         }
                     }
                 }
@@ -133,13 +158,10 @@ proc mfjST::readTcl {} {
             } else {
                 append Lines " [string trim $Line]"
             }
+            incr LineIdx
         }
         close $Inf
-        vputs -v3 -i1 "Found [llength $VarName] simulation variables!"
-        set arr(TclVarName) $VarName
-        set arr(TclVarVal) $VarVal
-        set arr(TclSWBName) $SwbName
-        set arr(TclSWBVal) $SwbVal
+        vputs -v3 -i1 "Found [llength $arr(Tcl|VarLst)] simulation variables!"
     } else {
         vputs -i1 "The variable Tcl file '$::SimArr(FVarEnv)' or\
             '$::SimArr(FVarSim)' not found!"
@@ -151,7 +173,7 @@ proc mfjST::readTcl {} {
 
 # mfjST::readGTree
     # Read gtree.dat and update the following variables in arr:
-    # GTreeLine0 GTreeSTVer GTreeColMode GTreeSTName GTreeSTLbl GTreeSWBIdx
+    # GTreeLine0 GTreeSTVer GTreeColMode GTr|STLst GTreeSTLbl GTreeSWBIdx
     # GTreeSWBName GTreeSWBVal GTreeNode4All UpdateGTree
 proc mfjST::readGTree {} {
     variable arr
@@ -175,10 +197,9 @@ proc mfjST::readGTree {} {
             if {[regexp {^\s*#} $Line]} {
 
                 # Extract Sentaurus TCAD version
-                if {$arr(GTreeSTVer) eq "" && [regexp -nocase\
-                    ^#\\s[lindex $arr(DfltGTreeID) 0] $Line\
-                    -> arr(GTreeSTVer)]} {
-                    vputs -v2 -i1 "ST version: '$arr(GTreeSTVer)'"
+                if {$arr(GTreeSTVer) eq ""} {
+                    regexp -nocase ^#\\s[lindex $arr(DfltGTreeID) 0] $Line\
+                        -> arr(GTreeSTVer)
                 }
 
                 # Extract simulation flow
@@ -189,15 +210,16 @@ proc mfjST::readGTree {} {
                     set VarIdx 0
                     set VarName [list]
                     set VarVal [list]
+                    set IdxLst [list]
                 }
                 if {[regexp -nocase\
                     ^$::SimArr(Prefix)\\s[lindex $arr(DfltGTreeID) 2] $Line]} {
+                    vputs -v2 -i1 "ST version: '$arr(GTreeSTVer)'"
                     vputs -v2 -i1 "Found [lindex $arr(DfltGTreeID) 2]:"
                     set ReadFlow false
                     set ReadVar true
                     set mfjProc::arr(Indent1) 2
-                    set GTree [buildTree $VarName $VarVal $arr(GTreeSWBIdx)\
-                        ColMode]
+                    set GTree [buildTree $VarName $VarVal $IdxLst ColMode]
                     set mfjProc::arr(Indent1) 0
                     vputs -v2 -i1 "SWB node arrangement for all variables:\
                         '$arr(GTreeNode4All)'"
@@ -220,37 +242,43 @@ proc mfjST::readGTree {} {
             } else {
                 if {$ReadFlow} {
                     if {[llength $Line] != 4} {
-                        vputs -i1 "The SWB setting file 'gtree.dat' is\
-                            damaged!"
+                        vputs -i1 "The SWB setting file 'gtree.dat' is damaged!"
                         set arr(UpdateGTree) true
                         break
                     }
 
                     # Tools can be distinguished by the empty value
-                    if {[lindex $Line 2] eq "" && [lindex $Line 3] eq ""} {
-                        lappend arr(GTreeSTLbl) [lindex $Line 0]
-                        lappend arr(GTreeSTName) [lindex $Line 1]
-                        lappend arr(GTreeSWBIdx) $VarIdx
-                        vputs -v3 -i2 "ST tool name: '[lindex $Line 1]'\tlabel:\
-                            '[lindex $Line 0]'\tindex: '$VarIdx'"
+                    if {[lindex $Line 3] eq ""} {
+                        if {[regexp {\-rel\s+(\S+)} [lindex $Line 2] -> Tmp]} {
+                            set arr(GTreeSTVer) $Tmp
+                        }
+                        set Tool [lindex $Line 1]
+                        lappend arr(GTr|STLst) $Tool
+                        set arr(GTrLbl|$Tool) [lindex $Line 0]
+                        set arr(GTr$Tool|VarLst) [list]
+                        lappend IdxLst $VarIdx
+                        vputs -v3 -i2 "ST tool: '$Tool'\tlabel:\
+                            '[lindex $Line 0]'"
                     } else {
                         lappend VarName [lindex $Line 1]
                         lappend VarVal [lindex $Line end]
+                        set Var [lindex $Line 1]
+                        lappend arr(GTr$Tool|VarLst) $Var
+                        lappend arr(GTr|VarLst) $Var
+                        set arr(GTrLvl|$Var) [llength [lindex $Line end]]
 
                         # Decode values of swb variables, refer to the rules
                         # set out in 'updateGTree'
-                        if {[llength [lindex $Line end]] == 1} {
-                            lappend arr(GTreeSWBName) [lindex $Line 1]
+                        if {$arr(GTrLvl|$Var) == 1} {
                             set arr(GTreeNode4All) Node4All
-                            set Val [lindex $Line end 0]
+                            set Val [lindex $Line end]
                             if {$Val eq "/0"} {
-                                lappend arr(GTreeSWBVal) ""
+                                set arr(GTrVal|$Var) ""
                             } else {
-                                set Val [string map {*: \{ :* \} :: " "} $Val]
-                                lappend arr(GTreeSWBVal) $Val
+                                set arr(GTrVal|$Var) [string map\
+                                    {*: \{ :* \} :: " "} $Val]
                             }
                         } else {
-                            lappend arr(GTreeSWBName) [lindex $Line 1]<mfj>
                             set Lst [list]
                             foreach Elm [lindex $Line end] {
                                 if {$Elm eq "/0"} {
@@ -260,11 +288,11 @@ proc mfjST::readGTree {} {
                                         {*: \{ :* \} :: " "} $Elm]
                                 }
                             }
-                            lappend arr(GTreeSWBVal) $Lst
+                            set arr(GTrVal|$Var) $Lst
                         }
                         incr VarIdx
-                        vputs -v3 -i3 "[lindex $arr(GTreeSWBName) end]:\
-                            \{[lindex $arr(GTreeSWBVal) end]\}"
+                        vputs -v3 -i3 "$Var<$arr(GTrLvl|$Var)>:\
+                            \{$arr(GTrVal|$Var)\}"
                     }
                 }
                 if {$ReadVar} {
@@ -289,8 +317,8 @@ proc mfjST::readGTree {} {
             }
         }
         close $Inf
-        if {$arr(GTreeSTName) eq ""} {
-            vputs -i1 "No tools found in 'gtree.dat'!"
+        if {$arr(GTr|STLst) eq ""} {
+            vputs -i1 "No ST tools found in 'gtree.dat'!"
             set arr(UpdateGTree) true
         }
         if {!$arr(UpdateGTree)} {
@@ -414,178 +442,130 @@ proc mfjST::readBatch {} {
 proc mfjST::tclvsFmt {} {
     variable arr
 
-    # Create SwbName, SwbVal and SwbIdx for easier comparison
-    if {[string index $::SimArr(Node4All) 0] ne "!"} {
-        set SwbName $mfjIntrpr::arr(FmtVarName)
-        set SwbVal $mfjIntrpr::arr(FmtVarVal)
-        set SwbIdx $mfjIntrpr::arr(FmtSTIdx)
-    } else {
-        set SwbName [list]
-        set SwbVal [list]
-        set SwbIdx [list]
-        set VarIdx 0
-        set STIdx 0
-        set Idx 0
-        set FmtSTIdx $mfjIntrpr::arr(FmtSTIdx)
-        set STLen [llength $FmtSTIdx]
-        foreach Var $mfjIntrpr::arr(FmtVarName) Val $mfjIntrpr::arr(FmtVarVal) {
-
-            # In case no variables between tools
-            while {$STIdx < $STLen && [lindex $FmtSTIdx $STIdx] == $VarIdx} {
-                lappend SwbIdx $Idx
-                incr STIdx
-            }
-            if {[regexp ^\\w+<mfj>$ $Var]} {
-                lappend SwbName $Var
-                lappend SwbVal $Val
-                incr Idx
-            }
-            incr VarIdx
-        }
-
-        # In case no variables or the rest tools have no variables
-        while {$STIdx < $STLen && [lindex $FmtSTIdx $STIdx] == $VarIdx} {
-            lappend SwbIdx $Idx
-            incr STIdx
-        }
-    }
-
     # Tcl related variables should be updated here
-    set StartIdx $arr(StartIdx)
     if {!$arr(UpdateTcl)} {
         vputs "Comparing '$::SimArr(FVarEnv)' and '$::SimArr(FVarSim)' against\
             '$::SimArr(FVarFmt)'..."
 
-        # Re-run all the tools for major changes
-        if {$arr(TclSimEnv) ne $mfjIntrpr::arr(FmtSimEnv)} {
-            set arr(UpdateTcl) true
-            set Msg "Environment variable 'SimEnv' has a value of\
-                '$arr(TclSimEnv)' different from '$mfjIntrpr::arr(FmtSimEnv)'!"
-        } elseif {$arr(TclDfltSet) ne $mfjIntrpr::arr(FmtDfltSet)} {
-            set arr(UpdateTcl) true
-            set Msg "Environment variable 'mfjDfltSet' has a value of\
-                '$arr(TclDfltSet)' different from\
-                '$mfjIntrpr::arr(FmtDfltSet)'!"
-        } elseif {$arr(TclModTime) ne $mfjIntrpr::arr(FmtModTime)} {
-            set arr(UpdateTcl) true
-            set Msg "Environment variable 'mfjModTime' has a value of\
-                '$arr(TclModTime)' different from\
-                '$mfjIntrpr::arr(FmtModTime)'!"
-        } elseif {$arr(TclRegInfo) ne $mfjIntrpr::arr(FmtRegInfo)} {
-            set arr(UpdateTcl) true
-            set Msg "Environment variable 'mfjRegInfo' has a value of\
-                '$arr(TclRegInfo)' different from\
-                '$mfjIntrpr::arr(FmtRegInfo)'!"
-        } else {
-            if {[llength $arr(TclSTLbl)]\
-                != [llength $mfjIntrpr::arr(FmtSTLbl)]} {
-                set arr(UpdateTcl) true
-                set Msg "ST tool # '[llength $arr(TclSTLbl)]' different\
-                    from '[llength $mfjIntrpr::arr(FmtSTLbl)]'!"
-            } else {
-                foreach TLbl $arr(TclSTLbl) FLbl $mfjIntrpr::arr(FmtSTLbl)\
-                    TName $arr(TclSTName) FName $mfjIntrpr::arr(FmtSTName)\
-                    TIdx $arr(TclSTIdx) FIdx $mfjIntrpr::arr(FmtSTIdx) {
+        # Check reserved and environment variables
+        set Msg "'$::SimArr(FVarEnv)' is different from '$::SimArr(FVarFmt)'!"
+        foreach Tool {Rsvd Env} Str {Reserved Environment} {
 
-                    # Case is sensitive
-                    if {$TLbl ne $FLbl} {
+            # Variables for a tool may have a different sequence
+            foreach Var $arr(Tcl$Tool|VarLst) {
+                if {[lsearch -exact $mfjIntrpr::arr(Fmt$Tool|VarLst)\
+                    $Var] == -1} {
+                    if {!$arr(UpdateTcl)} {
                         set arr(UpdateTcl) true
-                        set Msg "ST tool label '$TLbl' different from '$FLbl'!"
-                        break
+                        vputs -i1 $Msg
                     }
-                    if {$TName ne $FName} {
+                    vputs -v3 -i2 "$Str variable '$Var' in\
+                        '$::SimArr(FVarFmt)' removed!"
+                    continue
+                }
+                if {$arr(TclVal|$Var) ne $mfjIntrpr::arr(FmtVal|$Var)} {
+                    if {!$arr(UpdateTcl)} {
                         set arr(UpdateTcl) true
-                        set Msg "ST tool name '$TName' different from '$FName'!"
-                        break
+                        vputs -i1 $Msg
                     }
-                    if {$TIdx != $FIdx} {
-
-                        # Variables could be moved up, but not down
+                    vputs -v3 -i2 "$Str variable '$Var' has a value of\
+                        '$arr(TclVal|$Var)' different from\
+                        '$mfjIntrpr::arr(FmtVal|$Var)'!"
+                }
+            }
+            foreach Var $mfjIntrpr::arr(Fmt$Tool|VarLst) {
+                if {[lsearch -exact $arr(Tcl$Tool|VarLst) $Var] == -1} {
+                    if {!$arr(UpdateTcl)} {
                         set arr(UpdateTcl) true
-                        set Msg "ST tool index '$TIdx' different from '$FIdx'!"
-                        break
+                        vputs -i1 $Msg
                     }
+                    vputs -v3 -i2 "$Str variable '$Var' in\
+                        '$::SimArr(FVarFmt)' added!"
                 }
             }
         }
 
-        if {!$arr(UpdateTcl)} {
+        # Check ST Tools and variables
+        set Msg "'$::SimArr(FVarSim)' is different from '$::SimArr(FVarFmt)'!"
 
-            # Try to preserve as many cases in ::SimArr(FVarSim) as possible
-            set DelVar [list]
-            set IdxLst [list]
-            foreach Var $arr(TclVarName) {
-                set Idx [lsearch -regexp $mfjIntrpr::arr(FmtVarName)\
-                    (?i)^$Var$]
-                if {$Idx == -1} {
-                    lappend DelVar $Var
-                } else {
-                    if {[lindex $mfjIntrpr::arr(FmtVarName) $Idx] ne $Var} {
-                        lset mfjIntrpr::arr(FmtVarName) $Idx $Var
-                    }
-                    lappend IdxLst $Idx
-                }
-            }
-            if {[llength $DelVar]} {
+        # Tools should have the same sequence
+        if {$arr(Tcl|STLst) ne $mfjIntrpr::arr(Fmt|STLst)} {
+            if {!$arr(UpdateTcl)} {
                 set arr(UpdateTcl) true
-                set Msg "Deleted '[llength $DelVar]' simulation variables:\
-                    $DelVar"
+                vputs -i1 $Msg
             }
-            if {[llength $IdxLst] < [llength $mfjIntrpr::arr(FmtVarName)]} {
-                set IdxLst [lsort -integer $IdxLst]
-                set Idx 0
-                set AddVar [list]
-                foreach Var $mfjIntrpr::arr(FmtVarName) {
-                    if {$Var eq [lindex $mfjIntrpr::arr(FmtVarName)\
-                        [lindex $IdxLst $Idx]]} {
-                        incr Idx
-                    } else {
-                        lappend AddVar $Var
-                    }
-                }
-                set arr(UpdateTcl) true
-                set Msg "Added '[llength $AddVar]' simulation variables:\
-                    $AddVar"
-            }
-        }
-
-        if {!$arr(UpdateTcl)} {
-
-            # The tool index may be updated after comparison
-            if {[llength $DelVar] == 0 && [llength $IdxLst]
-                == [llength $mfjIntrpr::arr(FmtVarName)]} {
-                set VarIdx 0
-                foreach TVar $arr(TclVarName) TVal $arr(TclVarVal)\
-                    FVal $mfjIntrpr::arr(FmtVarVal) {
-                    if {$TVal ne $FVal} {
-                        set arr(UpdateTcl) true
-                        set Msg "Simulation variable '$TVar' has a value of\
-                            '$TVal' different from '$FVal'!"
-                        break
-                    }
-                    incr VarIdx
-                }
-
-                # Determine the changed variable belongs to which tool
-                if {$arr(UpdateTcl)} {
-                    set STIdx 0
-                    foreach Idx $arr(TclSTIdx) {
-                        if {$VarIdx < $Idx} {
-                            break
-                        }
-                        incr STIdx
-                    }
-                    set StartIdx [incr STIdx -1]
-                }
-            }
+            vputs -i2 "ST tools '$arr(Tcl|STLst)' different from\
+                '$mfjIntrpr::arr(Fmt|STLst)'!"
         }
         if {$arr(UpdateTcl)} {
-            vputs -i1 "'$::SimArr(FVarEnv)' and '$::SimArr(FVarSim)' are\
-                different from '$::SimArr(FVarFmt)'!"
-            vputs -i2 $Msg
-            vputs -v2 -i2 "ST starting tool index: '$StartIdx'"
+            set arr(StartIdx) 0
+        }
+
+        set STIdx 0
+        set Flg true
+        foreach Tool $arr(Tcl|STLst) {
+            if {$arr(TclLbl|$Tool) ne $mfjIntrpr::arr(FmtLbl|$Tool)} {
+                if {!$arr(UpdateTcl)} {
+                    set arr(UpdateTcl) true
+                    vputs -i1 $Msg
+                }
+                vputs -i2 "ST tool label '$arr(TclLbl|$Tool)' different\
+                    from '$mfjIntrpr::arr(FmtLbl|$Tool)'!"
+            }
+
+            # Variables for a tool may have a different sequence
+            foreach Var $arr(Tcl$Tool|VarLst) {
+                if {[lsearch -exact $mfjIntrpr::arr(Fmt$Tool|VarLst)\
+                    $Var] == -1} {
+                    if {!$arr(UpdateTcl)} {
+                        set arr(UpdateTcl) true
+                        vputs -i1 $Msg
+                    }
+                    if {$Flg && $STIdx > 0 && $arr(StartIdx) == -1} {
+                        set arr(StartIdx) [expr $STIdx-1]
+                        set Flg false
+                    }
+                    vputs -i2 "Simulation variable '$Var' of '$Tool' removed!"
+                    continue
+                }
+                if {$arr(TclVal|$Var) ne $mfjIntrpr::arr(FmtVal|$Var)} {
+                    if {!$arr(UpdateTcl)} {
+                        set arr(UpdateTcl) true
+                        vputs -i1 $Msg
+                    }
+                    if {$Flg && $STIdx > 0 && $arr(StartIdx) == -1} {
+                        set arr(StartIdx) [expr $STIdx-1]
+                        set Flg false
+                    }
+                    vputs -i2 "Simulation variable '$Var' has a value of\
+                        '$arr(TclVal|$Var)' different from\
+                        '$mfjIntrpr::arr(FmtVal|$Var)'!"
+                }
+            }
+            foreach Var $mfjIntrpr::arr(Fmt$Tool|VarLst) {
+                if {[lsearch -exact $arr(Tcl$Tool|VarLst) $Var] == -1} {
+                    if {!$arr(UpdateTcl)} {
+                        set arr(UpdateTcl) true
+                        vputs -i1 $Msg
+                    }
+                    if {$Flg && $STIdx > 0 && $arr(StartIdx) == -1} {
+                        set arr(StartIdx) [expr $STIdx-1]
+                        set Flg false
+                    }
+                    vputs -i2 "Simulation variable '$Var' of '$Tool' added!"
+                }
+            }
+            incr STIdx
+        }
+
+        if {$arr(UpdateTcl)} {
+            if {$arr(StartIdx) == -1} {
+                set arr(StartIdx) 0
+            }
+            vputs -v2 -i2 "ST starting tool index: '$arr(StartIdx)'"
         } else {
-            set arr(StartIdx) [llength $arr(TclSTIdx)]
+            set arr(StartIdx) [llength $arr(Tcl|STLst)]
+            vputs -v2 -i2 "ST starting tool index: '$arr(StartIdx)'"
             vputs -i1 "'$::SimArr(FVarEnv)' and '$::SimArr(FVarSim)' are\
                 the same as '$::SimArr(FVarFmt)'!"
         }
@@ -594,19 +574,42 @@ proc mfjST::tclvsFmt {} {
     if {$arr(UpdateTcl)} {
 
         # Perform an efficient update of all related variables
-        set arr(StartIdx) $StartIdx
-        set arr(TclSimEnv) $mfjIntrpr::arr(FmtSimEnv)
-        set arr(TclDfltSet) $mfjIntrpr::arr(FmtDfltSet)
-        set arr(TclModTime) $mfjIntrpr::arr(FmtModTime)
-        set arr(TclRegInfo) $mfjIntrpr::arr(FmtRegInfo)
-        set arr(TclSTName) $mfjIntrpr::arr(FmtSTName)
-        set arr(TclSTLbl) $mfjIntrpr::arr(FmtSTLbl)
-        set arr(TclSTIdx) $mfjIntrpr::arr(FmtSTIdx)
-        set arr(TclVarName) $mfjIntrpr::arr(FmtVarName)
-        set arr(TclVarVal) $mfjIntrpr::arr(FmtVarVal)
-        set arr(TclSWBName) $SwbName
-        set arr(TclSWBVal) $SwbVal
-        set arr(TclSWBIdx) $SwbIdx
+        set arr(TclRsvd|VarLst) $mfjIntrpr::arr(FmtRsvd|VarLst)
+        set arr(TclEnv|VarLst) $mfjIntrpr::arr(FmtEnv|VarLst)
+        set arr(Tcl|VarLst) $mfjIntrpr::arr(Fmt|VarLst)
+        foreach Var [concat $arr(TclRsvd|VarLst) $arr(Tcl|VarLst)] {
+            set arr(TclVal|$Var) $mfjIntrpr::arr(FmtVal|$Var)
+            set arr(TclLvl|$Var) $mfjIntrpr::arr(FmtLvl|$Var)
+        }
+        set arr(Tcl|STLst) $mfjIntrpr::arr(Fmt|STLst)
+        set arr(TclST|VarLst) $mfjIntrpr::arr(FmtST|VarLst)
+        set arr(TclWB|STLst) [list]
+        set arr(TclWB|VarLst) [list]
+        set WBFlg true
+        foreach Tool $arr(Tcl|STLst) {
+            set arr(TclLbl|$Tool) $mfjIntrpr::arr(FmtLbl|$Tool)
+            set arr(Tcl$Tool|VarLst) $mfjIntrpr::arr(Fmt$Tool|VarLst)
+            if {$WBFlg} {
+
+                # Skip the rest tools after 'sprocess' for process simulation
+                if {$Tool eq "sprocess" && [string equal -nocase Process\
+                    [lindex $arr(TclVal|SimEnv) 3]]} {
+                    set WBFlg false
+                }
+                lappend arr(TclWB|STLst) $Tool
+                set arr(TclWB$Tool|VarLst) [list]
+                foreach Var $arr(Tcl$Tool|VarLst) {
+
+                    # SWB variables: 1) Node4All is true; 2) Level > 1
+                    if {$arr(TclLvl|$Var) == 1
+                        && [string index $::SimArr(Node4All) 0] ne "!"
+                        || $arr(TclLvl|$Var) > 1} {
+                        lappend arr(TclWB$Tool|VarLst) $Var
+                        lappend arr(TclWB|VarLst) $Var
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -617,81 +620,84 @@ proc mfjST::gtreevsTcl {} {
     variable arr
 
     if {!$arr(UpdateGTree)} {
-        vputs "Comparing 'gtree.dat' and '$::SimArr(FVarSim)'..."
+        vputs "Comparing 'gtree.dat' against '$::SimArr(FVarSim)'..."
+        set Msg "'gtree.dat' is different from '$::SimArr(FVarSim)'!"
         if {$arr(GTreeColMode) ne $::SimArr(ColMode)} {
-            set arr(UpdateGTree) true
-            set Msg "SWB variable column combination '$arr(GTreeColMode)'\
+            if {!$arr(UpdateGTree)} {
+                set arr(UpdateGTree) true
+                vputs -i1 $Msg
+            }
+            vputs -v3 -i2 "SWB variable column combination '$arr(GTreeColMode)'\
                 different from '$::SimArr(ColMode)'!"
-        } elseif {$arr(GTreeSTVer) ne [lindex $arr(TclSimEnv) 1]} {
-            set arr(UpdateGTree) true
-            set Msg "Sentaurus TCAD version '$arr(GTreeSTVer)' different\
-                from '[lindex $arr(TclSimEnv) 1]'!"
-        } elseif {$arr(GTreeNode4All) ne $::SimArr(Node4All)} {
-            set arr(UpdateGTree) true
+        }
+        if {$arr(GTreeSTVer) ne [lindex $arr(TclVal|SimEnv) 1]} {
+            if {!$arr(UpdateGTree)} {
+                set arr(UpdateGTree) true
+                vputs -i1 $Msg
+            }
+            vputs -v3 -i2 "Sentaurus TCAD version '$arr(GTreeSTVer)' different\
+                from '[lindex $arr(TclVal|SimEnv) 1]'!"
+        }
+        if {$arr(GTreeNode4All) ne $::SimArr(Node4All)} {
+            if {!$arr(UpdateGTree)} {
+                set arr(UpdateGTree) true
+                vputs -i1 $Msg
+            }
             set Msg "SWB node arrangement for all variables\
                 '$arr(GTreeNode4All)' different from '$::SimArr(Node4All)'!"
-        } else {
-            if {[llength $arr(GTreeSTLbl)] != [llength $arr(TclSTLbl)]} {
-                set arr(UpdateGTree) true
-                set Msg "SWB tool # '[llength $arr(GTreeSTLbl)]' different\
-                    from '[llength $arr(TclSTLbl)]'!"
-            } else {
-                foreach GLbl $arr(GTreeSTLbl) TLbl $arr(TclSTLbl)\
-                    GName $arr(GTreeSTName) TName $arr(TclSTName)\
-                    GIdx $arr(GTreeSWBIdx) TIdx $arr(TclSWBIdx) {
+        }
 
-                    # Case is sensitive
-                    if {$GLbl ne $TLbl} {
+        # Check SWB tools and variables. Tools should have the same sequence
+        if {$arr(GTr|STLst) ne $arr(TclWB|STLst)} {
+            if {!$arr(UpdateGTree)} {
+                set arr(UpdateGTree) true
+                vputs -i1 $Msg
+            }
+            vputs -v3 -i2 "SWB tools '$arr(GTr|STLst)' different from\
+                '$arr(TclWB|STLst)'!"
+        }
+        foreach Tool $arr(GTr|STLst) {
+            if {$arr(GTrLbl|$Tool) ne $arr(TclLbl|$Tool)} {
+                if {!$arr(UpdateGTree)} {
+                    set arr(UpdateGTree) true
+                    vputs -i1 $Msg
+                }
+                vputs -v3 -i2 "SWB tool label '$arr(GTrLbl|$Tool)' different\
+                    from '$arr(TclLbl|$Tool)'!"
+            }
+
+            # Variables for a tool may have a different sequence
+            foreach Var $arr(GTr$Tool|VarLst) {
+                if {[lsearch -exact $arr(TclWB$Tool|VarLst) $Var] == -1} {
+                    if {!$arr(UpdateGTree)} {
                         set arr(UpdateGTree) true
-                        set Msg "ST tool label '$GLbl' different from '$TLbl'!"
-                        break
+                        vputs -i1 $Msg
                     }
-                    if {$GName ne $TName} {
+                    vputs -v3 -i2 "Simulation variable '$Var' of '$Tool'\
+                        removed!"
+                    continue
+                }
+                if {$arr(GTrVal|$Var) ne $arr(TclVal|$Var)} {
+                    if {!$arr(UpdateGTree)} {
                         set arr(UpdateGTree) true
-                        set Msg "ST tool name '$GName' different from '$TName'!"
-                        break
+                        vputs -i1 $Msg
                     }
-                    if {$GIdx != $TIdx} {
+                    vputs -v3 -i2 "Simulation variable '$Var' has a value of\
+                        '$arr(GTrVal|$Var)' different from '$arr(TclVal|$Var)'!"
+                }
+            }
+            foreach Var $arr(TclWB$Tool|VarLst) {
+                if {[lsearch -exact $arr(GTr$Tool|VarLst) $Var] == -1} {
+                    if {!$arr(UpdateGTree)} {
                         set arr(UpdateGTree) true
-                        set Msg "ST SWB index '$GIdx' different from '$TIdx'!"
-                        break
+                        vputs -i1 $Msg
                     }
+                    vputs -v3 -i2 "Simulation variable '$Var' of '$Tool' added!"
                 }
             }
         }
-
         if {$arr(UpdateGTree)} {
-
-            # Major changes to gtree.dat so re-run is necessary
             set arr(StartIdx) 0
-        } else {
-            if {[llength $arr(GTreeSWBName)] != [llength $arr(TclSWBName)]} {
-                set arr(UpdateGTree) true
-                set arr(StartIdx) 0
-                set Msg "SWB variable # '[llength $arr(GTreeSWBName)]'\
-                    different from '[llength $arr(TclSWBName)]'!"
-            } else {
-                foreach GVar $arr(GTreeSWBName) TVar $arr(TclSWBName)\
-                    GVal $arr(GTreeSWBVal) TVal $arr(TclSWBVal) {
-
-                    # Case is insensitive
-                    if {![string equal -nocase $GVar $TVar]} {
-                        set arr(UpdateGTree) true
-                        set Msg "ST variable '$GVar' different from '$TVar'!"
-                        break
-                    }
-                    if {![string equal -nocase $GVal $TVal]} {
-                        set arr(UpdateGTree) true
-                        set Msg "ST variable '$GVar' has a value of '$GVal'\
-                            different from '$TVal'!"
-                        break
-                    }
-                }
-            }
-        }
-        if {$arr(UpdateGTree)} {
-            vputs -i1 "'gtree.dat' is different from '$::SimArr(FVarSim)'!"
-            vputs -i2 $Msg
             vputs -v2 -i2 "ST starting tool index: '$arr(StartIdx)'"
         } else {
             vputs -i1 "'gtree.dat' is the same as '$::SimArr(FVarSim)'!"
@@ -701,14 +707,20 @@ proc mfjST::gtreevsTcl {} {
     if {$arr(UpdateGTree)} {
 
         # Perform an efficient update of all related variables
-        set arr(GTreeSTVer) [lindex $arr(TclSimEnv) 1]
+        set arr(StartIdx) 0
+        set arr(GTreeSTVer) [lindex $arr(TclVal|SimEnv) 1]
         set arr(GTreeNode4All) $::SimArr(Node4All)
         set arr(GTreeColMode) $::SimArr(ColMode)
-        set arr(GTreeSWBName) $arr(TclSWBName)
-        set arr(GTreeSWBVal) $arr(TclSWBVal)
-        set arr(GTreeSWBIdx) $arr(TclSWBIdx)
-        set arr(GTreeSTLbl) $arr(TclSTLbl)
-        set arr(GTreeSTName) $arr(TclSTName)
+        set arr(GTr|STLst) $arr(TclWB|STLst)
+        set arr(GTr|VarLst) $arr(TclWB|VarLst)
+        foreach Tool $arr(GTr|STLst) {
+            set arr(GTrLbl|$Tool) $arr(TclLbl|$Tool)
+            set arr(GTr$Tool|VarLst) $arr(TclWB$Tool|VarLst)
+            foreach Var $arr(GTr$Tool|VarLst) {
+                set arr(GTrVal|$Var) $arr(TclVal|$Var)
+                set arr(GTrLvl|$Var) $arr(TclLvl|$Var)
+            }
+        }
     }
 }
 
@@ -718,157 +730,92 @@ proc mfjST::gtreevsTcl {} {
 proc mfjST::tclvsGtree {} {
     variable arr
 
+    # Assumption: Changes in Sentaurus workbench are related to workbench
+    # variables.
     if {!$arr(UpdateTcl)} {
-        vputs "Comparing '$::SimArr(FVarSim)' and '$::SimArr(FVarEnv)' against\
-            'gtree.dat'..."
-        if {[lindex $arr(TclSimEnv) 1] ne $arr(GTreeSTVer)} {
-            set arr(UpdateTcl) true
-            set Msg "Sentaurus TCAD version '[lindex $arr(TclSimEnv) 1]'\
-                different from '$arr(GTreeSTVer)'!"
-        }
-        if {!$arr(UpdateTcl)} {
-            if {[llength $arr(TclSTLbl)] != [llength $arr(GTreeSTLbl)]} {
-                set arr(UpdateTcl) true
-                set Msg "SWB tool # '[llength $arr(TclSTLbl)]' different\
-                    from '[llength $arr(GTreeSTLbl)]'!"
-            } else {
-                foreach TLbl $arr(TclSTLbl) GLbl $arr(GTreeSTLbl)\
-                    TName $arr(TclSTName) GName $arr(GTreeSTName)\
-                    TIdx $arr(TclSWBIdx) GIdx $arr(GTreeSWBIdx) {
+        vputs "Comparing '$::SimArr(FVarSim)' against 'gtree.dat'..."
 
-                    # Case is sensitive
-                    if {$TLbl ne $GLbl} {
+        # Check ST Tools and variables. Tools should have the same sequence
+        set Msg "'$::SimArr(FVarSim)' is different from 'gtree.dat'!"
+        if {$arr(TclWB|STLst) ne $arr(GTr|STLst)} {
+            if {!$arr(UpdateTcl)} {
+                set arr(UpdateTcl) true
+                vputs -i1 $Msg
+            }
+            vputs -v3 -i2 "SWB tools '$arr(TclWB|STLst)' different from\
+                '$arr(GTr|STLst)'!"
+        }
+        foreach Tool $arr(TclWB|STLst) {
+            if {$arr(GTrLbl|$Tool) ne $arr(TclLbl|$Tool)} {
+                if {!$arr(UpdateTcl)} {
+                    set arr(UpdateTcl) true
+                    vputs -i1 $Msg
+                }
+                vputs -v3 -i2 "SWB tool label '$arr(TclLbl|$Tool)' different\
+                    from '$arr(GTrLbl|$Tool)'!"
+            }
+
+            # Variables for a tool may have a different sequence
+            foreach Var $arr(TclWB$Tool|VarLst) {
+                if {[lsearch -exact $arr(GTr$Tool|VarLst) $Var] == -1} {
+                    if {!$arr(UpdateTcl)} {
                         set arr(UpdateTcl) true
-                        set Msg "ST tool label '$TLbl' different from '$GLbl'!"
-                        break
+                        vputs -i1 $Msg
                     }
-                    if {$TName ne $GName} {
+                    vputs -v3 -i2 "Simulation variable '$Var' of '$Tool'\
+                        removed!"
+                    continue
+                }
+                if {$arr(GTrVal|$Var) ne $arr(TclVal|$Var)} {
+                    if {!$arr(UpdateTcl)} {
                         set arr(UpdateTcl) true
-                        set Msg "ST tool name '$TName' different from '$GName'!"
-                        break
+                        vputs -i1 $Msg
                     }
-                    if {$TIdx != $GIdx} {
+                    vputs -v3 -i2 "Simulation variable '$Var' has a value of\
+                        '$arr(TclVal|$Var)' different from '$arr(GTrVal|$Var)'!"
+                }
+            }
+            foreach Var $arr(GTr$Tool|VarLst) {
+                if {[lsearch -exact $arr(TclWB$Tool|VarLst) $Var] == -1} {
+                    if {!$arr(UpdateTcl)} {
                         set arr(UpdateTcl) true
-                        set Msg "ST SWB index '$TIdx' different from '$GIdx'!"
-                        break
+                        vputs -i1 $Msg
                     }
+                    vputs -v3 -i2 "Simulation variable '$Var' of '$Tool' added!"
                 }
             }
         }
         if {!$arr(UpdateTcl)} {
-            if {[llength $arr(TclSWBName)] != [llength $arr(GTreeSWBName)]} {
-                set arr(UpdateTcl) true
-                set Msg "SWB variable # '[llength $arr(TclSWBName)]'\
-                    different from '[llength $arr(GTreeSWBName)]'!"
-            } else {
-                foreach TVar $arr(TclSWBName) GVar $arr(GTreeSWBName)\
-                    TVal $arr(TclSWBVal) GVal $arr(GTreeSWBVal) {
-
-                    # Case is insensitive
-                    if {![string equal -nocase $TVar $GVar]} {
-                        set arr(UpdateTcl) true
-                        set Msg "ST variable '$TVar' different from '$GVar'!"
-                        break
-                    }
-                    if {![string equal -nocase $TVal $GVal]} {
-                        set arr(UpdateTcl) true
-                        set Msg "ST variable '$GVar' has a value of '$TVal'\
-                            different from '$GVal'!"
-                        break
-                    }
-                }
-            }
+            vputs -i1 "'$::SimArr(FVarSim)' is the same as 'gtree.dat'!"
         }
-        if {$arr(UpdateTcl)} {
-            vputs -i1 "'$::SimArr(FVarSim)' and '$::SimArr(FVarEnv)' are\
-                different from 'gtree.dat'!"
-            vputs -i2 $Msg
-        } else {
-            vputs -i1 "'$::SimArr(FVarSim)' and '$::SimArr(FVarEnv)' are the\
-                same as 'gtree.dat'!"
-            vputs
-        }
+        vputs
     }
     if {$arr(UpdateTcl)} {
 
         vputs -v3 -i1 "Perform a smart update of Tcl related variables"
-        if {$arr(TclSimEnv) eq ""} {
-            set arr(TclSimEnv) [list Sentaurus $arr(GTreeSTVer)]
-        } else {
-            lset arr(TclSimEnv) 1 $arr(GTreeSTVer)
+        set arr(TclWB|STLst) $arr(GTr|STLst)
+        set VarLst [list]
+        foreach Tool $arr(TclWB|STLst) {
+            set arr(TclLbl|$Tool) $arr(GTrLbl|$Tool)
+            set arr(Tcl$Tool|VarLst) $arr(GTr$Tool|VarLst)
+            set VarLst [concat $VarLst $arr(Tcl$Tool|VarLst)]
+            foreach Var $arr(Tcl$Tool|VarLst) {
+                set arr(TclVal|$Var) $arr(GTrVal|$Var)
+                set arr(TclLvl|$Var) $arr(GTrLvl|$Var)
+            }
         }
-        set arr(TclSWBName) $arr(GTreeSWBName)
-        set arr(TclSWBVal) $arr(GTreeSWBVal)
-        set arr(TclSWBIdx) $arr(GTreeSWBIdx)
-        set arr(TclSTName) $arr(GTreeSTName)
-        set arr(TclSTLbl) $arr(GTreeSTLbl)
-
-        if {[llength $arr(TclSTIdx)] != [llength $arr(TclSWBIdx)]} {
-            set arr(TclVarName) $arr(GTreeSWBName)
-            set arr(TclVarVal) $arr(GTreeSWBVal)
-            set arr(TclSTIdx) $arr(TclSWBIdx)
-        } elseif {[llength $arr(GTreeSWBName)]} {
-
-            # In case SWB variables are present, update arr(TclVarName),
-            # arr(TclVarVal) and arr(TclSTIdx) in two steps
-            # 1: Remove SWB variables from the Tcl variable list
-            set TclVarName $arr(TclVarName)
-            set TclVarVal $arr(TclVarVal)
-            set TclSTIdx $arr(TclSTIdx)
-            foreach Var $arr(GTreeSWBName) Val $arr(GTreeSWBVal) {
-
-                # Extract variable name
-                regexp {^(\w+)(<mfj>)?$} $Var -> Name
-                set Idx [lsearch -regexp $TclVarName (?i)^${Name}(<mfj>)?$]
-                set Idx1 [incr Idx -1]
-                set Idx2 [incr Idx 2]
-                if {$Idx != -1} {
-                    set TclVarName [concat [lrange $TclVarName 0 $Idx1]\
-                        [lrange $TclVarName $Idx2 end]]
-                    set TclVarVal [concat [lrange $TclVarVal 0 $Idx1]\
-                        [lrange $TclVarVal $Idx2 end]]
-                    set Lst [list]
-                    foreach VarIdx $TclSTIdx {
-                        if {$Idx < $VarIdx} {
-                            lappend Lst [incr VarIdx -1]
-                        } else {
-                            lappend Lst $VarIdx
-                        }
-                    }
-                    set TclSTIdx $Lst
+        set Len [llength $arr(TclWB|STLst)]
+        set arr(Tcl|STLst) [concat $arr(TclWB|STLst)\
+            [lrange $arr(Tcl|STLst) $Len end]]
+        foreach Tool [lrange $arr(Tcl|STLst) $Len end] {
+            set Lst [list]
+            foreach Var $arr(Tcl$Tool|VarLst) {
+                if {[lsearch -exact $VarLst $Var] == -1} {
+                    lappend Lst $Var
                 }
             }
-
-            # 2: Append SWB variables to Tcl variables for each tool
-            set arr(TclVarName) [list]
-            set arr(TclVarVal) [list]
-            set Lst [lindex $TclSTIdx 0]
-            set VarIdx 0
-            set SWBIdx 0
-            set VarIdx1 0
-            set SWBIdx1 0
-            foreach VarIdx [lrange $TclSTIdx 1 end]\
-                SWBIdx [lrange $arr(GTreeSWBIdx) 1 end] {
-                set arr(TclVarName) [concat $arr(TclVarName)\
-                    [lrange $TclVarName $VarIdx1 [expr $VarIdx-1]]\
-                    [lrange $arr(GTreeSWBName) $SWBIdx1 [expr $SWBIdx-1]]]
-                set arr(TclVarVal) [concat $arr(TclVarVal)\
-                    [lrange $TclVarVal $VarIdx1 [expr $VarIdx-1]]\
-                    [lrange $arr(GTreeSWBVal) $SWBIdx1 [expr $SWBIdx-1]]]
-                set VarIdx1 $VarIdx
-                set SWBIdx1 $SWBIdx
-                lappend Lst [incr VarIdx $SWBIdx]
-            }
-            set arr(TclVarName) [concat $arr(TclVarName)\
-                [lrange $TclVarName $VarIdx1 end]\
-                [lrange $arr(GTreeSWBName) $SWBIdx1 end]]
-            set arr(TclVarVal) [concat $arr(TclVarVal)\
-                [lrange $TclVarVal $VarIdx1 end]\
-                [lrange $arr(GTreeSWBVal) $SWBIdx1 end]]
-            set arr(TclSTIdx) $Lst
+            set arr(Tcl$Tool|VarLst) $Lst
         }
-        vputs -v3 -i1 "[llength $arr(TclVarName)] simulation variables\
-            updated!\n"
     }
 }
 
@@ -878,71 +825,86 @@ proc mfjST::tclvsGtree {} {
 proc mfjST::arrvsGtree {} {
     variable arr
 
-    vputs "Comparing '::SimArr' against 'gtree.dat'..."
-    if {$::SimArr(ColMode) ne $arr(GTreeColMode)} {
-        set arr(UpdateArr) true
-        set Msg "SWB variable combination '$::SimArr(ColMode)'\
-            different from '$arr(GTreeColMode)'!"
-        set ::SimArr(ColMode) $arr(GTreeColMode)
-    } elseif {$::SimArr(Node4All) ne $arr(GTreeNode4All)} {
-        if {[string index $arr(GTreeNode4All) 0] ne "!"
-            && ($arr(TclVarName) eq ""
-            || [llength $arr(TclVarName)] == [llength $arr(GTreeSWBName)])} {
-            set arr(UpdateArr) true
-        } else {
-            set arr(UpdateArr) true
+    if {!$arr(UpdateArr)} {
+        vputs "Comparing '::SimArr' against 'gtree.dat'..."
+        set Msg "'::SimArr' is different from 'gtree.dat'!"
+        if {$::SimArr(ColMode) ne $arr(GTreeColMode)} {
+            if {!$arr(UpdateArr)} {
+                set arr(UpdateArr) true
+                vputs -i1 $Msg
+            }
+            vputs -v3 -i2 "SWB variable combination '$::SimArr(ColMode)'\
+                different from '$arr(GTreeColMode)'!"
+            set ::SimArr(ColMode) $arr(GTreeColMode)
         }
-        if {$arr(UpdateArr)} {
-            set Msg "SWB node arrangement for all variables\
+        if {$::SimArr(Node4All) ne $arr(GTreeNode4All)} {
+            if {!$arr(UpdateArr)} {
+                set arr(UpdateArr) true
+                vputs -i1 $Msg
+            }
+            vputs -v3 -i2 "SWB node arrangement for all variables\
                 '$::SimArr(Node4All)' different from '$arr(GTreeNode4All)'!"
             set ::SimArr(Node4All) $arr(GTreeNode4All)
         }
-    } else {
 
         # Go through each SWB variable and update the case in ::SimArr(VarName)
-        foreach Elm $arr(GTreeSWBName) {
+        foreach Var $arr(GTr|VarLst) {
 
             # Extract variable name
-            regexp {^(\w+)(<mfj>)?$} $Elm -> Name
-            set Idx [lsearch -regexp $::SimArr(VarName) (?i)^$Name$]
+            set Idx [lsearch -regexp $::SimArr(VarName) (?i)^$Var$]
             if {$Idx == -1} {
 
                 # SWB variable not found
-                set arr(UpdateArr) true
-                lappend ::SimArr(VarName) $Name
-                set Msg "SWB variable '$Name' added in '::Sim(VarName)' of\
+                if {!$arr(UpdateArr)} {
+                    set arr(UpdateArr) true
+                    vputs -i1 $Msg
+                }
+                lappend ::SimArr(VarName) $Var
+                vputs -v3 -i2 "SWB variable '$Var' added in '::SimArr(VarName)'\
                     of '11ctrlsim.tcl'!"
             } else {
 
                 # Check whether the variable names are the same case
-                if {[lindex $::SimArr(VarName) $Idx] ne $Name} {
-                    set arr(UpdateArr) true
-                    lset ::SimArr(VarName) $Idx $Name
-                    set Msg "SWB variable '$Name' updated in\
+                if {[lindex $::SimArr(VarName) $Idx] ne $Var} {
+                    if {!$arr(UpdateArr)} {
+                        set arr(UpdateArr) true
+                        vputs -i1 $Msg
+                    }
+                    lset ::SimArr(VarName) $Idx $Var
+                    vputs -v3 -i2 "SWB variable '$Var' updated in\
                         '::SimArr(VarName)' of '11ctrlsim.tcl'!"
                 }
             }
         }
+        if {!$arr(UpdateArr)} {
+            vputs -i1 "'::SimArr' is the same as 'gtree.dat'!"
+        }
+        vputs
     }
-    if {$arr(UpdateArr)} {
-        vputs -i1 "'::SimArr' is different from 'gtree.dat'!"
-        vputs -i2 $Msg
-    } else {
-        vputs -i1 "'::SimArr' is the same as 'gtree.dat'!"
-    }
-    vputs
 }
 
 # mfjST::batchvsTcl
-    # Compare ::SimArr(FSTBatch) against ::SimArr(FVarEnv), ::SimArr(FVarSim)
-    # and mfjIntrpr::host. Update TclKeyNode and set arr(UpdateBat) to be true
-    # if there is any difference
+    # Compare ::SimArr(FSTBatch) against ::SimArr(FVarEnv), ::SimArr(FVarSim).
+    # Update TclKeyNode and set arr(UpdateBat) to be true if there is any
+    # difference
 proc mfjST::batchvsTcl {} {
     variable arr
 
     # Update arr(TclKeyNode), arr(TclRunNode) and arr(TclCMILst)
-    set arr(TclKeyNode) [buildTree $arr(TclSWBName) $arr(TclSWBVal)\
-        $arr(TclSWBIdx) $::SimArr(ColMode) !NodeTree]
+    set VarName [list]
+    set VarVal [list]
+    set IdxLst [list]
+    set VarIdx 0
+    foreach Tool $arr(TclWB|STLst) {
+        lappend IdxLst $VarIdx
+        foreach Var $arr(TclWB$Tool|VarLst) {
+            lappend VarName $Var
+            lappend VarVal $arr(TclVal|$Var)
+            incr VarIdx
+        }
+    }
+    set arr(TclKeyNode) [buildTree $VarName $VarVal $IdxLst\
+        $::SimArr(ColMode) !NodeTree]
     if {$arr(UpdateTcl)} {
         if {$arr(StartIdx) == 0} {
             set arr(TclRunNode) all
@@ -953,7 +915,7 @@ proc mfjST::batchvsTcl {} {
     } else {
         set arr(TclRunNode) remaining
     }
-    foreach Elm $arr(TclModTime) {
+    foreach Elm $arr(TclVal|mfjModTime) {
         if {[regexp {(\w+)\.[cC]$} [lindex $Elm 0] -> Root]} {
             if {[glob -nocomplain $::SimArr(PMIDir)/$Root.so.*] eq ""} {
                 lappend arr(TclCMILst) [file tail [lindex $Elm 0]]
@@ -961,93 +923,138 @@ proc mfjST::batchvsTcl {} {
         }
     }
     set STROOT [lsearch -inline -regexp [glob -nocomplain -directory\
-        $mfjIntrpr::host(STPath) *] (?i)[lindex $arr(TclSimEnv) 1]$]
+        $mfjIntrpr::arr(Host|STPath) *] (?i)[lindex $arr(TclVal|SimEnv) 1]$]
 
     if {!$arr(UpdateBat)} {
         vputs "Comparing '$::SimArr(FSTBatch)' against\
             '$::SimArr(FVarEnv)', '$::SimArr(FVarSim)' and the host..."
-        if {$arr(BatSTVer) ne [lindex $arr(TclSimEnv) 1]} {
+        set Msg "'$::SimArr(FSTBatch)' is different from '$::SimArr(FVarEnv)'!"
+        if {$arr(BatSTVer) ne [lindex $arr(TclVal|SimEnv) 1]} {
 
             # Sentaurus related variables are case-sensitive
-            set arr(UpdateBat) true
-            set Msg "Sentaurus version '$arr(BatSTVer)' different\
-                from '[lindex $arr(TclSimEnv) 1]'!"
-        } elseif {$arr(BatSTRoot) ne $STROOT} {
-            set arr(UpdateBat) true
-            set Msg "Sentaurus root '$arr(BatSTRoot)' different from '$STROOT'!"
-        } elseif {$arr(BatSTLicn) ne $mfjIntrpr::host(STLicn)} {
-            set arr(UpdateBat) true
-            set Msg "Sentaurus license '$arr(BatSTLicn)' different\
-                from '$mfjIntrpr::host(STLicn)'!"
-        } elseif {$arr(BatSTPDir) ne [pwd]} {
-            set arr(UpdateBat) true
-            set Msg "Sentaurus project directory '$arr(BatSTPDir)' different\
-                from '[pwd]'!"
-        } elseif {$arr(BatRunNode) ne $arr(TclRunNode)} {
-            set arr(UpdateBat) true
-            set Msg "SWB to run nodes '$arr(BatRunNode)' different\
-                from '$arr(TclRunNode)'!"
-        } elseif {$arr(BatCMILst) ne $arr(TclCMILst)} {
-            set arr(UpdateBat) true
-            set Msg "CMI list '$arr(BatCMILst)' different\
-                from '$arr(TclCMILst)'!"
-        } else {
-
-            # SLURM partition or PBS queue is case sensitive
-            if {$arr(BatSched) ne [lindex $arr(TclSimEnv) 4]} {
+            if {!$arr(UpdateBat)} {
                 set arr(UpdateBat) true
-                set Msg "Job scheduler '$arr(BatSched)' different\
-                    from '[lindex $arr(TclSimEnv) 4]'!"
-
+                vputs -i1 $Msg
             }
-            if {$arr(BatSched) ne "Local"} {
-                if {$arr(BatMaxTmHr) != [lindex $arr(TclSimEnv) 5]} {
-                    set arr(UpdateBat) true
-                    set Msg "Maximum walltime '$arr(BatMaxTmHr)' hrs\
-                        different from '[lindex $arr(TclSimEnv) 5]'!"
-                }
-                if {$arr(BatMaxMemGB) != [lindex $arr(TclSimEnv) 6]} {
-                    set arr(UpdateBat) true
-                    set Msg "Maximum memory '$arr(BatMaxMemGB)' GB\
-                        different from '[lindex $arr(TclSimEnv) 6]'!"
-                }
-                if {$arr(BatMaxCPU) != [lindex $arr(TclSimEnv) 7]} {
-                    set arr(UpdateBat) true
-                    set Msg "Maximum CPUs '$arr(BatMaxCPU)'\
-                        different from '[lindex $arr(TclSimEnv) 7]'!"
-                }
-                if {$arr(BatEmail) ne $mfjIntrpr::host(Email)} {
+            vputs -v3 -i2 "Sentaurus version '$arr(BatSTVer)' different\
+                from '[lindex $arr(TclVal|SimEnv) 1]'!"
+        }
+        if {$arr(BatSTRoot) ne $STROOT} {
+            if {!$arr(UpdateBat)} {
+                set arr(UpdateBat) true
+                vputs -i1 $Msg
+            }
+            vputs -v3 -i2 "Sentaurus root '$arr(BatSTRoot)' different\
+                from '$STROOT'!"
+        }
 
-                    # Case sensitive
+        # SLURM partition or PBS queue is case sensitive
+        if {$arr(BatSched) ne [lindex $arr(TclVal|SimEnv) 4]} {
+            if {!$arr(UpdateBat)} {
+                set arr(UpdateBat) true
+                vputs -i1 $Msg
+            }
+            vputs -v3 -i2 "Job scheduler '$arr(BatSched)' different\
+                from '[lindex $arr(TclVal|SimEnv) 4]'!"
+
+        }
+        if {$arr(BatSched) ne "Local"} {
+            if {$arr(BatMaxTmHr) != [lindex $arr(TclVal|SimEnv) 5]} {
+                if {!$arr(UpdateBat)} {
                     set arr(UpdateBat) true
-                    set Msg "Email '$arr(BatEmail)' different\
-                        from '$mfjIntrpr::host(Email)'!"
+                    vputs -i1 $Msg
                 }
+                vputs -v3 -i2 "Maximum walltime '$arr(BatMaxTmHr)' hrs\
+                    different from '[lindex $arr(TclVal|SimEnv) 5]'!"
+            }
+            if {$arr(BatMaxMemGB) != [lindex $arr(TclVal|SimEnv) 6]} {
+                if {!$arr(UpdateBat)} {
+                    set arr(UpdateBat) true
+                    vputs -i1 $Msg
+                }
+                vputs -v3 -i2 "Maximum memory '$arr(BatMaxMemGB)' GB\
+                    different from '[lindex $arr(TclVal|SimEnv) 6]'!"
+            }
+            if {$arr(BatMaxCPU) != [lindex $arr(TclVal|SimEnv) 7]} {
+                if {!$arr(UpdateBat)} {
+                    set arr(UpdateBat) true
+                    vputs -i1 $Msg
+                }
+                vputs -v3 -i2 "Maximum CPUs '$arr(BatMaxCPU)'\
+                    different from '[lindex $arr(TclVal|SimEnv) 7]'!"
             }
         }
-        if {$arr(UpdateBat)} {
-            vputs -i1 "'$::SimArr(FSTBatch)' is different from\
-                '$::SimArr(FVarEnv)' or '$::SimArr(FVarSim)' or the host!"
-            vputs -i2 $Msg
-        } else {
+
+        set Msg "'$::SimArr(FSTBatch)' is different from the host!"
+        if {$arr(BatSTLicn) ne $mfjIntrpr::arr(Host|STLicn)} {
+            if {!$arr(UpdateBat)} {
+                set arr(UpdateBat) true
+                vputs -i1 $Msg
+            }
+            vputs -v3 -i2 "Sentaurus license '$arr(BatSTLicn)' different\
+                from '$mfjIntrpr::arr(Host|STLicn)'!"
+        }
+        if {$arr(BatSTLib) ne $mfjIntrpr::arr(Host|STLib)} {
+            if {!$arr(UpdateBat)} {
+                set arr(UpdateBat) true
+                vputs -i1 $Msg
+            }
+            vputs -v3 -i2 "Sentaurus shared libraries '$arr(BatSTLib)'\
+                different from '$mfjIntrpr::arr(Host|STLib)'!"
+        }
+        if {$arr(BatSched) ne "Local"
+            && $arr(BatEmail) ne $mfjIntrpr::arr(Host|Email)} {
+
+            # Case sensitive
+            set arr(UpdateBat) true
+            set Msg "Email '$arr(BatEmail)' different\
+                from '$mfjIntrpr::arr(Host|Email)'!"
+        }
+        if {$arr(BatSTPDir) ne [pwd]} {
+            if {!$arr(UpdateBat)} {
+                set arr(UpdateBat) true
+                vputs -i1 $Msg
+            }
+            vputs -v3 -i2 "Sentaurus project directory '$arr(BatSTPDir)'\
+                different from '[pwd]'!"
+        }
+
+        set Msg "'$::SimArr(FSTBatch)' is different from '$::SimArr(FVarSim)'!"
+        if {$arr(BatRunNode) ne $arr(TclRunNode)} {
+            if {!$arr(UpdateBat)} {
+                set arr(UpdateBat) true
+                vputs -i1 $Msg
+            }
+            vputs -v3 -i2 "SWB to run nodes '$arr(BatRunNode)' different\
+                from '$arr(TclRunNode)'!"
+        }
+        if {$arr(BatCMILst) ne $arr(TclCMILst)} {
+            if {!$arr(UpdateBat)} {
+                set arr(UpdateBat) true
+                vputs -i1 $Msg
+            }
+            vputs -v3 -i2 "CMI list '$arr(BatCMILst)' different\
+                from '$arr(TclCMILst)'!"
+        }
+        if {!$arr(UpdateBat)} {
             vputs -i1 "'$::SimArr(FSTBatch)' is the same as\
                 '$::SimArr(FVarEnv)', '$::SimArr(FVarSim)' and the host!"
         }
         vputs
     }
     if {$arr(UpdateBat)} {
-        set arr(BatEmail) $mfjIntrpr::host(Email)
-        set arr(BatSTVer) [lindex $arr(TclSimEnv) 1]
-        set arr(BatSched) [lindex $arr(TclSimEnv) 4]
-        set arr(BatMaxTmHr) [lindex $arr(TclSimEnv) 5]
-        set arr(BatMaxMemGB) [lindex $arr(TclSimEnv) 6]
-        set arr(BatMaxCPU) [lindex $arr(TclSimEnv) 7]
+        set arr(BatSTVer) [lindex $arr(TclVal|SimEnv) 1]
+        set arr(BatSched) [lindex $arr(TclVal|SimEnv) 4]
+        set arr(BatMaxTmHr) [lindex $arr(TclVal|SimEnv) 5]
+        set arr(BatMaxMemGB) [lindex $arr(TclVal|SimEnv) 6]
+        set arr(BatMaxCPU) [lindex $arr(TclVal|SimEnv) 7]
         set arr(BatSTRoot) $STROOT
-        set arr(BatSTLicn) $mfjIntrpr::host(STLicn)
+        set arr(BatEmail) $mfjIntrpr::arr(Host|Email)
+        set arr(BatSTLicn) $mfjIntrpr::arr(Host|STLicn)
+        set arr(BatSTLib) $mfjIntrpr::arr(Host|STLib)
+        set arr(BatSTPDir) [pwd]
         set arr(BatRunNode) $arr(TclRunNode)
         set arr(BatCMILst) $arr(TclCMILst)
-        set arr(BatSTLib) $mfjIntrpr::host(STLib)
-        set arr(BatSTPDir) [pwd]
     }
 }
 
@@ -1068,20 +1075,20 @@ proc mfjST::updateTcl {} {
         set Ouf [open $::SimArr(FVarEnv).mfj w]
         vputs -v3 -i1 -n "Calculating the max length of environment variable\
             names... "
-        set VarName {SimEnv DfltSet ModTime RegInfo STName}
-        set MaxLen [calMaxVarLen $VarName]
-        vputs -v3 -c '[incr MaxLen 3]'
+        set MaxLen [calMaxVarLen [concat $arr(TclRsvd|VarLst)\
+            $arr(TclEnv|VarLst)]]
 
         # Add at least one space between a variable and its value
         set MaxLen [expr {int(ceil(($MaxLen+1.)/4.))*4}]
+        vputs -v3 -c '$MaxLen'
         puts $Ouf "$::SimArr(Prefix) $arr(DfltSTHead)\n"
 
         # Output environment variables
-        puts $Ouf [wrapText [format "set %-${MaxLen}s\{%s\}\n" SimEnv\
-            $arr(TclSimEnv)] $Tab]
-        foreach Elm [lrange $VarName 1 end] {
-            puts $Ouf [wrapText [format "set %-${MaxLen}s\{%s\}\n"\
-                mfj$Elm $arr(Tcl$Elm)] $Tab]
+        foreach Tool {Rsvd Env} {
+            foreach Var $arr(Tcl$Tool|VarLst) {
+                puts $Ouf [wrapText [format "set %-${MaxLen}s\{%s\}\n"\
+                    $Var $arr(TclVal|$Var)] $Tab]
+            }
         }
         close $Ouf
         file rename -force $::SimArr(FVarEnv).mfj $::SimArr(FVarEnv)
@@ -1095,55 +1102,52 @@ proc mfjST::updateTcl {} {
         set Ouf [open $::SimArr(FVarSim).mfj w]
         vputs -v3 -i1 -n "Calculating the max length of simulation variable\
             names... "
-        set MaxLen [calMaxVarLen $arr(TclVarName)]
-        vputs -v3 -c '$MaxLen'
+        set MaxLen [calMaxVarLen $arr(TclST|VarLst)]
 
         # Add at least one space between a variable and its value
-        set MaxLen [expr {int(ceil(($MaxLen+1.)/4.))*4}]
+        # Assuming a maximum of 999 values, which consume <=5 characters
+        set MaxLen [expr {int(ceil(($MaxLen+6.)/4.))*4}]
+        vputs -v3 -c '$MaxLen'
 
         # Output simulation variables
         set Ptn [string map {(\\S+) %s} $arr(STDfltID)]
-        set VarIdx 0
         set STIdx 0
-        set STLen [llength $arr(TclSTLbl)]
-        foreach Var $arr(TclVarName) Val $arr(TclVarVal) {
-
-            # In case no variables between tools
-            while {$STIdx < $STLen
-                && [lindex $arr(TclSTIdx) $STIdx] == $VarIdx} {
-                if {$STIdx} {
-                    puts $Ouf "#endif\n"
-                }
-                puts $Ouf [format $Ptn\n [lindex $arr(TclSTLbl) $STIdx]]
-                incr STIdx
-            }
-            puts $Ouf [wrapText [format "set %-${MaxLen}s\{%s\}\n" $Var $Val]\
-                $Tab]
-
-            # Decrease MaxLen with 4 spaces and change it back afterwards
-            if {[regexp ^(\\w+)<mfj>$ $Var -> Tmp]} {
-                incr MaxLen -4
-                puts $Ouf [wrapText [format "#if \"@%s@\" eq \"/0\"" $Tmp] $Tab]
-                puts $Ouf [wrapText [format "set %-${MaxLen}s\{\}" $Tmp]\
-                    ${Tab}$Tab]
-                puts $Ouf [wrapText "#else" $Tab]
-                puts $Ouf [wrapText [format "set %-${MaxLen}s\[string map\
-                    \{*: \\{ :* \\} :: \" \"\} @%s@\]" $Tmp $Tmp] ${Tab}$Tab]
-                puts $Ouf [wrapText "#endif\n" $Tab]
-                incr MaxLen 4
-            }
-            incr VarIdx
-        }
-
-        # In case no variables or the rest tools have no variables
-        while {$STIdx < $STLen && [lindex $arr(TclSTIdx) $STIdx] == $VarIdx} {
+        foreach Tool $arr(Tcl|STLst) {
             if {$STIdx} {
                 puts $Ouf "#endif\n"
             }
-            puts $Ouf [format $Ptn\n [lindex $arr(TclSTLbl) $STIdx]]
+            puts $Ouf [format $Ptn\n $arr(TclLbl|$Tool)]
+            foreach Var $arr(Tcl$Tool|VarLst) {
+                if {$arr(TclLvl|$Var) == 1
+                    && [string index $::SimArr(Node4All) 0] eq "!"} {
+                    puts $Ouf [wrapText [format "set %-${MaxLen}s\{%s\}\n"\
+                        $Var $arr(TclVal|$Var)] $Tab]
+                }
+
+                # SWB variables: 1) Node4All is true; 2) Level > 1
+                if {$arr(TclLvl|$Var) == 1
+                    && [string index $::SimArr(Node4All) 0] ne "!"
+                    || $arr(TclLvl|$Var) > 1} {
+                    puts $Ouf [wrapText [format "set %-${MaxLen}s\{%s\}\n"\
+                        $Var<$arr(TclLvl|$Var)> $arr(TclVal|$Var)] $Tab]
+
+                    # Decrease MaxLen with 4 spaces and revert it afterwards
+                    incr MaxLen -4
+                    puts $Ouf [wrapText [format "#if \"@%s@\" eq \"/0\"" $Var]\
+                        $Tab]
+                    puts $Ouf [wrapText [format "set %-${MaxLen}s\{\}" $Var]\
+                        ${Tab}$Tab]
+                    puts $Ouf [wrapText "#else" $Tab]
+                    puts $Ouf [wrapText [format "set %-${MaxLen}s\[string map\
+                        \{*: \\{ :* \\} :: \" \"\} @%s@\]" $Var $Var]\
+                        ${Tab}$Tab]
+                    puts $Ouf [wrapText "#endif\n" $Tab]
+                    incr MaxLen 4
+                }
+            }
             incr STIdx
         }
-        if {$STLen} {
+        if {[llength $arr(Tcl|STLst)]} {
             puts $Ouf "#endif"
         }
         close $Ouf
@@ -1183,7 +1187,7 @@ proc mfjST::updateArr {} {
 # mfjST::updateGTree
     # If arr(UpdateGTree) is true, update the SWB setting file 'gtree.dat'
     # with arr(GTreeLine0) arr(GTreeColMode) arr(GTreeSTVer) arr(GTreeNode4All)
-    # arr(GTreeSWBName) arr(GTreeSWBVal) arr(GTreeSTLbl) arr(GTreeSTName)
+    # arr(GTreeSWBName) arr(GTreeSWBVal) arr(GTreeSTLbl) arr(GTr|STLst)
 proc mfjST::updateGTree {} {
     variable arr
 
@@ -1215,73 +1219,58 @@ proc mfjST::updateGTree {} {
         vputs -v2 -i1 "Writing [lindex $arr(DfltGTreeID) 1]..."
         puts $Ouf "\n$::SimArr(Prefix) [lindex $arr(DfltGTreeID) 1]"
         set VarIdx 0
-        set STIdx 0
-        set STLen [llength $arr(GTreeSTName)]
         set VarName [list]
         set VarVal [list]
-        foreach Var $arr(GTreeSWBName) Val $arr(GTreeSWBVal) {
-
-            # In case no variables between tools
-            while {$STIdx < $STLen
-                && [lindex $arr(GTreeSWBIdx) $STIdx] == $VarIdx} {
-                set Lbl [lindex $arr(GTreeSTLbl) $STIdx]
-                set Name [lindex $arr(GTreeSTName) $STIdx]
-                puts $Ouf "$Lbl $Name \"\" {}"
-                incr STIdx
-            }
-
-            # swb allowed characters: \w.:+/*-
-            # swb can display illegal characters like [](){}<>
-            # To renounce illegal characters, follow the rules below:
-            # '*:' denotes '{', ':*' denotes '}', '::' denotes ' '
-            # If the variable value is an empty string, replace it with '/0'
-            if {[regexp ^(\\w+)<mfj>$ $Var -> Tmp]} {
-                set Lst [list]
-                foreach Elm $Val {
-                    if {$Elm eq ""} {
-                        lappend Lst /0
-                    } else {
-                        lappend Lst [string map {\{ *: \} :* " " ::} $Elm]
-                    }
-                }
-                puts $Ouf "$Lbl $Tmp \"[llength $Lst]\" \{$Lst\}"
-                lappend VarName $Tmp
-                lappend VarVal $Lst
-            } else {
-                if {$Val eq ""} {
-                    set Val /0
-                } else {
-                    set Val [string map {\{ *: \} :* " " ::} $Val]
-                }
-                puts $Ouf "$Lbl $Var \"1\" \{$Val\}"
+        set IdxLst [list]
+        foreach Tool $arr(GTr|STLst) {
+            set Lbl $arr(GTrLbl|$Tool)
+            puts $Ouf "$Lbl $Tool \"-rel [lindex $arr(TclVal|SimEnv) 1]\" {}"
+            lappend IdxLst $VarIdx
+            foreach Var $arr(GTr$Tool|VarLst) {
                 lappend VarName $Var
-                lappend VarVal $Val
-            }
-            incr VarIdx
-        }
 
-        # In case no variables or the rest tools have no variables
-        while {$STIdx < $STLen
-            && [lindex $arr(GTreeSWBIdx) $STIdx] == $VarIdx} {
-            set Lbl [lindex $arr(GTreeSTLbl) $STIdx]
-            set Name [lindex $arr(GTreeSTName) $STIdx]
-            puts $Ouf "$Lbl $Name \"\" {}"
-            incr STIdx
+                # swb allowed characters: \w.:+/*-
+                # swb can display illegal characters like [](){}<>
+                # To renounce illegal characters, follow the rules below:
+                # '*:' denotes '{', ':*' denotes '}', '::' denotes ' '
+                # If a variable value is an empty string, replace it with '/0'
+                if {$arr(GTrLvl|$Var) > 1} {
+                    set Lst [list]
+                    foreach Elm $arr(GTrVal|$Var) {
+                        if {$Elm eq ""} {
+                            lappend Lst /0
+                        } else {
+                            lappend Lst [string map {\{ *: \} :* " " ::} $Elm]
+                        }
+                    }
+                    lappend VarVal $Lst
+                    puts $Ouf "$Lbl $Var \"$arr(GTrLvl|$Var)\" \{$Lst\}"
+                } else {
+                    if {$arr(GTrVal|$Var) eq ""} {
+                        set Val /0
+                    } else {
+                        set Val [string map {\{ *: \} :* " " ::}\
+                            $arr(GTrVal|$Var)]
+                    }
+                    puts $Ouf "$Lbl $Var \"1\" \{$Val\}"
+                    lappend VarVal $Val
+                }
+                incr VarIdx
+            }
         }
 
         vputs -v2 -i1 "Writing [lindex $arr(DfltGTreeID) 2]..."
         puts $Ouf "$::SimArr(Prefix) [lindex $arr(DfltGTreeID) 2]"
         vputs -v2 -i1 "Writing [lindex $arr(DfltGTreeID) 3]..."
         puts $Ouf "$::SimArr(Prefix) [lindex $arr(DfltGTreeID) 3]"
-        foreach Var $VarName {
+        foreach Var $arr(GTr|VarLst) {
             puts $Ouf "scenario default $Var \"\""
         }
 
         vputs -v2 -i1 "Writing [lindex $arr(DfltGTreeID) 4]..."
         puts $Ouf "$::SimArr(Prefix) [lindex $arr(DfltGTreeID) 4]"
         set mfjProc::arr(Indent1) 2
-        foreach Elm [buildTree $VarName $VarVal $arr(GTreeSWBIdx)\
-            $arr(GTreeColMode)] {
+        foreach Elm [buildTree $VarName $VarVal $IdxLst $arr(GTreeColMode)] {
             puts $Ouf $Elm
         }
         set mfjProc::arr(Indent1) 0
@@ -1436,7 +1425,7 @@ proc mfjST::miscTask {} {
 
         # Remove all old results
         foreach Junk [glob -nocomplain $::SimArr(EtcDir)/n*_*\
-            $::SimArr(OutDir)/n*_*] {
+            $::SimArr(OutDir)/n*_* *_n*_des.plt] {
             file delete $Junk
             vputs -v5 -i2 "'$Junk' deleted"
         }
@@ -1456,22 +1445,22 @@ proc mfjST::miscTask {} {
     }
 
     vputs -i1 "Check command files and disable interactive mode if necessary..."
-    foreach Lbl $arr(TclSTLbl) Name $arr(TclSTName) {
-        set Idx [lsearch -regexp $::SimArr(STTools) ^$Name$]
+    foreach Tool $arr(Tcl|STLst) {
+        set Idx [lsearch -exact $::SimArr(STTools) $Tool]
         set Suf [lindex $::SimArr(STSuffix) $Idx]
-        set CmdFile ${Lbl}$Suf
+        set CmdFile $arr(TclLbl|$Tool)$Suf
         if {![file isfile $CmdFile]} {
             error "command file $CmdFile missing!"
         }
 
         # Check sdevice.par and skip preference file check for 'sdevice'
-        if {$Name eq "sdevice"} {
+        if {$Tool eq "sdevice"} {
             if {![file isfile sdevice.par]} {
                 error "parameter file sdevice.par missing!"
             }
             continue
         }
-        set PrfFile $Lbl[file rootname $Suf].prf
+        set PrfFile $arr(TclLbl|$Tool)[file rootname $Suf].prf
         if {[file isfile $PrfFile]} {
             set Inf [open $PrfFile r]
             set UpdatePrf false
@@ -1495,10 +1484,15 @@ proc mfjST::miscTask {} {
         } else {
             vputs -v5 -i2 "'$PrfFile' not found! Creating..."
             set Ouf [open $PrfFile w]
-            puts $Ouf "set WB_tool($Name,exec_mode) batch"
-            if {$Name eq "sde"} {
-                puts $Ouf "set WB_tool(sde,input,grid,user) 1\nset\
-                    WB_tool(sde,input,boundary,user) 1"
+            puts $Ouf "set WB_tool($Tool,exec_mode) batch"
+            if {$Tool eq "sde"} {
+                puts $Ouf "set WB_tool(sde,input,grid,user) 1"
+                puts $Ouf "set WB_tool(sde,input,boundary,user) 1"
+            } elseif {$Tool eq "sprocess"} {
+                puts $Ouf "set WB_tool(sprocess,parallel,activate) 1"
+            } elseif {$Tool eq "svisual"} {
+                puts $Ouf "set WB_tool(svisual,exec_dependency) strict"
+                puts $Ouf "set WB_tool(svisual,parallel,activate) 1"
             }
             close $Ouf
         }
@@ -1526,9 +1520,9 @@ proc mfjST::updateDOESum {} {
         set Ply 1
         set OldLen 1
         set StrLst [list]
-        foreach Var $arr(TclVarName) Val $arr(TclVarVal) {
-            if {[regexp ^(\\w+)<mfj> $Var -> Lst]} {
-                set ValLen [llength $Val]
+        foreach Var $arr(TclST|VarLst) {
+            if {$arr(TclLvl|$Var) > 1} {
+                set ValLen $arr(TclLvl|$Var)
                 if {[string index $::SimArr(ColMode) 0] ne "!"} {
                     if {$ValLen != $OldLen} {
                         set Ply [expr {$Ply*$ValLen}]
@@ -1537,17 +1531,18 @@ proc mfjST::updateDOESum {} {
                 } else {
                     set Ply [expr {$Ply*$ValLen}]
                 }
+                set Lst $Var
                 for {set i 0} {$i < $MaxLen} {incr i} {
                     set Idx [expr {int($i*$Ply/$MaxLen)%$ValLen}]
                     if {$i == 0 || $Idx != int(($i-1)*$Ply/$MaxLen)%$ValLen} {
-                        lappend Lst [list [lindex $Val $Idx]]
+                        lappend Lst [lindex $arr(TclVal|$Var) $Idx]
                     } else {
                         lappend Lst ""
                     }
                 }
                 lappend StrLst [join $Lst ,]
             } else {
-                set Lst [list $Var $Val]
+                set Lst [list $Var $arr(TclVal|$Var)]
                 for {set i 1} {$i < $MaxLen} {incr i} {
                     lappend Lst ""
                 }
@@ -1565,8 +1560,8 @@ proc mfjST::updateDOESum {} {
         set FVarBrf [file rootname $::SimArr(FVarRaw)]-brief.txt
         vputs -i1 "Copying '$FVarBrf' to '$::SimArr(OutDir)'..."
         file copy -force $FVarBrf $::SimArr(OutDir)
+        vputs
     }
-    vputs
 }
 
 # mfjST::updateStopSWB

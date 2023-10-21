@@ -26,25 +26,25 @@ Note 3: Problem or issue? Email Dr. Fa-Jun MA (mfjamao@yahoo.com) (Thanks!)
 Specification (after semicolon):
    0 Select a simulator: Sentaurus
    1 Choose a simulator_version: L-2016.03
-   2 Enable/disable cylindrical coordinate at Y = 0: (!)Cylindrical
-   3 Optical only? OptOnly | !OptOnly
+   2 Cylindrical coordinate switch at Y = 0: C<ylindrical> | !Cylindrical
+   3 Simulation type: O<ptical> | P<rocess> | Electrical
    4 Job scheduler: Local | PBS | SLURM
-   5 For PBS and SLURM, max_walltime [hr]: 12
-   6 Max_memory [GB]: 100
-   7 Number of CPUs: 4
+   5 For PBS and SLURM, max_walltime (i >= 1) [hr]: 1
+   6 Max_memory (i >= 1) [GB]: 20
+   7 Number of CPUs (i >= 1): 4
 
 <GRAMMAR>{a = Sentaurus | s Sentaurus}
 {a = U-2022.12 | `s E<-2010.12> F<-2011.09> G<-2012.06> H<-2013.03> I<-2013.12>
     J<-2014.09> K<-2015.06> L<-2016.03> M<-2016.12> N<-2017.09> O<-2018.06>
     P<-2019.03> Q<-2019.12> R<-2020.09> S<-2021.06> T<-2022.03> U<-2022.12>}
 {a = !Cylindrical | s C<ylindrical> !Cylindrical}
-{a = !OptOnly | s O<ptOnly> !OptOnly}
+{a = Electrical | s O<ptical> P<rocess> Electrical}
 {a = Local | s P<BS> Local}
 {== v-1 Local & `a | a = 1 | `i & `>= 1}
 {== v-2 Local & `a | a = 20 | `i & `>= 1}
 {== v-3 Local & `a | a = 4 | `i & `>= 1}
 
-<VAR>SimEnv      {Sentaurus T-2022.03 !Cylindrical !OptOnly PBS 1 5 8}
+<VAR>SimEnv      {Sentaurus T-2022.03 !Cylindrical Electrical Local}
 
 <TOOL>ST settings: Tool_label = sde Tool_name = sde
 
@@ -117,25 +117,34 @@ Specifications for regions employing the explicit method:
     45} {naSi 5} {Gas 0.1 44.5} {Gas 1} {Gas 4.5}}
 
 <COMMENT>--- Region and interface fields variable
-Supported constant region fields: B(Boron) P(Phosphorus) Al(Aluminum)
-    x|y(MoleFraction) PD(PhotonDensity) and interface fields (from file)
+Supported constant region fields: Al(Aluminum) As(Arsenic) B(Boron) C Carbon
+    F Fluorine Ge Germanium In Indium N Nitrogen P(Phosphorus) Sb Antimony
+    x|y(MoleFraction) PD(PhotonDensity) and interface fields
+    (from file)
 
 Specification for region fields:
     0 Region: ri
-    1 Region field: B
-    2 Field concentration [cm^-3]: 8e14
+    1 Region field 1: Al | As | B | C | F | Ge | In | N | P | Sb | x | y | PD
+    2 Field concentration (n >= 0) [cm^-3]: 8e14
+    3 Optional dopant activation switch: A<ctive> | !<Active>
+    4 Optional region field 2 ...
 Specification for interface fields:
     0 Interface: ri/j | px11_y11/x12_y12
-    1 Interface field file: 03exp/B40.plx
-    2 Optional field density ratio: 1
-    3 Optional lateral decay factor: 0.8
+    1 Interface field file 1: 03exp/B40.plx
+    2 Optional field density ratio (n > 0): 1
+    3 Optional lateral decay factor (0 <= n <= 1): 0.8
+    4 Optional Interface field file 2 ...
 
 <GRAMMAR>{r | rr | pp}
-{`!a & r v0 & (!= g0 Semiconductor & `a | `s B P Al x y PD) | `f}
-{r v0 & (== v-1 {[xy]} & (`!a & `n & `>= 0 & `<= 1) | == v-1 (B|P|Al|PD)
-    & (`!a & `n & `>= 0) | n v-1 & (a | `s B P Al x y PD))
-    | f v-1 & (a | n & `> 0 | `f) | f v-2 & (a | n & `>= 0 & `<= 1 | `f)
-    | f v-3 & (a | `f)}
+{`!a & r v0 & (!= g0 Semiconductor & `a | `s Al As B C F Ge In N P Sb x y PD)
+    | `f}
+{r v0 & (== v-1 {[xy]} & (`!a & `n & `>= 0 & `<= 1)
+    | == v-1 (Al|As|B|C|F|Ge|In|N|P|Sb|PD) & (`!a & `n & `>= 0)
+    | == v-2 (x|y|PD) & (a | `s Al As B C F Ge In N P Sb x y PD)
+    | == v-2 (Al|As|B|C|F|Ge|In|N|P|Sb) & (a | `s Al As B C F Ge In N P Sb x y
+    PD A<ctive> !<Active>) | == v-3 (Al|As|B|C|F|Ge|In|N|P|Sb) & (a | `s Al As
+    B C F Ge In N P Sb x y PD)) | f v-1 & (a | n & `> 0 | `f)
+    | f v-2 & (a | n & `>= 0 & `<= 1 | `f) | f v-3 & (a | `f)}
 ...
 
 <VAR>FldAttr     {{r2 P 1.56e+15} {r4 B 1.41e+19} {r5 P 1.45e+19}}
@@ -146,29 +155,29 @@ Specify three types of region interfaces - SRH, metal contact and tunnelling
 Specification for a fixed charge density and SRVs for SRH interface:
     0 Region interface: ri/j
     1 Fixed charge density [q/cm2]: 0
-    2 Electron SRV [cm/s]: A positive value like 1e4
-    3 Optional hole SRV [cm/s]: A positive value like 1e4
+    2 Electron SRV (n >= 0) [cm/s]: 1e4
+    3 Optional hole SRV (n >= 0) [cm/s]: 1e4
 Specification for a trap file for SRH interface:
     0 Region interface: ri/j
     1 A trap file with settings for at least one trap: 03exp/IntfTrap.txt
-    2 Optional trap density ratio (apply to multiple traps): 1
-    3 Optional electron capture cross section ratio (multiple traps): 1
-    4 Optional hole capture cross section ratio (multiple traps): 1
+    2 Optional trap density ratio (n > 0, apply to multiple traps): 1
+    3 Optional electron capture cross section ratio (n > 0, multiple traps): 1
+    4 Optional hole capture cross section ratio (n > 0, multiple traps): 1
 Specification for a metal contact:
     0 Region interface: ri/j
     1 Contact name: c[0-9]
     2 Contact type: O<hmic> | E<qOhmic> | S<chottky> | Cu<rrent> | Ch<arge>
     3 Contact value ([V] | [A] | [C]): 0
-    4 Distributed resistance for voltage contact [ohmcm^2]: 0
+    4 Distributed resistance for voltage contact (n >= 0) [ohmcm^2]: 0
     5 MS barrier for voltage contact [eV]: 0.5
-    6 Electron recombination velocity for voltage contact [cm/s]: 1e6
-    7 Hole recombination velocity for voltage contact [cm/s]: 1e6
+    6 Electron recombination velocity (n > 0) for voltage contact [cm/s]: 1e6
+    7 Optional hole recombination velocity (n > 0) for voltage contact [cm/s]: 1e6
 Specification for a tunneling interface:
     0 Region interface: ri/j
     1 Tunnelling attributes: eT | hT | cT | TAT
-    2 Tunnel setting file or trap file: 03exp/TnlSetting.txt | 03exp/TnlTrap.txt
-    3 Length of nonlocal mesh lines [um]: 5e-3
-    4 Permeation or trap density ratio for TAT: 0 | 1
+    2 Tunnel setting file or trap file: 03exp/Tnl.txt | 03exp/TAT.txt
+    3 Length of nonlocal mesh lines (n > 0) [um]: 5e-3
+    4 Permeation (n >= 0) or trap density ratio (n > 0) for TAT: 0 | 1
     5 B2B for WKB calculation or barrier tunneling type for TAT: N<one> | F<ull>
         | S<imple> | U<psideDown>  | e | h | c
 
@@ -197,50 +206,50 @@ Specify four types of optical solver E(External), O(OBAM), T(TMM), R(Raytrace).
 
 Specification for an external optical spectral profile:
     0 Optical window: ri/j | px11_y11/x12_y12
-    1 Optical solver: External
+    1 Optical solver: E<xternal>
     2 Spectral photogeneration file: 02opt/Spectral_OG1D_Upright_170um.plx
 Specification for the optical beam absorption method:
     0 Optical window: ri/j | px11_y11/x12_y12
-    1 Optical solver: OBAM
+    1 Optical solver: O<BAM>
 Specification for the transfer matrix method:
     0 Optical window: ri/j | px11_y11/x12_y12
-    1 Optical solver: TMM
-    2 Refractive index n or material file for TMM bottom medium: 2.3
-    3 Extinction coefficient k for TMM: 0
+    1 Optical solver: T<MM>
+    2 Refractive index n >= 1 or material file for TMM bottom medium: 2.3
+    3 Extinction coefficient k >= 0 for TMM: 0
 Specification for the raytrace solver:
     0 Optical window: ri/j | px11_y11/x12_y12
-    1 Optical solver: Raytrace
-    2 Number of rays: 1000
+    1 Optical solver: R<aytrace>
+    2 Number of rays (i > 0): 1000
     3 Deterministic or MonteCarlo: MonteCarlo | Deterministic
-    4 Minimum fraction of Istop: 1e-4
-    5 Maximum number of interfaces to pass: 80000
+    4 Minimum fraction of Istop (0 < n < 1): 1e-4
+    5 Maximum number of interfaces to pass (i > 0): 80000
 Specification for antireflective coating for the raytrace solver:
     0 Optical window: ri/j
-    1 Optical attribute: ARC
+    1 Optical attribute: A<RC>
     2 Material 1 (from ri to rj)
-    3 Thickness [um]
+    3 Thickness (n > 0) [um]
     4 Material file
     5 Material 2 ...
 Specification for boundary conditions for the raytrace solver:
     0 Optical window: ri/j
-    1 Reflection value or based on Fresnel: n | Fresnel
-    2 Optional diffusive model: Phong | Gaussian | Random
+    1 Reflection value (0 <= n <= 1) or based on Fresnel: n | F<resnel>
+    2 Optional diffusive model: G<aussian> | R<andom> | Phong
     3 Characteristic value for diffusive model
 Specification for a spectrum file for all solvers:
-    0 Optical ID: Spectrum
+    0 Optical ID: Spec<trum>
     1 Spectrum file: 02opt/am15g_IEC60904-3-2008.txt
-    2 Beginning wavelength [um]: 0.3
-    3 Ending wavelength [um]: 1.2
-    4 Step size [um]: 0.01
+    2 Beginning wavelength (n > 0) [um]: 0.3
+    3 Ending wavelength (n > 0) [um]: 1.2
+    4 Step size (n > 0) [um]: 0.01
 Specification for a monochromatic light for all optical solvers:
-    0 Optical ID: Monochromatic
-    1 Wavelength of monochromatic light [um]: 0.3
-    2 Intensity or power of monochromatic light [Wcm^-2]: 1e-3
+    0 Optical ID: Mono<chromatic>
+    1 Wavelength of monochromatic light (n > 0) [um]: 0.3
+    2 Intensity or power of monochromatic light (n > 0) [Wcm^-2]: 1e-3
 Specification for incidence angles and a shading fraction for all solvers:
-    0 Optical ID: Incidence
-    1 Fraction of shading: 0
-    2 Incident angle (Theta): 0
-    3 Incident angle (Phi): 0
+    0 Optical ID: Inci<dence>
+    1 Fraction of shading (0 <= n <= 1): 0
+    2 Incident angle (0 <= n <= 90) (Theta): 0
+    3 Incident angle (0 <= n <= 90) (Phi): 0
 
 <GRAMMAR>{pp | rr | o}
 {== v0 Spectrum & (a = 02opt/am15g_IEC60904-3-2008.txt | `f)
@@ -262,7 +271,7 @@ Specification for incidence angles and a shading fraction for all solvers:
     | == v1 TMM & (n v2 & (a = 0 | `n & `>= 0) | `a)
     | == v1 (External|OBAM) & `a
     | a = MonteCarlo | s D<eterministic> MonteCarlo}
-{== v0 Spectrum & (a = 0.01 | `n & `< v-1) | == v0 {[IM]\w+} & `a
+{== v0 Spectrum & (a = 0.01 | `n & `> 0 & `< v-1) | == v0 {[IM]\w+} & `a
     | == v1 ARC & (`!a & `f) | == v1 Raytrace & (a = 1e-4 | `n & `> 0 & `< 1)
     | `a}
 {== v1 ARC & (a | `m) | == v1 Raytrace & (a = 100000 | `i & `> 0) | `a}
@@ -276,35 +285,129 @@ Specification for incidence angles and a shading fraction for all solvers:
 
 <COMMENT>--- Default attributes variable
 Specification for mesh refinements:
-    0 ID: Mesh
-    1 Maximum element size for region refinement [um]: 10
-    2 Minimum element size for region refinement [um]: 0.05
-    3 Minimum spaces for a region: 8
-    4 Minimum layer thickness for interface refinement [um]: 0.01
-    5 Maximum number of interface layers: 8
-    6 Expansion ratio for interface refinement: 1.5
-    7 Minimum layer size for optical refinement [um]: 0.005
-    8 Expansion ratio for optical refinement: 1.1
+    0 ID: M<esh>
+    1 Maximum element size for region refinement (n > 0) [um]: 10
+    2 Minimum element size for region refinement (n > 0) [um]: 0.05
+    3 Minimum spaces for a region (i > 1): 8
+    4 Minimum layer thickness for interface refinement (n > 0) [um]: 0.01
+    5 Maximum number of interface layers (i > 1): 8
+    6 Expansion ratio for interface refinement (n > 1): 1.5
+    7 Minimum layer size for optical refinement (n > 0) [um]: 0.005
+    8 Expansion ratio for optical refinement (n > 1): 1.1
 Specification for numeric settings:
-    0 ID: Numeric
+    0 ID: N<umeric>
     1 Bit length for a floating-point number: 64 | 80 | 128 | 256
 Specification for other settings:
-    0 ID: Other
-    1 Initial device temperature [°C]: 25
+    0 ID: O<ther>
+    1 Initial device temperature (n >= -273.15) [°C]: 25
 
 <GRAMMAR>d
-{== v0 Mesh && (a = 10 | `n & `> 0) | == v0 Numeric && (a = 64
+{== v0 Mesh & (a = 10 | `n & `> 0) | == v0 Numeric & (a = 64
     | s 80 128 256 64) | a = 25 | `n & `>= -273.15}
-{== v0 Mesh && (a = 0.05 | `n & `> 0) | `a}
-{== v0 Mesh && (a = 8 | `i & `> 1) | `a}
-{== v0 Mesh && (a = 0.001 | `n & `> 0) | `a}
-{== v0 Mesh && (a = 8 | `i & `> 1) | `a}
-{== v0 Mesh && (a = 1.5 | `n & `> 1) | `a}
-{== v0 Mesh && (a = 0.001 | `n & `> 0) | `a}
-{== v0 Mesh && (a = 1.1 | `n & `> 1) | `a}
+{== v0 Mesh & (a = 0.05 | `n & `> 0) | `a}
+{== v0 Mesh & (a = 8 | `i & `> 1) | `a}
+{== v0 Mesh & (a = 0.001 | `n & `> 0) | `a}
+{== v0 Mesh & (a = 8 | `i & `> 1) | `a}
+{== v0 Mesh & (a = 1.5 | `n & `> 1) | `a}
+{== v0 Mesh & (a = 0.001 | `n & `> 0) | `a}
+{== v0 Mesh & (a = 1.1 | `n & `> 1) | `a}
 
 <VAR>DfltAttr    {{Mesh 10 0.05 8 0.001 8 1.5 0.001 1.1} {Numeric 64} {Other
     25}}
+
+<TOOL>ST settings: Tool_label = sprocess Tool_name = sprocess
+
+<COMMENT>--- Process sequences
+Specification for process sequences:
+    0 ID: Cal<ibrate>
+    1 Advanced calibration version: T-2022.03
+    2 User calibration file: sprocess_cal.fps
+Specification for deposition
+    0 ID: Dep<osit>
+    1 Material: Oxide
+    2 Thickness (n > 0) [um]: 0.2
+    3 Deposition type: i<sotropic> | !isotropic
+    4 Mask name: ! | a previous defined mask name
+    5 Field 1: Al | As | B | C | F | Ge | In | N | P | Sb
+    6 Field 1 value (n > 0): 1e19
+    7 Field 2 ...
+Specification for diffusion:
+    0 ID: Dif<fuse>
+    1 Diffusion time/temperature profile: 03exp/Diff/anneal_profile.plx
+    2 Diffusion pressure: torr | Pa | atm
+    3 Diffusion ambient gas 1: Cl2 | H2 | H2O | HCl | N2 | N2O | O2
+    4 Diffusion partial pressure (n > 0): 1
+    5 Diffusion ambient gas 2 ...
+Specification for etch:
+    0 ID: Etc<h>
+    1 Material: Oxide
+    2 Etch thickness (n > 0) [um]: 0.2
+    3 Etch type: i<sotropic> | !isotropic
+    4 Mask name: ! | a previous defined mask name
+Specification for initialization:
+    0 ID: Ini<t>
+    1 Materal: Silicon
+    2 Orientation: 111 | 110 | 100
+    3 Region size: p0_0_0/1_1_1
+    3 Optional field: Al | As | B | C | F | Ge | In | N | P | Sb
+    4 Optional field value (n > 0) [cm^-3]: 1e15
+Specification for implant:
+    0 ID: Imp<lant>
+    1 Implant species: As | B | P
+    2 Energy (n > 0) [keV]: 250
+    3 Dose (n > 0) [cm^-2]: 1e14
+    4 Rotation angle (-360 <= n <= 360) of the wafer in the implanter [°]: -90
+    5 Tilt angle (0 <= n < 90) normal to the substrate [°]: 7
+Specification for photoresist mask:
+    0 ID: Mas<k>
+    1 Mask name: Mask0
+    2 Mask type: positive | !positive
+    3 Mask interface: p0_0/0_1
+Specification for setting fields:
+    0 ID: Sel<ect>
+    1 Field: Interstitial
+    2 Value or Tcl expression: 1e7
+    3 Operation: d<elete> | store
+    4 Optional material: Silicon
+Specification for transform:
+    0 ID: Tra<nsform>
+    1 Operation: flip
+    2 X-coordinate: x10
+Specification for write 1D profile along x:
+    0 ID: Wri<te>
+    1 Position: p0_1
+
+<GRAMMAR>{q}
+{== v0 Calibrate & (a = U-2022.12 | `s E<-2010.12> F<-2011.09> G<-2012.06>
+    H<-2013.03> I<-2013.12> J<-2014.09> K<-2015.06> L<-2016.03> M<-2016.12>
+    N<-2017.09> O<-2018.06> P<-2019.03> Q<-2019.12> R<-2020.09> S<-2021.06>
+    T<-2022.03> U<-2022.12>) | == v0 (Deposit|Etch) & (`!a & `m) | == v0 Diffuse
+    & (`!a & `f) | == v0 Implant & (`!a & `s As B P) | == v0 Init  | == v0 Mask
+    & (`!a & `== {Mask\d} ) | == v0 Write & (`!a & `p) | == v0 Transform & (`!a
+    & s flip)}
+{== v0 Write & `a | == v0 Calibrate & (a | `f) | == v0 (Deposit|Etch) & (`!a & `n
+    & `> 0) | == v0 Diffuse & (a = atm | `s torr Pa atm) | == v0 Implant & (`!a
+    & `n & `> 0) | == v0 Mask & (`!a & `s positive !positive) | == v0 Transform
+    & (a | `x)}
+{== v0 (Calibrate|Transform|Write) & `a | == v0 (Deposit|Etch) & (a = !isotropic
+    | s i<sotropic> !isotropic) | == v0 Diffuse & (a = N2 | `s Cl2 H2 H2O HCl N2
+    N2O O2) | == v0 Implant & (`!a & `n & `> 0) | == v0 Mask & (`!a & `pp)}
+{== v0 (Calibrate|Mask|Transform|Write) & `a | == v0 (Deposit|Etch) & (a = !
+    | == ! | `== {Mask\d} ) | == v0 Diffuse & (a = 1 | `n & `> 0 & `<= 1)
+    | == v0 Implant & (a = -90 | `n & `>= -360 & `<= 360)}
+{== v0 (Calibrate|Etch|Mask|Transform|Write) & `a | == v0 Deposit & (a
+    | == {\w+} ) | == v0 Diffuse & (a | `s Cl2 H2 H2O HCl N2 N2O O2)
+    | == v0 Implant & (a = 7 | `n & `>= 0 & `< 90)}
+{== v0 (Calibrate|Etch|Implant|Mask|Transform|Write) & `a | == v0 Deposit
+    & (e v-1 & `a | `!a & `n & `> 0) | == v0 Diffuse & (e v-1 & `a | `!a & `n
+    & `> 0 & `< 1)}
+{== v0 (Calibrate|Etch|Implant|Mask|Transform|Write) & `a | == v0 Deposit
+    & (n v-1 & (a | == {\w+} ) | e v-1 & `a | `!a & `n & `> 0) | == v0 Diffuse
+    & (n v-1 & (a | `s Cl2 H2 H2O HCl N2 N2O O2)
+    | e v-1 & `a | `!a & `n & `> 0)}
+...
+
+<VAR>ProcSeq     {}
 
 <TOOL>ST settings: Tool_label = sdevice Tool_name = sdevice
 
@@ -329,36 +432,37 @@ Specification for carrier mobility:
     0 Materal or region: ri | mat
     1 Material model parameter file: 01mdb/silicon.par
     2 Individual model: mu
-    3 Doping dependent models or electron mu [cm^2/(Vs)] for constant mu:
-        A<rora> M<asetti> | 1417
-    4 Optional hole mu [cm^2/(Vs)] for constant mu: 470.5
+    3 Doping dependent models or electron mu (n > 0) [cm^2/(Vs)] for constant
+        mu: A<rora> M<asetti> | 1417
+    4 Optional hole mu (n > 0) [cm^2/(Vs)] for constant mu: 470.5
 Specification for Auger recombination (With PMI Auger models, radiative is
     already included unless the photon recycling ratio is unit):
     0 Materal or region: ri | mat
     1 Material model parameter file: 01mdb/silicon.par
     2 Individual model: Aug
-    3 Ceeh [cm^6/s] or PMI models or ! (disable Auger): 3.41e-31
+    3 Ceeh (n > 0) [cm^6/s] or PMI models or ! (disable Auger): 3.41e-31
         | A<ltermatt> R<ichter> N<iewelt> | !
-    4 Optional Cehh [cm^6/s] or optional photon recycling ratio: 1.17e-31 | 0
+    4 Optional Cehh (n > 0) [cm^6/s] or optional photon recycling ratio
+        (0 <= n <= 1): 1.17e-31 | 0
 Specification for radiative recombination:
     0 Materal or region: ri | mat
     1 Material model parameter file: 01mdb/silicon.par
     2 Individual model: Rad
-    3 Radiative recombination coefficient [cm^3/s] or !: 4.73e-15 | !
+    3 Radiative recombination coefficient (n > 0) [cm^3/s] or !: 4.73e-15 | !
 Specification for lifetime values for SRH recombination:
     0 Materal or region: ri | mat
     1 Material model parameter file: 01mdb/silicon.par
     2 Individual model: SRH
-    3 Electron lifetime [s] or !: 1e-3 | !
-    4 Optional hole lifetime [s]: 1e-3
+    3 Electron lifetime (n > 0) [s] or !: 1e-3 | !
+    4 Optional hole lifetime (n > 0) [s]: 1e-3
 Specification for a trap file for SRH recombination:
     0 Materal or region: ri | mat
     1 Material model parameter file: 01mdb/silicon.par
     2 Individual model: Trap
     3 A trap file with settings for at least one trap: 03exp/BulkTrap.txt
-    4 Optional trap density ratio (apply to multiple traps): 1
-    5 Optional electron capture cross section ratio (multiple traps): 1
-    6 Optional hole capture cross section ratio (multiple traps): 1
+    4 Optional trap density ratio (n > 0) (apply to multiple traps): 1
+    5 Optional electron capture cross section ratio (n > 0) (multiple traps): 1
+    6 Optional hole capture cross section ratio (n > 0) (multiple traps): 1
 
 <GRAMMAR>{m | r} {`!a & `f}
 {a | r v0 & (== g0 Insulator & `s EA0 Eg0 DC mt | == g0 Semiconductor
@@ -429,23 +533,23 @@ Specification for setting contact value:
 Specification for changing contact attribute:
     0 Contact name defined in 'IntfAttr' c#: c1
     1 Contact attribute: Voltage | Current | Charge | Frequency
-    2 Beginning frequency (> 0): 1e3
-    3 Ending frequency (> 0): 1e3
-    4 # of logarithmic intervals (>= 1): 1
+    2 Beginning frequency (n > 0): 1e3
+    3 Ending frequency (n > 0): 1e3
+    4 # of logarithmic intervals (i >= 1): 1
 Specification for varying spectrum and monochromatic light intensity:
     0 Illumination type: S<pecScaling> or M<onoScaling>
-    1 Intensity scaling goal: 1
-    2 # of intervals from 1e-4: 10 (on the logarithmic scale)
+    1 Intensity scaling goal (n > 0): 1
+    2 # of intervals from 1e-5 (i >= 1): 10 (on the logarithmic scale)
   >=3 Value for taking snapshots: 0.3
 Specification for varying wavelength:
     0 Variable identifier: W<avelength>
-    1 Wavelength [um] goal: 1.2
-    2 # of intervals: 10 (linear)
+    1 Wavelength (n > 0) [um] goal: 1.2
+    2 # of intervals (i >= 1): 10 (linear)
   >=3 Value for taking snapshots: 0.6
 Specification for varying other variables (sdevice --parameter-names):
     0 Variable format: (Region or interface)/model/parameter(/initial value)
     1 Goal: 1
-    2 # of intervals: 10 (linear)
+    2 # of intervals (i >= 1): 10 (linear)
   >=3 Value for taking snapshots: 0.3
 
 <GRAMMAR>b
@@ -481,13 +585,13 @@ Specification for point extraction during variable varying:
   >=1 Supported field: n
 Specification for other extraction during variable varying:
     0 Window, region, interface: p0_0_0/1_1_1
-    1 A<verage> | I<ntegrate> | M<aximum> | L<east>
+    1 Operation: A<verage> | I<ntegrate> | M<aximum> | L<east>
     2 Supported field: n
   >=3 Optional coordinate printing (CP) for A|M|L or supported field
 Specification for axis aligned cut from snapshots: (Band = "EA EC EV EFe EFh")
     0 Point: p0_250
-    1 # of the front dummy layers: 1
-    2 # of the back dummy layers: 1
+    1 # of the front dummy layers (i >= 0): 1
+    2 # of the back dummy layers (i >= 0): 1
   >=3 Supported field: Band
 Specification for field integration from snapshots:
     0 Region or a window: r1 | p0_0/1_1
@@ -545,13 +649,13 @@ Extract data from 'VarVary', prepare XY plots and make further analysis
 Specification:
     0 A reference to VarVary step to extract data: v#
     1 Optional analysis of extracted data: JV
-    2 Optional Dn [cm-3] for lifetime extraction: 1e15
-    3 Optional JOG [mA/cm2] for iVoc extraction: 44
+    2 Optional Dn (n > 0) [cm-3] for lifetime extraction: 1e15
+    3 Optional JOG (n > 0) [mA/cm2] for iVoc extraction: 38
 
 <GRAMMAR>v
 {a | `s CV JV QE SunsVoc SunsJsc QSSPC RAT}
 {== v-1 QSSPC & (a = 1e15 | `n & `> 0) | `a}
-{== v-2 QSSPC & (a = 44 | `n & `> 0) | `a}
+{== v-2 QSSPC & (a = 38 | `n & `> 0) | `a}
 
 <VAR>PPAttr      {{v2 QE} {v5 JV}}
 

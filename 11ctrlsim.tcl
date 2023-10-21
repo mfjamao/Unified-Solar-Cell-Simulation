@@ -38,11 +38,14 @@ array set SimArr {
     RhsMin {1e-10 1e-12 1e-15 1e-25} Iter {10 12 15 20}
     ModTime "" RegInfo "" RegLvl 0 RegMat "" RegIdx "" DimLen "" MatDB ""
     ConLst "" ConLen "" VarLen ""
-    VarName {SimEnv RegGen FldAttr IntfAttr GopAttr DfltAttr ModPar VarVary GetFld PPAttr}
+    VarName {SimEnv RegGen FldAttr IntfAttr GopAttr DfltAttr ProcSeq ModPar
+        VarVary GetFld PPAttr}
     Prefix "# ---" ESuffix {unsw.edu.au unsw.edu.au}
     BIDLst {{c\d} {(\w+/)?\w+/\w+(/[\deE.+-]+)?} {S\w*} {M\w*} {W\w*}}
     DIDLst {{M\w*} {N\w*} {O\w*}}
     OIDLst {{Spec\w*} {Mono\w*} {Inci\w*}}
+    QIDLst {{Cal\w*} {Dep\w*} {Dif\w*} {Etc\w*} {Imp\w*} {Ini\w*} {Mas\w*}
+        {Sel\w*} {Tra\w*} {Wri\w*}}
     FST .mfj/mfjST.tcl FSTStat .status STHosts {katana tyrion}
     STPaths {/srv/scratch/z3505796/apps/sentaurus
         /share/scratch/z3505796/apps/sentaurus}
@@ -290,8 +293,8 @@ if {$SimArr(0Raw2Fmt)} {
     set mfjProc::arr(Indent2) 0
 
     # Update SimArr(FInfo) if necessary
-    set Lst [list [lindex $mfjIntrpr::arr(FmtSimEnv) 0]\
-        [lindex $mfjIntrpr::arr(FmtSimEnv) 4]]
+    set Lst [list [lindex $mfjIntrpr::arr(FmtVal|SimEnv) 0]\
+        [lindex $mfjIntrpr::arr(FmtVal|SimEnv) 4]]
     if {$InfoLst ne $Lst} {
         set InfoLst $Lst
         exec echo [join $InfoLst |] > $SimArr(FInfo)
@@ -322,9 +325,8 @@ if {$SimArr(1Fmt2Sim)} {
 if {$SimArr(2PreProc) && [lindex $InfoLst 0] eq "Sentaurus"} {
     vputs "Preprocessing with 'Sentaurus Workbench spp'...\n"
     exec true > $SimArr(FPPOut)
-    if {[catch {exec $SimArr(FSTPP) >/dev/stdout\
-        | tee -a $SimArr(FPPOut) $mfjProc::arr(FOut) $mfjProc::arr(FLog)}\
-        ErrMsg]} {
+    if {[catch {exec $SimArr(FSTPP) >/dev/stdout | tee -a $SimArr(FPPOut)\
+        $mfjProc::arr(FOut) $mfjProc::arr(FLog)} ErrMsg]} {
         vputs -c "\nerror: $ErrMsg\n"
         exit 1
     }
