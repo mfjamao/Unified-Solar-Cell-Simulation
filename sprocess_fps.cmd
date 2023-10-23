@@ -3,160 +3,225 @@
 #--- Get Tcl global variables
 #include ".mfj/varSim.tcl"
 
-)!
-
-#setdep @previous@
-#--- Get global Tcl parameters
-!(
-
-foreach var {Dim YMax DfltAttr ProcSeq} {
-    vputs -n -i-3 "
-        set $var \{[regsub -all {\s+} [set $var] " "]\}"
-}
-vputs -n -i-2 "
-    array set SimArr \{[array get SimArr]\}"
-
-)!
-
-CHECKOFF
+# Generate an input script for sprocess
+set ouf [open n@node@_fps.tcl w]
 if {[llength $ProcSeq]} {
-    source $SimArr(FProc)
-    namespace import mfjProc::*
-    set mfjProc::arr(FLog) [file rootname [info script]].mfj
-    set mfjProc::arr(MaxVerb) 1
-    vputs -n -w ""
 
-    regexp -nocase {\{Other\s+([^\}]+)} $DfltAttr -> lst
-    math coord.ucs numThreads= 1
-    SetTemp [lindex $lst 0]<C>
+    # Global settings for sprocess
+    puts $ouf "math coord.ucs numThreads= 1"
+    regexp -nocase {\{Other([^\}]+)} $DfltAttr -> lst
+    puts $ouf "SetTemp [lindex $lst 0]<C>\n"
+
+    # Extract 'calibrate' and set 'init' as the 1st process in 'ProcSeq'
+    set lst [list]
+    set var [list]
+    foreach grp $ProcSeq {
+        if {[lindex $grp 0] eq "calibrate"} {
+            set var $grp
+        } elseif {[lindex $grp 0] eq "init"} {
+            set lst [concat [list $grp] $lst]
+        } else {
+            lappend lst $grp
+        }
+    }
+    set ProcSeq $lst
 
     # Advanced calibration
-    if {![regexp -nocase {\{calibrate\s+([^\}]+)} $ProcSeq -> lst]} {
-        error "no calibration settings for 'ProcSeq'!"
+    if {[llength $var] > 1} {
+        puts $ouf "AdvancedCalibration [lindex [split [lindex $var 1] -] 1]"
+        if {[llength $var] > 2} {
+            puts $ouf "source [lindex $var 2]"
+        }
+        puts -nonewline $ouf \n
     }
-    AdvancedCalibration [lindex [split [lindex $lst 0] -] 1]
-    if {[llength $lst] >= 2} {
-        source [lindex $lst 1]
+
+    if {[lindex $ProcSeq 0 0] ne "init"} {
+        puts $ouf "init tdr= n@previous@_msh"
     }
-    array set arr {B Boron P Phosphorus As Arsenic C Carbon Sb Antimony
-        F Fluorine Ge Germanium In Indium N Nitrogen}
 
-    init tdr= n@previous@_msh
-
-    # Process sequences
+    # Interprete process sequences in 'ProcSeq'
     set idx 0
+    set cnt -1
+    set lst [list]
     foreach grp $ProcSeq {
         switch -- [lindex $grp 0] {
-            calibrate {
-                incr idx
-                continue
-            }
             deposit {
-                set cmd "deposit material= [lindex $grp 1]\
-                    thickness= [lindex $grp 2]<um>"
-                if {[string index [lindex $grp 3] 0] eq "!"} {
-                    append cmd " type= anisotropic"
-                } else {
-                    append cmd " type= isotropic"
-                }
-                if {$Dim > 1 && [lindex $grp 4] ne "!"} {
-                    append cmd " mask= [lindex $grp 4]"
+                set str "deposit material= [lindex $grp 1]\
+                    thickness= [lindex $grp 2]<um> type= [lindex $grp 3]"
+                if {$Dim > 1 && [lindex $grp 4] >= 0
+                    && [lindex $grp 4] <= $cnt} {
+                    append str " mask= \"M[lindex $grp 4]\""
                 }
                 set grp [lrange $grp 5 end]
-                set str ""
+                set var ""
                 while {[llength $grp]} {
-                    if {[regexp {^(B|P|As)$} [lindex $grp 0]]} {
-                        set fld $arr([lindex $grp 0])
-                    } else {
-                        set fld [lindex $grp 0]
+                    if {[regexp {^(Al|As|B|C|F|Ge|In|N|P|Sb)$}\
+                        [lindex $grp 0]]} {
+                        set val [lindex [split\
+                            $mfjProc::tabArr([lindex $grp 0]) |] 0]
                     }
-                    if {$str eq ""} {
-                        append str "$fld= [lindex $grp 1]"
+                    if {$var eq ""} {
+                        append var "$val= [lindex $grp 1]"
                     } else {
-                        append str " $fld= [lindex $grp 1]"
+                        append var " $val= [lindex $grp 1]"
                     }
                     set grp [lrange $grp 2 end]
                 }
-                if {$str ne ""} {
-                    append cmd " fields.values= \{$str\}"
+                if {$var ne ""} {
+                    append str " fields.values= \{$var\}"
                 }
-                vputs $cmd
-                eval $cmd
+                puts $ouf $str
             }
             diffuse {
-                temp_ramp name= ramp$idx read.temp.file= [lindex $grp 1]
-                set unit [lindex $grp 2]
+                puts $ouf "temp_ramp name= temp$idx\
+                    read.temp.file= [lindex $grp 1]"
+                set val [lindex $grp 2]
                 set grp [lrange $grp 3 end]
                 if {[llength $grp] == 2} {
                     if {[string equal -nocase [lindex $grp 0] N2]} {
-                        diffuse temp.ramp= ramp$idx
+                        puts $ouf "diffuse temp.ramp= temp$idx"
                     } else {
-                        diffuse temp.ramp= ramp$idx [lindex $grp 0]\
-                            pressure= [lindex $grp 1]<$unit>
+                        puts $ouf "diffuse temp.ramp= temp$idx [lindex $grp 0]\
+                            pressure= [lindex $grp 1]<$val>"
                     }
                 } else {
-                    set lst [list]
+                    set var [list]
                     while {[llength $grp]} {
-                        lappend lst "[lindex $grp 0]= [lindex $grp 1]<$unit>"
+                        lappend var "[lindex $grp 0]= [lindex $grp 1]<$val>"
                         set grp [lrange $grp 2 end]
                     }
-                    gas_flow name= flow$idx partial.pressure= "$lst"
-                    diffuse temp.ramp= ramp$idx gas.flow= flow$idx
+                    puts $ouf "gas_flow name= flow$idx\
+                        partial.pressure= \"$var\""
+                    puts $ouf "diffuse temp.ramp= temp$idx gas.flow= flow$idx"
                 }
             }
             etch {
-                set cmd "etch material= [lindex $grp 1]\
-                    thickness= [lindex $grp 2]<um>"
-                if {[string index [lindex $grp 3] 0] eq "!"} {
-                    append cmd " anisotropic"
-                } else {
-                    append cmd " isotropic"
+                set str "etch material= [lindex $grp 1]\
+                    thickness= [lindex $grp 2]<um> type= [lindex $grp 3]"
+                if {$Dim > 1 && [lindex $grp 4] >= 0
+                    && [lindex $grp 4] <= $cnt} {
+                    append str " mask= \"M[lindex $grp 4]\""
                 }
-                if {[lindex $grp 4] ne "!"} {
-                    append cmd " mask= [lindex $grp 4]"
-                }
-                vputs "# $cmd"
-                $cmd
+                puts $ouf $str
             }
            implant {
-                implant species= $arr([lindex $grp 1])\
-                    energy= [lindex $grp 2]<keV> dose= [lindex $grp 3]\
-                    rotation= [lindex $grp 4] tilt=[lindex $grp 5]
+                set str "implant species= $arr([lindex $grp 1])\
+                    energy= [lindex $grp 2]<keV> dose= [lindex $grp 3]"
+                if {[llength $grp] >= 5} {
+                    append str " rotation= [lindex $grp 4]"
+                }
+                if {[llength $grp] >= 6} {
+                    append str " tilt=[lindex $grp 5]"
+                }
+                puts $ouf $str
+            }
+            init {
+                set var [string map {p \{ _ " " / "\} \{"} [lindex $grp 2]]\}
+                set val [lindex $var 1 0]
+                puts $ouf "line x loc= 0.0 Spa= 0.001 tag= top"
+                if {$val > 0.05} {
+                    puts $ouf "line x loc= 0.05 Spa= 0.005"
+                }
+                if {$val > 1} {
+                    puts $ouf "line x loc= 1.0 Spa= 0.05"
+                }
+                puts $ouf "line x loc= $val Spa= 0.05 tag= bot"
+                if {$Dim > 1} {
+                    set val [lindex $var 1 1]
+                    puts $ouf "line y loc= 0.0 Spa= 0.001 tag= left"
+                    if {$val > 0.05} {
+                        puts $ouf "line y loc= 0.05 Spa= 0.005"
+                    }
+                    if {$val > 1} {
+                        puts $ouf "line y loc= 1.0 Spa= 0.05"
+                    }
+                    puts $ouf "line y loc= $val Spa= 0.05 tag= right"
+                }
+                if {$Dim == 3} {
+                    set val [lindex $var 1 2]
+                    puts $ouf "line z loc= 0.0 Spa= 0.001 tag= far"
+                    if {$val > 0.05} {
+                        puts $ouf "line z loc= 0.05 Spa= 0.005"
+                    }
+                    if {$val > 1} {
+                        puts $ouf "line z loc= 1.0 Spa= 0.05"
+                    }
+                    puts $ouf "line z loc= $val Spa= 0.05 tag= near"
+                }
+                if {$Dim == 1} {
+                    puts $ouf "region [lindex $grp 1] xlo= top xhi= bot"
+                } elseif {$Dim == 2} {
+                    puts $ouf "region [lindex $grp 1] xlo= top xhi= bot\
+                        ylo= left yhi= right"
+                } else {
+                    puts $ouf "region [lindex $grp 1] xlo= top xhi= bot\
+                        ylo= left yhi= right zlo= far zhi= near"
+                }
+                set str init
+                if {[llength $grp] > 3} {
+                    append str " wafer.orient= [lindex $grp 3]"
+                } else {
+                    append str " wafer.orient= 100"
+                }
+                if {[llength $grp] == 6} {
+                    set val [lindex [split\
+                        $mfjProc::tabArr([lindex $grp 4]) |] 0]
+                    append str " field= $val concentration= [lindex $grp 5]"
+                }
+                puts $ouf $str
             }
             mask {
-                set lst [string map {p \{ _ " " / "\} \{"} [lindex $grp 3]]\}
-                if {$Dim == 1} {
-                    incr idx
-                    continue
-                } elseif {$Dim == 2} {
-                    set str "left= [lindex $lst 0 1] right= [lindex $lst 1 1]"
+                if {[lindex $grp 3] eq "clear"} {
+                    puts $ouf "mask clear"
+                    set cnt -1
                 } else {
-                    set str "left= [lindex $lst 0 1] right= [lindex $lst 1 1]\
-                        front= [lindex $lst 0 2] back= [lindex $lst 1 2]"
+                    set str "mask name= [incr cnt] [lindex $grp 2]"
+                    set var [string map {p \{ _ " " / "\} \{"}\
+                        [lindex $grp 1]]\}
+                    if {$Dim == 1} {
+                        incr idx
+                        continue
+                    } elseif {$Dim == 2} {
+                        append str " left= [lindex $var 0 1]\
+                            right= [lindex $var 1 1]"
+                    } else {
+                        append str " left= [lindex $var 0 1]\
+                            right= [lindex $var 1 1] front= [lindex $var 0 2]\
+                            back= [lindex $var 1 2]"
+                    }
+                    puts $ouf $str
                 }
-                if {[string index [lindex $grp 2] 0] eq "!"} {
-                    set type negative
-                } else {
-                    set type positive
-                }
-                mask name= [lindex $grp 1] $type $str
             }
-            save {
-                set lst [split [string range [lindex $grp 1] 1 end] _]
-                if {$Dim == 1} {
-                    WritePlx $SimArr(OutDir)/n@node@_p${idx}_1DCut.plx\
-                        y= [expr $YMax*0.5]
-                } elseif {$Dim == 2} {
-                    WritePlx $SimArr(OutDir)/n@node@_p${idx}_1DCut.plx\
-                        y= [lindex $lst 1]
+            select {
+                set str "select name= [lindex $grp 1] z= [lindex $grp 2]"
+                if {[llength $grp] > 3} {
+                    append str " [lindex $grp 3]"
                 } else {
-                    WritePlx $SimArr(OutDir)/n@node@_p${idx}_1DCut.plx\
-                        y= [lindex $lst 1] z= [lindex $lst 2]
+                    append str " store"
                 }
+                if {[llength $grp] > 4} {
+                    append str " [lindex $grp 4]"
+                } else {
+                    append str " Silicon"
+                }
+                puts $ouf $str
             }
             transform {
-                transform [lindex $grp 1]\
-                    location= [string range [lindex $grp 2] 1 end]
+                puts $ouf "transform [lindex $grp 1]\
+                    location= [string range [lindex $grp 2] 1 end]"
+            }
+            write {
+                set var [split [string range [lindex $grp 1] 1 end] _]
+                set str "WritePlx $SimArr(OutDir)/n@node@_p${idx}_1DCut.plx"
+                if {$Dim == 1} {
+                    append str " y= [expr $YMax*0.5]"
+                } elseif {$Dim == 2} {
+                    append str " y= [lindex $var 1]"
+                } else {
+                    append str " y= [lindex $var 1] z= [lindex $var 2]"
+                }
+                puts $ouf $str
+                lappend lst [lindex $str 1]
             }
             default {
                 error "unknown process '$grp'!"
@@ -164,14 +229,22 @@ if {[llength $ProcSeq]} {
         }
         incr idx
     }
+    puts $ouf "struct tdr= n@node@ Gas\n"
 
-    struct tdr= n@node@ Gas
-
-    vputs "Convert .plx files from process simulaton to .CSV files..."
-    foreach elm [glob -nocomplain -d $SimArr(OutDir) n@node@*.plx] {
-        vputs -i1 "$elm -> [file rootname $elm].csv"
-        plx2CSV $elm
+    # Convert .plx files from process simulaton to .CSV files
+    if {[llength $lst]} {
+        puts $ouf "source $SimArr(FProc)"
+    }
+    foreach elm $lst {
+        puts $ouf "mfjProc::plx2CSV $elm"
     }
 } else {
-    file copy -force n@previous@_msh.tdr n@node@_fps.tdr
+    puts $ouf "file copy -force n@previous@_msh.tdr n@node@_fps.tdr"
 }
+close $ouf
+
+)!
+
+#setdep @previous@
+CHECKOFF
+source n@node@_fps.tcl

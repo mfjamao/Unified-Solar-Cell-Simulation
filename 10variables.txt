@@ -318,6 +318,10 @@ Specification for other settings:
 <TOOL>ST settings: Tool_label = sprocess Tool_name = sprocess
 
 <COMMENT>--- Process sequences
+The deposit and etch processes can make use a mask and actions are performed
+    outside of the mask unless the mask is negative. A mask is indexed from
+    0 and reset after a clear operation
+
 Specification for process sequences:
     0 ID: Cal<ibrate>
     1 Advanced calibration version: T-2022.03
@@ -326,8 +330,8 @@ Specification for deposition
     0 ID: Dep<osit>
     1 Material: Oxide
     2 Thickness (n > 0) [um]: 0.2
-    3 Deposition type: i<sotropic> | !isotropic
-    4 Mask name: ! | a previous defined mask name
+    3 Deposition type: i<sotropic> | anisotropic
+    4 Mask ID (negative integer means no mask): nonnegative integer
     5 Field 1: Al | As | B | C | F | Ge | In | N | P | Sb
     6 Field 1 value (n > 0): 1e19
     7 Field 2 ...
@@ -342,15 +346,8 @@ Specification for etch:
     0 ID: Etc<h>
     1 Material: Oxide
     2 Etch thickness (n > 0) [um]: 0.2
-    3 Etch type: i<sotropic> | !isotropic
-    4 Mask name: ! | a previous defined mask name
-Specification for initialization:
-    0 ID: Ini<t>
-    1 Materal: Silicon
-    2 Orientation: 111 | 110 | 100
-    3 Region size: p0_0_0/1_1_1
-    3 Optional field: Al | As | B | C | F | Ge | In | N | P | Sb
-    4 Optional field value (n > 0) [cm^-3]: 1e15
+    3 Etch type: i<sotropic> | anisotropic
+    4 Mask ID (negative integer means no mask): nonnegative integer
 Specification for implant:
     0 ID: Imp<lant>
     1 Implant species: As | B | P
@@ -358,18 +355,25 @@ Specification for implant:
     3 Dose (n > 0) [cm^-2]: 1e14
     4 Rotation angle (-360 <= n <= 360) of the wafer in the implanter [°]: -90
     5 Tilt angle (0 <= n < 90) normal to the substrate [°]: 7
+Specification for initialization:
+    0 ID: Ini<t>
+    1 Materal: Silicon
+    2 Region size: p0_0_0/1_1_1
+    3 Optional orientation: 111 | 110 | 100
+    4 Optional field: Al | As | B | C | F | Ge | In | N | P | Sb
+    5 Optional field value (n > 0) [cm^-3]: 1e15
 Specification for photoresist mask:
     0 ID: Mas<k>
-    1 Mask name: Mask0
-    2 Mask type: positive | !positive
-    3 Mask interface: p0_0/0_1
+    1 Mask interface: p0_0/0_1
+    2 Mask type: n<egative> | positive
+    3 Mask operation: c<lear> | !clear
 Specification for setting fields:
     0 ID: Sel<ect>
-    1 Field: Interstitial
+    1 Field: Int | Vac
     2 Value or Tcl expression: 1e7
-    3 Operation: d<elete> | store
+    3 Optional operation: d<elete> | store
     4 Optional material: Silicon
-Specification for transform:
+Specification for structure transformation:
     0 ID: Tra<nsform>
     1 Operation: flip
     2 X-coordinate: x10
@@ -381,30 +385,50 @@ Specification for write 1D profile along x:
 {== v0 Calibrate & (a = U-2022.12 | `s E<-2010.12> F<-2011.09> G<-2012.06>
     H<-2013.03> I<-2013.12> J<-2014.09> K<-2015.06> L<-2016.03> M<-2016.12>
     N<-2017.09> O<-2018.06> P<-2019.03> Q<-2019.12> R<-2020.09> S<-2021.06>
-    T<-2022.03> U<-2022.12>) | == v0 (Deposit|Etch) & (`!a & `m) | == v0 Diffuse
-    & (`!a & `f) | == v0 Implant & (`!a & `s As B P) | == v0 Init  | == v0 Mask
-    & (`!a & `== {Mask\d} ) | == v0 Write & (`!a & `p) | == v0 Transform & (`!a
-    & s flip)}
-{== v0 Write & `a | == v0 Calibrate & (a | `f) | == v0 (Deposit|Etch) & (`!a & `n
-    & `> 0) | == v0 Diffuse & (a = atm | `s torr Pa atm) | == v0 Implant & (`!a
-    & `n & `> 0) | == v0 Mask & (`!a & `s positive !positive) | == v0 Transform
-    & (a | `x)}
-{== v0 (Calibrate|Transform|Write) & `a | == v0 (Deposit|Etch) & (a = !isotropic
-    | s i<sotropic> !isotropic) | == v0 Diffuse & (a = N2 | `s Cl2 H2 H2O HCl N2
-    N2O O2) | == v0 Implant & (`!a & `n & `> 0) | == v0 Mask & (`!a & `pp)}
-{== v0 (Calibrate|Mask|Transform|Write) & `a | == v0 (Deposit|Etch) & (a = !
-    | == ! | `== {Mask\d} ) | == v0 Diffuse & (a = 1 | `n & `> 0 & `<= 1)
-    | == v0 Implant & (a = -90 | `n & `>= -360 & `<= 360)}
-{== v0 (Calibrate|Etch|Mask|Transform|Write) & `a | == v0 Deposit & (a
-    | == {\w+} ) | == v0 Diffuse & (a | `s Cl2 H2 H2O HCl N2 N2O O2)
-    | == v0 Implant & (a = 7 | `n & `>= 0 & `< 90)}
-{== v0 (Calibrate|Etch|Implant|Mask|Transform|Write) & `a | == v0 Deposit
-    & (e v-1 & `a | `!a & `n & `> 0) | == v0 Diffuse & (e v-1 & `a | `!a & `n
-    & `> 0 & `< 1)}
-{== v0 (Calibrate|Etch|Implant|Mask|Transform|Write) & `a | == v0 Deposit
-    & (n v-1 & (a | == {\w+} ) | e v-1 & `a | `!a & `n & `> 0) | == v0 Diffuse
-    & (n v-1 & (a | `s Cl2 H2 H2O HCl N2 N2O O2)
-    | e v-1 & `a | `!a & `n & `> 0)}
+    T<-2022.03> U<-2022.12>)
+    | == v0 (Deposit|Etch) & (`!a & `m)
+    | == v0 Diffuse & (`!a & `f)
+    | == v0 Implant & (`!a & `s As B P)
+    | == v0 Init & (`!a & `m)
+    | == v0 Mask & (`!a & `pp)
+    | == v0 Select & (`!a & `s Int Vac)
+    | == v0 Transform & (`!a & s flip)
+    | == v0 Write & (`!a & `p)}
+{== v0 Write & `a | == v0 Calibrate & (a | `f)
+    | == v0 (Deposit|Etch) & (`!a & `n & `> 0)
+    | == v0 Diffuse & (a = atm | s torr Pa atm)
+    | == v0 Implant & (`!a & `n & `> 0)
+    | == v0 Init & (`!a & `pp)
+    | == v0 Mask & (a = positive | s n<egative> positive)
+    | == v0 Select & (`!a & `n & `> 0)
+    | == v0 Transform & (a | `x)}
+{== v0 (Calibrate|Transform|Write) & `a
+    | == v0 Deposit & (a = anisotropic | s i<sotropic> anisotropic)
+    | == v0 Etch & (a = anisotropic | s i<sotropic> anisotropic)
+    | == v0 Diffuse & (a = N2 | s Cl2 H2 H2O HCl N2O O2 N2)
+    | == v0 Implant & (`!a & `n & `> 0)
+    | == v0 Init & (a = 100 | s 111 110 100)
+    | == v0 Mask & (a | s c<lear> !clear)
+    | == v0 Select & (a = store | s d<elete> store)}
+{== v0 (Calibrate|Mask|Transform|Write) & `a
+    | == v0 (Deposit|Etch) & (a = -1 | `i)
+    | == v0 Diffuse & (a = 1 | `n & `> 0 & `<= 1)
+    | == v0 Implant & (a = -90 | `n & `>= -360 & `<= 360)
+    | == v0 Init & (a | `s Al As B C F Ge In N P Sb)
+    | == v0 Select & (a = Silicon | `m)}
+{== v0 (Calibrate|Etch|Mask|Select|Transform|Write) & `a
+    | == v0 Deposit & (a | `s Al As B C F Ge In N P Sb)
+    | == v0 Diffuse & (a | `s Cl2 H2 H2O HCl N2 N2O O2)
+    | == v0 Implant & (a = 7 | `n & `>= 0 & `< 90)
+    | == v0 Init & (e v-1 & `a | `!a & `n & `> 0)}
+{== v0 (Calibrate|Etch|Implant|Init|Mask|Select|Transform|Write) & `a
+    | == v0 Deposit & (e v-1 & `a | `!a & `n & `> 0)
+    | == v0 Diffuse & (e v-1 & `a | `!a & `n & `> 0 & `< 1)}
+{== v0 (Calibrate|Etch|Implant|Init|Mask|Select|Transform|Write) & `a
+    | == v0 Deposit & (n v-1 & (a | `s Al As B C F Ge In N P Sb)
+        | e v-1 & `a | `!a & `n & `> 0)
+    | == v0 Diffuse & (n v-1 & (a | `s Cl2 H2 H2O HCl N2 N2O O2)
+        | e v-1 & `a | `!a & `n & `> 0)}
 ...
 
 <VAR>ProcSeq     {}

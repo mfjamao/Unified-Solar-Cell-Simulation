@@ -149,9 +149,9 @@ foreach grp $FldAttr {
                 set elm [lindex $grp 0]
             } elseif {[lindex $grp 0] eq "Active"} {
                 lset elm 0 [lindex $elm 0]ActiveConcentration
+                lappend elm Active
             } elseif {[lindex $grp 0] eq "!Active"} {
-
-                # Do nothing
+                lappend elm !Active
             } else {
                 set elm [lindex [split\
                     $mfjProc::tabArr([lindex $grp 0]) |] 0]
@@ -169,6 +169,7 @@ foreach grp $FldAttr {
 
             # Dopants are default to be active
             lset elm 0 [lindex $elm 0]ActiveConcentration
+            lappend elm Active
         }
         lappend lst $elm
     }
@@ -868,7 +869,8 @@ vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
                             (begin
                                 (mfj:display (make-string 8 #\space)
                                     "Region field: '" Name "'\n")
-                                (apply sdedr:define-constant-profile Name FLst)
+                                (sdedr:define-constant-profile Name (car FLst)
+                                    (cadr FLst))
                                 (sdedr:define-constant-profile-region Name Name
                                     Reg)
                             )

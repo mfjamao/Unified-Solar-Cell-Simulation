@@ -1738,14 +1738,20 @@ proc mfjProc::groupValues {VarName VarVal GrpID LvlIdx LvlLen} {
                             Imp {
                                 set Val implant
                             }
+                            Ini {
+                                set Val init
+                            }
                             Mas {
                                 set Val mask
                             }
-                            Sav {
-                                set Val save
+                            Sel {
+                                set Val select
                             }
                             Tra {
                                 set Val transform
+                            }
+                            Wri {
+                                set Val write
                             }
                             default {
                                 error "unknown group ID '$Val'!"
