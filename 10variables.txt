@@ -22,14 +22,14 @@ Note 2: Case insensitiveness do NOT apply to grammar rules. Only savvy users
     are supposed to modify grammar rules.
 Note 3: Problem or issue? Email Dr. Fa-Jun MA (mfjamao@yahoo.com) (Thanks!)
 
-<COMMENT>--- Simulation environment variable
+<COMMENT>Simulation environment variable
 Specification (after semicolon):
    0 Select a simulator: Sentaurus
    1 Choose a simulator_version: L-2016.03
    2 Cylindrical coordinate switch at Y = 0: C<ylindrical> | !Cylindrical
    3 Simulation type: O<ptical> | P<rocess> | Electrical
    4 Job scheduler: Local | PBS | SLURM
-   5 For PBS and SLURM, max_walltime (i >= 1) [hr]: 1
+   5 For PBS and SLURM, max walltime (i >= 1) [hr]: 1
    6 Max_memory (i >= 1) [GB]: 20
    7 Number of CPUs (i >= 1): 4
 
@@ -44,11 +44,11 @@ Specification (after semicolon):
 {== v-2 Local & `a | a = 20 | `i & `>= 1}
 {== v-3 Local & `a | a = 4 | `i & `>= 1}
 
-<VAR>SimEnv      {Sentaurus T-2022.03 !Cylindrical Electrical Local}
+<VAR>SimEnv     {Sentaurus T-2022.03 !Cylindrical Electrical PBS 1 5 8}
 
-<TOOL>ST settings: Tool_label = sde Tool_name = sde
+<SENTAURUS>Tool_label = sde Tool_name = sde
 
-<COMMENT>--- Region generation variable
+<COMMENT>Region generation variable
 Follow the Cartesian coordinate system setting:
     X top -> bottom, Y left -> right, Z far -> near
 
@@ -90,12 +90,12 @@ Specifications for regions employing the implicit method:
 Specifications for regions employing the explicit method:
     Block (2D/3D) specify its diagonal vertices: mat Block Keep px1_y1/x2_y2
     Vertices (2D polygon) specify its vertices (>= 3): mat V K px1_y1 px2_y2 ...
-    Ellipse (2D/3D) specify its center to its major radius followed by an
+    Ellipse (2D/3D) specify its centre to its major radius followed by an
         optional MinR/MaxR: mat Ellipse Keep px1_y1/x2_y2 [MinR/MaxR]
-    Cone (3D) specify its base center to its top center/vertex followed by the
+    Cone (3D) specify its base centre to its top centre/vertex followed by the
         major base radius and optional top radius and MinR/MaxR:
         mat Cone Keep px1_y1_z1/x2_y2_z2 BaseR [TopR MinR/MaxR]
-    Pyramid (3D) specify its base center to its top center/vertex followed by
+    Pyramid (3D) specify its base centre to its top centre/vertex followed by
         the major base radius and optional top radius, sides and MinR/MaxR:
         mat Pyramid Keep px1_y1_z1/x2_y2_z2 BaseR [TopR NSides MinR/MaxR]
 
@@ -113,10 +113,10 @@ Specifications for regions employing the explicit method:
     | == v1 Pyramid & (a = 1 | `n & `> 0 & `<= 1) | a | `p}
 {(n v1 | != v1 Vertices) & `a | a | `p} ...
 
-<VAR>RegGen      {{iaSi 0.006 50} {Silicon 165 50} {iaSi 0.006 50} {paSi 0.02
-    45} {naSi 5} {Gas 0.1 44.5} {Gas 1} {Gas 4.5}}
+<VAR>RegGen     {{iaSi 0.006 50} {Silicon 165 50} {iaSi 0.006 50} {paSi 0.02 45}
+    {naSi 5} {Gas 0.1 44.5} {Gas 1} {Gas 4.5}}
 
-<COMMENT>--- Region and interface fields variable
+<COMMENT>Region and interface fields variable
 Supported constant region fields: Al(Aluminum) As(Arsenic) B(Boron) C Carbon
     F Fluorine Ge Germanium In Indium N Nitrogen P(Phosphorus) Sb Antimony
     x|y(MoleFraction) PD(PhotonDensity) and interface fields
@@ -147,9 +147,9 @@ Specification for interface fields:
     | f v-2 & (a | n & `>= 0 & `<= 1 | `f) | f v-3 & (a | `f)}
 ...
 
-<VAR>FldAttr     {{r2 P 1.56e+15} {r4 B 1.41e+19} {r5 P 1.45e+19}}
+<VAR>FldAttr    {{r2 P 1.56e+15} {r4 B 1.41e+19} {r5 P 1.45e+19}}
 
-<COMMENT>--- Interface attributes variable
+<COMMENT>Interface attributes variable
 Specify three types of region interfaces - SRH, metal contact and tunnelling
 
 Specification for a fixed charge density and SRVs for SRH interface:
@@ -178,7 +178,7 @@ Specification for a tunneling interface:
     2 Tunnel setting file or trap file: 03exp/Tnl.txt | 03exp/TAT.txt
     3 Length of nonlocal mesh lines (n > 0) [um]: 5e-3
     4 Permeation (n >= 0) or trap density ratio (n > 0) for TAT: 0 | 1
-    5 B2B for WKB calculation or barrier tunneling type for TAT: N<one> | F<ull>
+    5 B2B for WKB calculation or barrier tunnelling type for TAT: N<one> | F<ull>
         | S<imple> | U<psideDown>  | e | h | c
 
 <GRAMMAR>rr
@@ -195,12 +195,12 @@ Specification for a tunneling interface:
 {(n v1 | f v1 | == v2 {C\w+} ) & `a | == v1 {c\d} & (a = 1e7 | `n & `> 0) | a}
 {(n v1 | f v1 | == v2 {C\w+} ) & `a | == v1 {c\d} & (a | `n & `> 0) | a}
 
-<VAR>IntfAttr    {{r4/6 c0 Ohmic 0 0 0 1e7} {r5/8 c1 Ohmic 0 0 0 1e7} {r0/1
-    1e+12 100000} {r4/7 0 10000000} {r5/7 0 10000000} {r1/2 0 190} {r3/2 0 190}}
+<VAR>IntfAttr   {{r4/6 c0 Ohmic 0 0 0 1e7} {r5/8 c1 Ohmic 0 0 0 1e7} {r0/1 1e+12
+    100000} {r4/7 0 10000000} {r5/7 0 10000000} {r1/2 0 190} {r3/2 0 190}}
     {{r4/6 c0 Ohmic 0 0 0 1e7} {r5/8 c1 Ohmic 0 0 0 1e7} {r0/1 0 0} {r4/7 0
     10000000} {r5/7 0 10000000} {r1/2 0 190} {r3/2 0 190}}
 
-<COMMENT>--- Optical generation attributes variable
+<COMMENT>Optical generation attributes variable
 Specify four types of optical solver E(External), O(OBAM), T(TMM), R(Raytrace).
     For Raytrace, ARCs and BC(boundary condition)s need to be specified.
 
@@ -279,11 +279,11 @@ Specification for incidence angles and a shading fraction for all solvers:
     | `a}
 ...
 
-<VAR>GopAttr     {{r0/1 External 02opt/HJT_165um_a-Si-i_6nm_Spectral.plx}
+<VAR>GopAttr    {{r0/1 External 02opt/HJT_165um_a-Si-i_6nm_Spectral.plx}
     {Spectrum 02opt/AM1.5g_IEC60904-3_2008.txt 0.3 1.2 0.01} {Monochromatic 0.3
     0.001}}
 
-<COMMENT>--- Default attributes variable
+<COMMENT>Default attributes variable
 Specification for mesh refinements:
     0 ID: M<esh>
     1 Maximum element size for region refinement (n > 0) [um]: 10
@@ -312,12 +312,11 @@ Specification for other settings:
 {== v0 Mesh & (a = 0.001 | `n & `> 0) | `a}
 {== v0 Mesh & (a = 1.1 | `n & `> 1) | `a}
 
-<VAR>DfltAttr    {{Mesh 10 0.05 8 0.001 8 1.5 0.001 1.1} {Numeric 64} {Other
-    25}}
+<VAR>DfltAttr   {{Mesh 10 0.05 8 0.001 8 1.5 0.001 1.1} {Numeric 64} {Other 25}}
 
-<TOOL>ST settings: Tool_label = sprocess Tool_name = sprocess
+<SENTAURUS>Tool_label = sprocess Tool_name = sprocess
 
-<COMMENT>--- Process sequences
+<COMMENT>Process sequences
 The deposit and etch processes can make use a mask and actions are performed
     outside of the mask unless the mask is negative. A mask is indexed from
     0 and reset after a clear operation
@@ -325,36 +324,36 @@ The deposit and etch processes can make use a mask and actions are performed
 Specification for process sequences:
     0 ID: Cal<ibrate>
     1 Advanced calibration version: T-2022.03
-    2 User calibration file: sprocess_cal.fps
+    2 Optional user calibration file: sprocess_cal.fps
 Specification for deposition
     0 ID: Dep<osit>
     1 Material: Oxide
     2 Thickness (n > 0) [um]: 0.2
-    3 Deposition type: i<sotropic> | anisotropic
-    4 Mask ID (negative integer means no mask): nonnegative integer
-    5 Field 1: Al | As | B | C | F | Ge | In | N | P | Sb
-    6 Field 1 value (n > 0): 1e19
-    7 Field 2 ...
+    3 Optional deposition type: i<sotropic> | anisotropic
+    4 Optional mask ID (negative integer means no mask): nonnegative integer
+    5 Optional field 1: Al | As | B | C | F | Ge | In | N | P | Sb
+    6 Optional field 1 value (n > 0): 1e19
+    7 Optional field 2 ...
 Specification for diffusion:
     0 ID: Dif<fuse>
     1 Diffusion time/temperature profile: 03exp/Diff/anneal_profile.plx
-    2 Diffusion pressure: torr | Pa | atm
-    3 Diffusion ambient gas 1: Cl2 | H2 | H2O | HCl | N2 | N2O | O2
-    4 Diffusion partial pressure (n > 0): 1
-    5 Diffusion ambient gas 2 ...
+    2 Optional diffusion pressure: torr | Pa | atm
+    3 Optional diffusion ambient gas 1: Cl2 | H2 | H2O | HCl | N2O | O2 | N2
+    4 Optional diffusion partial pressure (n > 0): 1
+    5 Optional diffusion ambient gas 2 ...
 Specification for etch:
     0 ID: Etc<h>
     1 Material: Oxide
     2 Etch thickness (n > 0) [um]: 0.2
-    3 Etch type: i<sotropic> | anisotropic
-    4 Mask ID (negative integer means no mask): nonnegative integer
+    3 Optional etch type: i<sotropic> | anisotropic
+    4 Optional mask ID (negative integer means no mask): nonnegative integer
 Specification for implant:
     0 ID: Imp<lant>
     1 Implant species: As | B | P
     2 Energy (n > 0) [keV]: 250
     3 Dose (n > 0) [cm^-2]: 1e14
-    4 Rotation angle (-360 <= n <= 360) of the wafer in the implanter [°]: -90
-    5 Tilt angle (0 <= n < 90) normal to the substrate [°]: 7
+    4 Optional rotation angle (-360 <= n <= 360) of the substrate [°]: -90
+    5 Optional tilt angle (0 <= n < 90) normal to the substrate [°]: 7
 Specification for initialization:
     0 ID: Ini<t>
     1 Materal: Silicon
@@ -365,8 +364,8 @@ Specification for initialization:
 Specification for photoresist mask:
     0 ID: Mas<k>
     1 Mask interface: p0_0/0_1
-    2 Mask type: n<egative> | positive
-    3 Mask operation: c<lear> | !clear
+    2 Optional mask type: n<egative> | positive
+    3 Optional mask operation: c<lear> | !clear
 Specification for setting fields:
     0 ID: Sel<ect>
     1 Field: Int | Vac
@@ -431,11 +430,11 @@ Specification for write 1D profile along x:
         | e v-1 & `a | `!a & `n & `> 0)}
 ...
 
-<VAR>ProcSeq     {}
+<VAR>ProcSeq    {}
 
-<TOOL>ST settings: Tool_label = sdevice Tool_name = sdevice
+<SENTAURUS>Tool_label = sdevice Tool_name = sdevice
 
-<COMMENT>--- Models and parameters variable
+<COMMENT>Models and parameters variable
 The default models for a semiconductor region: constant mobility, no bandgap
     narrowing, no Auger, no radiative with only SRH recombination enabled.
 The default models for a silicon region: Philips unified mobility, Schenk BGN,
@@ -444,7 +443,7 @@ The grammar rules are quite challenging to set for models and parameters. It's
     necessary to write them clearly for easy maintenance.
 
 Specifications for models and parameters for regions:
-    0 Materal or region: ri | mat
+    0 Material or region: ri | mat
     1 Material model parameter file: 01mdb/silicon.par
     2 Individual model: EA0 | Eg0 | NC300 | NV300 | DC | mt | mu | BGN
         | Aug | Rad | tau | Trap
@@ -453,7 +452,7 @@ Specifications for models and parameters for regions:
         J<ainRoulston>, S<lotboom>, T<ableBGN>
     4 Same as index 4
 Specification for carrier mobility:
-    0 Materal or region: ri | mat
+    0 Material or region: ri | mat
     1 Material model parameter file: 01mdb/silicon.par
     2 Individual model: mu
     3 Doping dependent models or electron mu (n > 0) [cm^2/(Vs)] for constant
@@ -461,7 +460,7 @@ Specification for carrier mobility:
     4 Optional hole mu (n > 0) [cm^2/(Vs)] for constant mu: 470.5
 Specification for Auger recombination (With PMI Auger models, radiative is
     already included unless the photon recycling ratio is unit):
-    0 Materal or region: ri | mat
+    0 Material or region: ri | mat
     1 Material model parameter file: 01mdb/silicon.par
     2 Individual model: Aug
     3 Ceeh (n > 0) [cm^6/s] or PMI models or ! (disable Auger): 3.41e-31
@@ -469,18 +468,18 @@ Specification for Auger recombination (With PMI Auger models, radiative is
     4 Optional Cehh (n > 0) [cm^6/s] or optional photon recycling ratio
         (0 <= n <= 1): 1.17e-31 | 0
 Specification for radiative recombination:
-    0 Materal or region: ri | mat
+    0 Material or region: ri | mat
     1 Material model parameter file: 01mdb/silicon.par
     2 Individual model: Rad
     3 Radiative recombination coefficient (n > 0) [cm^3/s] or !: 4.73e-15 | !
 Specification for lifetime values for SRH recombination:
-    0 Materal or region: ri | mat
+    0 Material or region: ri | mat
     1 Material model parameter file: 01mdb/silicon.par
     2 Individual model: SRH
     3 Electron lifetime (n > 0) [s] or !: 1e-3 | !
     4 Optional hole lifetime (n > 0) [s]: 1e-3
 Specification for a trap file for SRH recombination:
-    0 Materal or region: ri | mat
+    0 Material or region: ri | mat
     1 Material model parameter file: 01mdb/silicon.par
     2 Individual model: Trap
     3 A trap file with settings for at least one trap: 03exp/BulkTrap.txt
@@ -535,19 +534,18 @@ Specification for a trap file for SRH recombination:
     | == v-5 Trap & (a | `s EA0 Eg0 NC300 NV300 DC mt mu BGN SRH Aug Rad)}
 ...
 
-<VAR>ModPar      {{r2 01mdb/Si_298.15K_2022Green.par SRH 0.0088 Aug Niewelt
-    0.55} {r1 01mdb/a-Si-i_2015Ling.par Trap
-    03exp/Traps/Bulk_a-Si-i_2015Ling.txt SRH !} {r3 01mdb/a-Si-i_2015Ling.par
-    Trap 03exp/Traps/Bulk_a-Si-i_2015Ling.txt SRH !} {r4
-    01mdb/a-Si-p_2015Ling.par Trap 03exp/Traps/Bulk_a-Si-p_2015Ling.txt SRH !}
-    {r5 01mdb/a-Si-n_2015Ling.par Trap 03exp/Traps/Bulk_a-Si-n_2015Ling.txt SRH
-    !}}
+<VAR>ModPar     {{r2 01mdb/Si_298.15K_2022Green.par SRH 0.0088 Aug Niewelt 0.55}
+    {r1 01mdb/a-Si-i_2015Ling.par Trap 03exp/Traps/Bulk_a-Si-i_2015Ling.txt SRH
+    !} {r3 01mdb/a-Si-i_2015Ling.par Trap 03exp/Traps/Bulk_a-Si-i_2015Ling.txt
+    SRH !} {r4 01mdb/a-Si-p_2015Ling.par Trap
+    03exp/Traps/Bulk_a-Si-p_2015Ling.txt SRH !} {r5 01mdb/a-Si-n_2015Ling.par
+    Trap 03exp/Traps/Bulk_a-Si-n_2015Ling.txt SRH !}}
 
-<COMMENT>--- Variable vary settings
+<COMMENT>Variable vary settings
 Specify the following variables for varying - c# contact property (IntfAttr),
     SpecScaling spectrum intensity scaling, MonoScaling monochromatic light
     intensity scaling, Wavelength, etc. By varying one or more variables to
-    mimic typical chacterization like DJV, LJV, QE, Suns-Voc, QSSPC, CV, etc.
+    mimic typical characterization like DJV, LJV, QE, Suns-Voc, QSSPC, CV, etc.
 
 Specification for setting contact value:
     0 Contact name defined in 'IntfAttr' c#: c1
@@ -586,23 +584,23 @@ Specification for varying other variables (sdevice --parameter-names):
 {== v1 {[CFV]\w+} & `a | a | `n & `< v1}
 ...
 
-<VAR>VarVary     {{SpecScaling 0.3 0} {MonoScaling 1 1} {Wavelength 1.2 90}
+<VAR>VarVary    {{SpecScaling 0.3 0} {MonoScaling 1 1} {Wavelength 1.2 90}
     {MonoScaling 0 0} {SpecScaling 1 0} {c0 0.8 160}}
 
-<COMMENT>--- Extract field during variable varying and from snapshots
+<COMMENT>Extract field during variable varying and from snapshots
 Specify a point pX_Y_Z [um] for extracting 1D structural fields from saved
-snapshots from top to bottom. Y or Z cut is performed to get 1D fields.
+    snapshots from top to bottom. Y or Z cut is performed to get 1D fields.
 Supported fields: (Dn = excess minority carrier density)
-n(eDensity) p(hDensity) UA(AugerRecombination) UB(RadiativeRecombination)
-US(SRHRecombination) UP(PMIRecombination) UD(eGapStatesRecombination)
-Gop(OpticalGeneration) Eg(BandGap) BGN(BandgapNarrowing) ni(IntrinsicDensity)
-EA(ElectronAffinity) EC(ConductionBandEnergy) EV(ValenceBandEnergy)
-EFe(eQuasiFermiEnergy) EFh(hQuasiFermiEnergy) NA(AcceptorConcentration)
-ND(DonorConcentration) PD(AbsorbedPhotonDensity)
-x(xMoleFraction) Eg_eff(EffectiveBandGap) ni_eff(EffectiveIntrinsicDensity)
-V(ElectrostaticPotential) q(SpaceCharge) UT(TotalRecombination)
-eBT(eBarrierTunneling) hBT(hBarrierTunneling) eQt(eTrappedCharge)
-hQt(hTrappedCharge) E(Abs(ElectricField-V)) mue(eMobility) muh(hMobility)
+    n(eDensity) p(hDensity) UA(AugerRecombination) UB(RadiativeRecombination)
+    US(SRHRecombination) UP(PMIRecombination) UD(eGapStatesRecombination)
+    Gop(OpticalGeneration) Eg(BandGap) BGN(BandgapNarrowing)
+    ni(IntrinsicDensity) EA(ElectronAffinity) EC(ConductionBandEnergy)
+    EV(ValenceBandEnergy) EFe(eQuasiFermiEnergy) EFh(hQuasiFermiEnergy)
+    NA(AcceptorConcentration) ND(DonorConcentration) PD(AbsorbedPhotonDensity)
+    x(xMoleFraction) Eg_eff(EffectiveBandGap) ni_eff(EffectiveIntrinsicDensity)
+    V(ElectrostaticPotential) q(SpaceCharge) UT(TotalRecombination)
+    eBT(eBarrierTunneling) hBT(hBarrierTunneling) eQt(eTrappedCharge)
+    hQt(hTrappedCharge) E(Abs(ElectricField-V)) mue(eMobility) muh(hMobility)
 
 Specification for point extraction during variable varying:
     0 Point: p0_0_0
@@ -663,11 +661,11 @@ Specification for field integration from snapshots:
     mue muh}
 ...
 
-<VAR>GetFld      {{p5_0/160_50 Average Dn} {p0_20 1 2 Band} {p0_48 1 2 Band}}
+<VAR>GetFld     {{p5_0/160_50 Average Dn} {p0_20 1 2 Band} {p0_48 1 2 Band}}
 
-<TOOL>ST settings: Tool_label = svisual Tool_name = svisual
+<SENTAURUS>Tool_label = svisual Tool_name = svisual
 
-<COMMENT>--- Data extraction and analysis for variable varying 'VarVary'
+<COMMENT>Data extraction and analysis for variable varying 'VarVary'
 Extract data from 'VarVary', prepare XY plots and make further analysis
 
 Specification:
@@ -681,8 +679,8 @@ Specification:
 {== v-1 QSSPC & (a = 1e15 | `n & `> 0) | `a}
 {== v-2 QSSPC & (a = 38 | `n & `> 0) | `a}
 
-<VAR>PPAttr      {{v2 QE} {v5 JV}}
+<VAR>PPAttr     {{v2 QE} {v5 JV}}
 
-<TAIL>--- No variables afterwards
+<TAIL>No variables afterwards
 Put down any notes
 

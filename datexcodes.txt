@@ -154,8 +154,18 @@ Materials {
         group= Semiconductor
         color= #a6d6d6, #b36b6b
     }
+    SnO2 {
+        label= "SnO2"
+        group= Semiconductor
+        color= #a6d6d6, #b36b6b
+    }
     ETL {
         label= "ETL"
+        group= Semiconductor
+        color= #a6d6d6, #b36b6b
+    }
+    NiOx {
+        label= "NiOx"
         group= Semiconductor
         color= #a6d6d6, #b36b6b
     }
@@ -169,8 +179,13 @@ Materials {
         group= Semiconductor
         color= #a6d6d6, #b36b6b
     }
-    CH3NH3PbI3 {
-        label= "CH3NH3PbI3"
+    MAPbBr3 {
+        label= "MAPbBr3"
+        group= Semiconductor
+        color= #a6d6d6, #b36b6b
+    }
+    MAPbI3 {
+        label= "MAPbI3"
         group= Semiconductor
         color= #a6d6d6, #b36b6b
     }

@@ -1,25 +1,28 @@
 # A collaborative framework for unifying multidimensional solar cell simulations
-Typical solar cell simulations follow the same procedures, which can be well
-    delineated by several variables. This project is designed to verify these
-    variable values and pass the formatted results to Sentaurus TCAD, where a
-    2/3D homo-/hetero-/single-/multi-junction solar cell is established and
-    typical optical and electrical behaviours are investigated by ramping
-    contact properties, illumination settings, etc.
-Once all the files are downloaded to a linux server, open '11ctrlsim.tcl'
-    with any text editor and update the settings for 'STHosts', 'STPaths',
-    'STLicns' and 'STLib' according to your own configuration of Sentaurus.
-    Save and make '11ctrlsim.tcl' executable.
+Typical simulations of 2/3D homo-/hetero-/single-/multi-junction solar cells
+    follow the similar procedures. These procedures can be well delineated by
+    eleven variables to easily carry out process, optical and electrical
+    simulations. This project is designed to first verify these variable values
+    based on ammendable grammar rules and then pass the formatted variables to
+    commercial simulators to perform various simulations like ramping up contact
+    properties, illumination settings, etc. Currently only Sentaurus TCAD is
+    supported.
+
+Once all the files are uploaded to a linux server, open '11ctrlsim.tcl'
+    with any text editor and update the settings for 'ST|Hosts', 'ST|Paths',
+    and 'ST|Licns' according to your own set up of Sentaurus TCAD.
+    Save and make sure '11ctrlsim.tcl' is executable.
 
 # Design of experiments (DOE) using WinSCP
 1. Login to a server hosting the desired simulator and find 10variables.txt
-2. Open that text file and edit variable values following the comments
-3. Add desired comments and save this text file to finalize DOE
-4. Right click 11ctrlsim.tcl and select execute to start batch running
+2. Edit variable values following the comments within the text file
+3. Add desired comments and save the text file to finalize DOE
+4. Right click 11ctrlsim.tcl and select 'execute' to start batch running
 5. Check 11ctrlsim.out or job scheduler output file for job progress
 6. Execute 11ctrlsim.tcl again to stop the running batch if necessary
-7. Download numbered results under 06out directory for further analysis
+7. Download numbered results under 06out directory for data analysis
 8. Execute 12savetpl.tcl to save key files in 07tpl for future reference
-9. Execute 13loadtpl.tcl to load key files back from a specified template
+9. Execute 13loadtpl.tcl to load key files back from a specified .tgz file
 
 Note 1: A variable takes a list (anything enclosed by braces. Braces can be
     omitted for a one-element list) as its value. Assigning lists to a
@@ -27,14 +30,13 @@ Note 1: A variable takes a list (anything enclosed by braces. Braces can be
     Multiple lists: 1 {2 3} {4 5 6} {7 8 9 10} ...
 Note 2: Case insensitiveness do NOT apply to grammar rules. Only savvy users
     are supposed to modify grammar rules.
-Note 3: Problem or issue? Email Dr. Fa-Jun MA (mfjamao@yahoo.com) (Thanks!)
+Note 3: Problem or issue? Please email Dr. Fa-Jun MA (mfjamao@yahoo.com)
 
-# Essential files for the codes and Sentaurus working properly
+# Essential files for the codes and Sentaurus TCAD working properly
 .mfj/mfjGrm.tcl
 .mfj/mfjIntrpr.tcl
 .mfj/mfjProc.tcl
 .mfj/mfjST.tcl
-.mfj/swb2var.tcl
 10variables.txt
 11ctrlsim.tcl
 12savetpl.tcl
@@ -43,6 +45,7 @@ gtooldb.tcl
 datexcodes.txt
 Molefraction.txt
 sde_dvs.cmd
+sprocess_fps.cmd
 sdevice_des.cmd
 sdevice.par
 svisual_vis.tcl
@@ -53,6 +56,8 @@ Material, spectra and experimental files are also required if appeared in
     02opt/ and 03exp/, respectively.
 
 # Version history
+2.2     04/01/2024
+    Enhancement: Process simulations are supported like diffusion, implantation
 2.1     04/03/2023
     Enhancement: The majority of planned features are finally implemented.
         Optical simulation: OBAM, TMM, Raytracing

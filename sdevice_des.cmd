@@ -1,7 +1,7 @@
 !(
 
 #--- Get Tcl global variables
-#include ".mfj/varSim.tcl"
+#include "varSim.tcl"
 
 # Check 'VarVary' for optical requirement
 set VarVary [str2List "" $VarVary]
@@ -1294,7 +1294,8 @@ if {[lindex $SimEnv 3] ne "Optical"} {
                     }
                 }
             } else {
-                if {[lindex $grp 0 0] eq "Silicon"} {
+                if {[lindex $grp 0 0] eq "Silicon"
+                    || [lindex $grp 0 0] eq "PolySilicon"} {
                     lappend val pmi_Aug_Niewelt
                 }
             }
@@ -1552,9 +1553,9 @@ Math {
     !(
 
     vputs -n -i-1 "
-        TrapDLN= [lindex $mfjDfltSet 6]
+        TrapDLN= $SimArr(TrapDLN)
         Traps (Damping= 100) * Default: 10
-        Number_of_Threads= [lindex $mfjDfltSet end-4]
+        Number_of_Threads= $SimArr(NThread)
         StackSize= 20000000 * Set stacksze as 20 MB
 
         * Increase the value of Digits. Possible values are Digits=15 for
@@ -1564,14 +1565,14 @@ Math {
         * Slightly increase Iterations, for example, from 15 to 20."
 
     regexp {\{Numeric\s+([^\}]+)} $DfltAttr -> lst
-    set idx [lsearch [lindex $mfjDfltSet end-3] [lindex $lst 0]]
+    set idx [lsearch $SimArr(BitSize) [lindex $lst 0]]
     if {$idx == -1} {
-        error "'[lindex $lst 0]' not found in '[lindex $mfjDfltSet end-3]'!"
+        error "bit length '[lindex $lst 0]' not found in '$SimArr(BitSize)'!"
     }
     vputs -n -i-1 "
-        Digits= [lindex $mfjDfltSet end-2 $idx]
-        RhsMin= [lindex $mfjDfltSet end-1 $idx]
-        Iterations= [lindex $mfjDfltSet end $idx]"
+        Digits= [lindex $SimArr(Digits) $idx]
+        RhsMin= [lindex $SimArr(RhsMin) $idx]
+        Iterations= [lindex $SimArr(Iter) $idx]"
     if {[lindex $lst 0] == 64} {
         vputs -n -i-2 "
             * CheckRhsAfterUpdate * May help improve convergence"
@@ -1603,7 +1604,7 @@ Math {
                     NonLocal \"NLM$idx\" (
                         RegionInterface= \"$var/$val\"
                         Length= [expr [lindex $grp 3]*1e-4] * cm"
-                if {[lindex $grp 1] ne "TAT"} {
+                if {[lindex $grp 1] ne "TAT" && [lindex $grp 4] > 0} {
                     vputs -n -i-4 "
                         Permeation= [expr [lindex $grp 4]*1e-4] * cm"
                 }
@@ -1614,8 +1615,8 @@ Math {
                     vputs -n -i-4 "
                         $elm= $arr($elm)"
                 }
-                if {![catch {set str [rr2pp $RegGen [lindex $lst 0]\
-                    [lindex $lst 1] !Intf]}]} {
+                if {![catch {set str [intfVn [rr2pp $RegGen [lindex $lst 0]\
+                    [lindex $lst 1]]]}]} {
                     vputs -n -i-4 "
                         Direction= ($str)"
                 }
@@ -1638,10 +1639,16 @@ Math {
                     if {$arr($elm) eq "- -"} {
                         set str "Region= \"$var\" Region= \"$val\""
                     }
-                    if {$arr($elm) eq "- +"} {
+
+                    # Default: -Endpoint for insulator regions
+                    if {$arr($elm) eq "- +" || ($elm eq "Endpoint"
+                        && [lindex $RegGen [lindex $lst 0] 0 2]
+                        eq "Insulator")} {
                         set str "Region= \"$var\""
                     }
-                    if {$arr($elm) eq "+ -"} {
+                    if {$arr($elm) eq "+ -" || ($elm eq "Endpoint"
+                        && [lindex $RegGen [lindex $lst 1] 0 2]
+                        eq "Insulator")} {
                         set str "Region= \"$val\""
                     }
                     if {$str eq ""} continue
@@ -1681,11 +1688,12 @@ if {[lindex $SimEnv 3] eq "Optical"} {
     # set var {Coupled {Poisson Electron Hole
         # eQuantumPotential hQuantumPotential}}
     set var {Coupled {Poisson Electron Hole}}
+    set ouf [file join $SimArr(EtcDir) n@node@_Eqm]
     vputs -n -i-1 "
         Coupled (LineSearchDamping=0.01 Iterations= 5000) \{Poisson\}\n
         NewCurrentPrefix= \"eqm_\"
         Coupled (Iterations= 100) \{Poisson Electron Hole\}
-        Plot (FilePrefix= \"$SimArr(EtcDir)/n@node@_Eqm\")\n"
+        Plot (FilePrefix= \"$ouf\")\n"
 }
 
 # Go through 'VarVary'
@@ -1712,8 +1720,9 @@ foreach grp $VarVary {
                             /([lindex $grp 1]-[lindex $val 1])]
                     }
                     set lst [lsort -real $lst]
+                    set ouf [file join $SimArr(EtcDir) n@node@_v$idx]
                     append str "\n[string repeat $mfjProc::arr(Tab) 6]Plot\
-                        (FilePrefix= \"$SimArr(EtcDir)/n@node@_v$idx\"\
+                        (FilePrefix= \"$ouf\"\
                         Time= ([join $lst {; }]) noOverwrite)"
                 } else {
                     set str "CurrentPlot (Time= (-1))"
@@ -1813,8 +1822,9 @@ foreach grp $VarVary {
                     /([lindex $grp 1]-$val)]
             }
             set lst [lsort -real $lst]
+            set ouf [file join $SimArr(EtcDir) n@node@_v$idx]
             append str "\n[string repeat $mfjProc::arr(Tab)\
-                6]Plot (FilePrefix= \"$SimArr(EtcDir)/n@node@_v$idx\"\
+                6]Plot (FilePrefix= \"$ouf\"\
                 Time= ([join $lst {; }]) noOverwrite)"
             if {[lindex $grp 2] == 0} {
                 set str "CurrentPlot (Time= (-1))"
@@ -1882,8 +1892,9 @@ foreach grp $VarVary {
                         /([lindex $grp 1]-[lindex $val 1])]
                 }
                 set lst [lsort -real $lst]
+                set ouf [file join $SimArr(EtcDir) n@node@_v$idx]
                 append str "\n[string repeat $mfjProc::arr(Tab) 6]Plot\
-                    (FilePrefix= \"$SimArr(EtcDir)/n@node@_v$idx\"\
+                    (FilePrefix= \"$ouf\"\
                     Time= ([join $lst {; }]) noOverwrite)"
             } else {
                 set str "CurrentPlot (Time= (-1))"

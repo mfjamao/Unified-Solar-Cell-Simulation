@@ -990,8 +990,7 @@ proc mfjProc::readTT {TTArr TTFile {TTRatio 1}} {
                     error "> 1 ID lines detected in '$TTFile'!"
                 }
                 set Arr(ID) $Str
-                set Arr(FFld) .mfj/[file rootname [file tail\
-                    $TTFile]]-[expr rand()].plx
+                set Arr(FFld) [file rootname $TTFile]-[expr rand()].plx
                 set Ouf [open $Arr(FFld) w]
                 puts $Ouf \"$Arr(ID)\"
             } else {
@@ -3286,7 +3285,7 @@ proc mfjProc::gVar2DOESum {GVarArr TrialNode {FDOESum ""}} {
 
     # Validate arguments
     if {$FDOESum eq ""} {
-        set FDOESum 06out/DOESummary.csv
+        set FDOESum [file join 06out DOESummary.csv]
     }
     if {![regexp {^\d+$} $TrialNode]} {
         error "'$TrialNode' should be a positive integer or zero!"
@@ -3298,13 +3297,14 @@ proc mfjProc::gVar2DOESum {GVarArr TrialNode {FDOESum ""}} {
     after [expr int(1e3*rand())]
 
     # No read and write of $FDOESum until the file lock is removed
-    while {[file exists .mfj/DOESum.lock]} {
+    set FLock [file rootname $FDOESum].lock
+    while {[file exists $FLock]} {
         after 1000
     }
 
     # Set the file lock for exclusive access to $FDOESum
     vputs -i2 "Set a file lock for exclusive access to $FDOESum"
-    close [open .mfj/DOESum.lock w]
+    close [open $FLock w]
     set Inf [open $FDOESum r]
     set Lines [list]
     set IdxLst [list]
@@ -3379,7 +3379,7 @@ proc mfjProc::gVar2DOESum {GVarArr TrialNode {FDOESum ""}} {
 
     # Have to remove the file lock to release $FDOESum
     vputs -i2 "Remove the file lock to release access to $FDOESum"
-    file delete .mfj/DOESum.lock
+    file delete $FLock
 }
 
 package provide mfjProc $mfjProc::version

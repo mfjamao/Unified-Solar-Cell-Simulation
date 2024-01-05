@@ -1,14 +1,14 @@
 !(
 
 #--- Get Tcl global variables
-#include ".mfj/varSim.tcl"
+#include "varSim.tcl"
 
 # Generate an input script for sprocess
 set ouf [open n@node@_fps.tcl w]
 if {[llength $ProcSeq]} {
 
     # Global settings for sprocess
-    puts $ouf "math coord.ucs numThreads= 1"
+    puts $ouf "math coord.ucs numThreads= $SimArr(NThread)"
     regexp -nocase {\{Other([^\}]+)} $DfltAttr -> lst
     puts $ouf "SetTemp [lindex $lst 0]<C>\n"
 
@@ -46,8 +46,13 @@ if {[llength $ProcSeq]} {
     foreach grp $ProcSeq {
         switch -- [lindex $grp 0] {
             deposit {
-                set str "deposit material= [lindex $grp 1]\
-                    thickness= [lindex $grp 2]<um> type= [lindex $grp 3]"
+                if {[llength $grp] == 3} {
+                    set str "deposit material= [lindex $grp 1]\
+                        thickness= [lindex $grp 2]<um> type= anisotropic"
+                } else {
+                    set str "deposit material= [lindex $grp 1]\
+                        thickness= [lindex $grp 2]<um> type= [lindex $grp 3]"
+                }
                 if {$Dim > 1 && [lindex $grp 4] >= 0
                     && [lindex $grp 4] <= $cnt} {
                     append str " mask= \"M[lindex $grp 4]\""
@@ -77,7 +82,9 @@ if {[llength $ProcSeq]} {
                     read.temp.file= [lindex $grp 1]"
                 set val [lindex $grp 2]
                 set grp [lrange $grp 3 end]
-                if {[llength $grp] == 2} {
+                if {[llength $grp] == 0} {
+                    puts $ouf "diffuse temp.ramp= temp$idx"
+                } elseif {[llength $grp] == 2} {
                     if {[string equal -nocase [lindex $grp 0] N2]} {
                         puts $ouf "diffuse temp.ramp= temp$idx"
                     } else {
@@ -96,8 +103,13 @@ if {[llength $ProcSeq]} {
                 }
             }
             etch {
-                set str "etch material= [lindex $grp 1]\
-                    thickness= [lindex $grp 2]<um> type= [lindex $grp 3]"
+                if {[llength $grp] == 3} {
+                    set str "etch material= [lindex $grp 1]\
+                        thickness= [lindex $grp 2]<um> type= anisotropic"
+                } else {
+                    set str "etch material= [lindex $grp 1]\
+                        thickness= [lindex $grp 2]<um> type= [lindex $grp 3]"
+                }
                 if {$Dim > 1 && [lindex $grp 4] >= 0
                     && [lindex $grp 4] <= $cnt} {
                     append str " mask= \"M[lindex $grp 4]\""
@@ -175,7 +187,11 @@ if {[llength $ProcSeq]} {
                     puts $ouf "mask clear"
                     set cnt -1
                 } else {
-                    set str "mask name= [incr cnt] [lindex $grp 2]"
+                    if {[llength $grp] == 2} {
+                        set str "mask name= [incr cnt] positive"
+                    } else {
+                        set str "mask name= [incr cnt] [lindex $grp 2]"
+                    }
                     set var [string map {p \{ _ " " / "\} \{"}\
                         [lindex $grp 1]]\}
                     if {$Dim == 1} {
@@ -212,7 +228,8 @@ if {[llength $ProcSeq]} {
             }
             write {
                 set var [split [string range [lindex $grp 1] 1 end] _]
-                set str "WritePlx $SimArr(OutDir)/n@node@_p${idx}_1DCut.plx"
+                set val [file join $SimArr(OutDir) n@node@_p${idx}_1DCut.plx]
+                set str "WritePlx $val"
                 if {$Dim == 1} {
                     append str " y= [expr $YMax*0.5]"
                 } elseif {$Dim == 2} {
@@ -233,7 +250,7 @@ if {[llength $ProcSeq]} {
 
     # Convert .plx files from process simulaton to .CSV files
     if {[llength $lst]} {
-        puts $ouf "source $SimArr(FProc)"
+        puts $ouf "source \[file join $SimArr(CodeDir) $SimArr(FProc)\]"
     }
     foreach elm $lst {
         puts $ouf "mfjProc::plx2CSV $elm"

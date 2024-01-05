@@ -22,16 +22,15 @@
 #   Use braces to suppress string substitution so '\' is literally '\'
 ################################################################################
 array set SimArr {
-    Time "" Append false Inverse false
+    Email "" Time "" Append false Inverse false
     0Raw2Fmt true 1Fmt2Sim true 2PreProc true 3Batch true
-    FVarRaw 10variables.txt FVarFmt .mfj/variables.txt
-    FIntrpr .mfj/mfjIntrpr.tcl FProc .mfj/mfjProc.tcl FGrm .mfj/mfjGrm.tcl
-    FVarSim .mfj/varSim.tcl FVarEnv .mfj/varEnv.tcl FSave 12savetpl.tcl
-    FLoad 13loadtpl.tcl FSTPP .mfj/preproc.sh FSTBatch .mfj/batch.sh
-    FPPOut .mfj/preproc.out FBatOut .mfj/batch.out FInfo .mfj/.siminfo
-    FLock .mfj/lock FDOESum DOESummary.csv
-    MDBDir 01mdb OptDir 02opt ExpDir 03exp PMIDir 04code EtcDir 05etc
-    OutDir 06out TplDir 07tpl
+    FVarRaw 10variables.txt FVarFmt variables.txt
+    FIntrpr mfjIntrpr.tcl FProc mfjProc.tcl FGrm mfjGrm.tcl FST mfjST.tcl
+    FVarSim varSim.tcl FVarEnv varEnv.tcl FSave 12savetpl.tcl
+    FLoad 13loadtpl.tcl FSTPP preproc.sh FSTBatch batch.sh
+    FInfo siminfo FLock lock FSTStat .status FDOESum DOESummary.csv
+    CodeDir .mfj MDBDir 01mdb OptDir 02opt ExpDir 03exp PMIDir 04code
+    EtcDir 05etc OutDir 06out TplDir 07tpl
     DfltYMax 2.0 LatFac 0.8 GasThx 0.1 Node4All !Node4All ColMode ColMode
     FullSchenk !FullSchenk TrapDLN 100  EdgeEx 10 IntfEx 0.001
     NThread 4 BitSize {64 80 128 256} Digits {5 5 6 10}
@@ -40,22 +39,22 @@ array set SimArr {
     ConLst "" ConLen "" VarLen ""
     VarName {SimEnv RegGen FldAttr IntfAttr GopAttr DfltAttr ProcSeq ModPar
         VarVary GetFld PPAttr}
-    Prefix "# ---" ESuffix {unsw.edu.au unsw.edu.au}
     BIDLst {{c\d} {(\w+/)?\w+/\w+(/[\deE.+-]+)?} {S\w*} {M\w*} {W\w*}}
     DIDLst {{M\w*} {N\w*} {O\w*}}
     OIDLst {{Spec\w*} {Mono\w*} {Inci\w*}}
     QIDLst {{Cal\w*} {Dep\w*} {Dif\w*} {Etc\w*} {Imp\w*} {Ini\w*} {Mas\w*}
         {Sel\w*} {Tra\w*} {Wri\w*}}
-    FST .mfj/mfjST.tcl FSTStat .status STHosts {katana tyrion}
-    STPaths {/srv/scratch/z3505796/apps/sentaurus
+    Prefix "# ---"
+    Email|Sufx {unsw.edu.au unsw.edu.au}
+    ST|Hosts {katana tyrion}
+    ST|Paths {/srv/scratch/z3505796/apps/sentaurus
         /share/scratch/z3505796/apps/sentaurus}
-    STLicns {27105@license1.restech.unsw.edu.au
+    ST|Licns {27105@license1.restech.unsw.edu.au
         27105@licence.eng.unsw.edu.au}
-    STLib {/srv/scratch/z3505796/apps/sentaurus/sharedlib
-        /share/scratch/z3505796/apps/sentaurus/sharedlib}
-    STTools {sde sdevice svisual inspect sprocess}
-    STSuffix {_dvs.cmd _des.cmd _vis.tcl _ins.cmd _fps.cmd}
-    STDfltID {ST settings: Tool_label = (\S+) Tool_name = (\S+)}
+    ST|Tools {sde sdevice svisual inspect sprocess}
+    sde|Sufx _dvs.cmd sdevice|Sufx _des.cmd svisual|Sufx _vis.tcl
+    inspect|Sufx _ins.cmd sprocess|Sufx _fps.cmd
+    STDfltID {Tool_label = (\S+) Tool_name = (\S+)}
 };# End of 'SimArr'
 
 set FScript [info script]
@@ -67,8 +66,9 @@ if {![file executable $FScript]} {
 cd [file dirname $FScript]
 
 # Keep waiting in case the previous script is still running
-if {[file isfile $SimArr(FLock)]} {
-    set PID [exec cat $SimArr(FLock)]
+set FLock [file join $SimArr(CodeDir) $SimArr(FLock)]
+if {[file isfile $FLock]} {
+    set PID [exec cat $FLock]
     set Lock false
     foreach Elm [split [exec ps -ef] \n] {
         if {[lindex $Elm 1] == $PID} {
@@ -79,19 +79,20 @@ if {[file isfile $SimArr(FLock)]} {
 
     # Wait until the file lock is removed
     if {$Lock} {
-        while {[file isfile $SimArr(FLock)]} {
+        while {[file isfile $FLock]} {
             after 100
         }
     } else {
-        file delete $SimArr(FLock)
+        file delete $FLock
     }
 }
 
 # Create a file lock to prevent running another '11simctrl.tcl'
-exec echo [pid] > $SimArr(FLock)
+exec echo [pid] > $FLock
 
 # Load key files
 foreach Elm [list $SimArr(FProc) $SimArr(FIntrpr) $SimArr(FST) $SimArr(FGrm)] {
+    set Elm [file join $SimArr(CodeDir) $Elm]
     if {![file isfile $Elm]} {
         error "Key file '$Elm' missing in directory '[file tail [pwd]]'!"
     } else {
@@ -187,7 +188,7 @@ if {!$SimArr(Append)} {
     vputs -n -w ""
 }
 vputs "\n[clock format [clock seconds] -format "%Y-%b-%d %A %H:%M:%S"]\
-    \t'$::env(USER)@$::env(HOSTNAME)'"
+    \t'$::env(USER)@[exec hostname]' on '$tcl_platform(platform)' platform"
 vputs -n "Tcl: [info nameofexecutable], version: [info tclversion], >= 8.4? "
 if {[info tclversion] >= 8.4} {
     vputs -c "Yes!"
@@ -196,14 +197,26 @@ if {[info tclversion] >= 8.4} {
     exit 1
 }
 
+# Inverse mode, SWB to variable file
+if {$SimArr(Inverse)} {
+
+    # Read gtree.dat and update SimArr(FVarEnv) and SimArr(FVarSim) if necessary
+    mfjST::swb2tcl
+
+    # Update SimArr(FVarFmt) and SimArr(FVarRaw) if necessary
+    mfjIntrpr::tcl2Raw
+    exit 0
+}
+
 # Determine simulator and job scheduler. Default: Sentaurus Local
-if {[file isfile $SimArr(FInfo)]} {
-    set InfoLst [split [exec cat $SimArr(FInfo)] |]
+set FInfo [file join $SimArr(CodeDir) $SimArr(FInfo)]
+if {[file isfile $FInfo]} {
+    set InfoLst [split [exec cat $FInfo] |]
 } else {
     set InfoLst {Sentaurus Local}
 }
-vputs -n "Checking [lindex $InfoLst 0] project '[file tail [pwd]]' status: "
-set StatLst [list [clock seconds] $::env(HOSTNAME) $::env(USER) unknown [pid]]
+vputs -n "Checking project '[file tail [pwd]]' status: '[lindex $InfoLst 0]', "
+set StatLst [list [clock seconds] [exec hostname] $::env(USER) unknown [pid]]
 if {[lindex $InfoLst 0] eq "Sentaurus"} {
     if {[file isfile $SimArr(FSTStat)]} {
         set StatLst [split [exec cat $SimArr(FSTStat)] |]
@@ -217,8 +230,10 @@ vputs -c '[lindex $StatLst 3]'\n
 # to 'running' when the project is running. Yet, it typically requires some
 # queue time before a scheduler completes arrangement of desired resources.
 set Queue false
-if {[file isfile $SimArr(FBatOut)]} {
-    set BatOut [exec head -1 $SimArr(FBatOut)]
+set FSTBatch [file join $SimArr(CodeDir) $SimArr(FSTBatch)]
+set FSTBatchOut [file rootname $FSTBatch].out
+if {[file isfile $FSTBatchOut]} {
+    set BatOut [exec head -1 $FSTBatchOut]
 } else {
     set BatOut ""
 }
@@ -231,13 +246,20 @@ if {[lindex $InfoLst 0] eq "Sentaurus" && [lindex $StatLst 3] eq "ready"} {
 }
 
 # Stop the previous batch if it is running or queuing
+if {$tcl_platform(platform) eq "unix"} {
+    set FNull /dev/null
+    set FSO /dev/stdout
+} elseif {$tcl_platform(platform) eq "windows"} {
+    set FNull Null
+    set FSO CON
+}
 if {[lindex $InfoLst 0] eq "Sentaurus"
     && ([lindex $StatLst 3] eq "running" || $Queue)} {
     if {[lindex $InfoLst 1] eq "SLURM"} {
         vputs -i1 "Stop the previous batch managed by 'SLURM'...\n"
         if {[regexp {Submitted batch job (\d+)$} $BatOut -> BID]} {
             vputs -i2 "Cancelling SLURM batch: $BID\n"
-            if {[catch {exec scancel $BID >/dev/null 2>@1}]} {
+            if {[catch {exec scancel $BID >$FNull 2>@1}]} {
                 vputs -i2 "Failed! Maybe batch no longer active\n"
             } else {
                 vputs -i2 "Batch cancelled successfully!\n"
@@ -250,7 +272,7 @@ if {[lindex $InfoLst 0] eq "Sentaurus"
         vputs -i1 "Stop the previous batch managed by 'PBS'...\n"
         if {[regexp {^(\d+)\.[^\d]+} $BatOut -> BID]} {
             vputs -i2 "Deleting PBS batch: $BID\n"
-            if {[catch {exec qdel $BID >/dev/null 2>@1}]} {
+            if {[catch {exec qdel $BID >$FNull 2>@1}]} {
                 vputs -i2 "Failed! Maybe batch no longer active\n"
             } else {
                 vputs -i2 "Batch deleted successfully!\n"
@@ -263,7 +285,7 @@ if {[lindex $InfoLst 0] eq "Sentaurus"
         vputs -i1 "Stop the previous batch at the current node...\n"
         if {[string is integer -strict [lindex $StatLst 4]]} {
             vputs -i2 "Killing PID: [lindex $StatLst 4]\n"
-            if {[catch {exec kill [lindex $StatLst 4] >/dev/null 2>@1}]} {
+            if {[catch {exec kill [lindex $StatLst 4] >$FNull 2>@1}]} {
                 vputs -i2 "Failed! Maybe PID no longer active\n"
             } else {
                 vputs -i2 "PID killed successfully!\n"
@@ -275,11 +297,11 @@ if {[lindex $InfoLst 0] eq "Sentaurus"
     after 1000
     lset StatLst 3 aborted
     exec echo [join $StatLst |] > $SimArr(FSTStat)
-    exec true > $SimArr(FBatOut)
+    exec true > $FSTBatchOut
     vputs -i2 "Project status was changed to 'aborted'. Bye :)\n"
 
     # Remove the file lock
-    file delete $SimArr(FLock)
+    file delete $FLock
     exit 0
 }
 
@@ -297,7 +319,7 @@ if {$SimArr(0Raw2Fmt)} {
         [lindex $mfjIntrpr::arr(FmtVal|SimEnv) 4]]
     if {$InfoLst ne $Lst} {
         set InfoLst $Lst
-        exec echo [join $InfoLst |] > $SimArr(FInfo)
+        exec echo [join $InfoLst |] > $FInfo
     }
     vputs -i1 "Processing time = [expr [clock seconds]-$::SimArr(Time)] s\n"
 }
@@ -324,8 +346,10 @@ if {$SimArr(1Fmt2Sim)} {
 # Perform preprocess
 if {$SimArr(2PreProc) && [lindex $InfoLst 0] eq "Sentaurus"} {
     vputs "Preprocessing with 'Sentaurus Workbench spp'...\n"
-    exec true > $SimArr(FPPOut)
-    if {[catch {exec $SimArr(FSTPP) >/dev/stdout | tee -a $SimArr(FPPOut)\
+    set FSTPP [file join $SimArr(CodeDir) $SimArr(FSTPP)]
+    set FSTPPOut [file rootname $FSTPP].out
+    exec true > $FSTPPOut
+    if {[catch {exec $FSTPP >$FSO | tee -a $FSTPPOut\
         $mfjProc::arr(FOut) $mfjProc::arr(FLog)} ErrMsg]} {
         vputs -c "\nerror: $ErrMsg\n"
         exit 1
@@ -335,22 +359,22 @@ if {$SimArr(2PreProc) && [lindex $InfoLst 0] eq "Sentaurus"} {
 # Run trials at the current node or summit them to a job scheduler
 if {$SimArr(3Batch) && [lindex $InfoLst 0] eq "Sentaurus"} {
     vputs "Running single/multiple trials with 'Sentaurus Workbench gsub'...\n"
-    exec true > $SimArr(FBatOut)
+    exec true > $FSTBatchOut
     if {[lindex $InfoLst 1] eq "SLURM"} {
         vputs -i1 "Hand over the simulation job to SLURM...\n"
-        exec sbatch $SimArr(FSTBatch) >/dev/stdout\
-            | tee -a $SimArr(FBatOut) $mfjProc::arr(FOut) $mfjProc::arr(FLog)
+        exec sbatch $FSTBatch >$FSO\
+            | tee -a $FSTBatchOut $mfjProc::arr(FOut) $mfjProc::arr(FLog)
     } elseif {[lindex $InfoLst 1] eq "PBS"} {
         vputs -i1 "Hand over the simulation job to PBS...\n"
-        exec qsub $SimArr(FSTBatch) >/dev/stdout\
-            | tee -a $SimArr(FBatOut) $mfjProc::arr(FOut) $mfjProc::arr(FLog)
+        exec qsub $FSTBatch >$FSO\
+            | tee -a $FSTBatchOut $mfjProc::arr(FOut) $mfjProc::arr(FLog)
     } else {
         vputs -i1 "Run the simulation job at the current node...\n"
-        exec $SimArr(FSTBatch) >/dev/stdout\
-            | tee -a $SimArr(FBatOut) $mfjProc::arr(FOut) $mfjProc::arr(FLog) &
+        exec $FSTBatch >$FSO\
+            | tee -a $FSTBatchOut $mfjProc::arr(FOut) $mfjProc::arr(FLog) &
     }
 }
 
 # Remove the file lock
-file delete $SimArr(FLock)
+file delete $FLock
 exit 0

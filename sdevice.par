@@ -200,7 +200,7 @@ foreach grp $ModPar {
     }
     if {![regexp {\{(BGN(\s+[^\}]+)+)\}} [lrange $grp 2 end]]} {
         if {[lindex $RegGen $idx 0 0] eq "Silicon"} {
-            if {[string index [lindex $mfjDfltSet 5] 0] eq "!"} {
+            if {[string index $SimArr(FullSchenk) 0] eq "!"} {
                 # vputs -n -i-4 "
                     # SchenkBGN_elec \{
                         # IsSimplified= 1     * Default simplified Schenk

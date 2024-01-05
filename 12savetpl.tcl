@@ -41,7 +41,7 @@ if {[file isfile $FOut] && [file size $FOut]} {
 }
 set Ouf [open $FOut w]
 mputs $Ouf "\n[clock format [clock seconds] -format "%Y-%b-%d %A %H:%M:%S"]\
-    \t'$::env(USER)@$::env(HOSTNAME)'"
+    \t'$::env(USER)@$::env(HOSTNAME)' on '$tcl_platform(platform)' platform"
 mputs $Ouf "Simulation project directory: '[pwd]'"
 
 # Load 'SimArr' in 11ctrlsim.tcl
@@ -51,9 +51,9 @@ if {![file isfile 11ctrlsim.tcl]} {
     error "'11ctrlsim.tcl' missing in directory '[file tail [pwd]]'!"
 } else {
     set Inf [open 11ctrlsim.tcl r]
-    set Str [read $Inf]
+    set Buff [read $Inf]
     close $Inf
-    if {[regexp {array set SimArr \{(.+)\};\#} $Str -> Tmp]} {
+    if {[regexp {array set SimArr \{(.+)\};\#} $Buff -> Tmp]} {
         array set SimArr $Tmp
     } else {
         mputs $Ouf "'SimArr' not found in '11ctrlsim.tcl'!"
@@ -89,14 +89,15 @@ if {[llength $argv]} {
         foreach Elm [lrange $argv 0 end-1] {
             set Flg false
             foreach Dir [glob -nocomplain -directory $Path -types d *] {
-                if {[string equal -nocase [file tail $Dir] $Elm]} {
+                set Dir [file tail $Dir]
+                if {[string equal -nocase $Dir $Elm]} {
                     set Flg true
                     break
                 }
             }
             if {$Flg} {
-                lset argv $Idx [file tail $Dir]
-                append Path /[file tail $Dir]
+                lset argv $Idx $Dir
+                set Path [file join $Path $Dir]
             } else {
                 break
             }
@@ -109,8 +110,8 @@ if {[llength $argv]} {
 } else {
     set SubDir [clock format [clock seconds] -format "%Y%m%d%H%M%S"]
 }
-set TmpDir $SimArr(TplDir)/$SubDir
-mputs $Ouf "Saving key files to a temp directory './$TmpDir'..."
+set TmpDir [file join $SimArr(TplDir) $SubDir]
+mputs $Ouf "Saving key files to a temp directory '$TmpDir'..."
 file mkdir $TmpDir
 
 # Create a list of files for saving
@@ -120,23 +121,21 @@ foreach Elm $mfjModTime {
 }
 set FBrf [file rootname $SimArr(FVarRaw)]-brief.txt
 set FLst [concat $FLst $SimArr(FVarRaw) $FBrf 11ctrlsim.tcl 11ctrlsim.mfj\
-    $SimArr(FSave)  $SimArr(FLoad) README.md gtooldb.tcl\
+    $SimArr(FSave) $SimArr(FLoad) README.md gtooldb.tcl\
     [glob -nocomplain -directory $::SimArr(OutDir) *.csv *.plx]\
     [glob -nocomplain -directory $::SimArr(PMIDir) {*.[cC]} *.so.*]\
+    [glob -nocomplain -directory $::SimArr(CodeDir) *.tcl *.sh]\
     [glob -nocomplain *.out n*_OG1D.plx v*.plt pbs.*]]
-foreach Elm [glob -nocomplain .mfj/*.tcl] {
-    lappend FLst $Elm
-}
 
 set Cnt 0
 set Tab [string repeat " " 4]
 foreach Elm [lsort -unique $FLst] {
     mputs $Ouf [format "%s%04d %s -> %s" $Tab [incr Cnt] $Elm $Elm]
     set Dir [file dirname $Elm]
-    if {$Dir ne "." && ![file isdirectory $TmpDir/$Dir]} {
-        file mkdir $TmpDir/$Dir
+    if {![file isdirectory [file join $TmpDir $Dir]]} {
+        file mkdir [file join $TmpDir $Dir]
     }
-    if {[catch {file copy $Elm $TmpDir/$Elm} ErrMsg]} {
+    if {[catch {file copy $Elm [file join $TmpDir $Elm]} ErrMsg]} {
         mputs $Ouf $ErrMsg
         close $Ouf
         error $ErrMsg
@@ -146,18 +145,18 @@ foreach Elm [lsort -unique $FLst] {
 # Go to the upper directory and create a Tar/GZip archive
 cd [file dirname $TmpDir]
 set Dir [file tail $TmpDir]
-mputs $Ouf "\nCreate a Tar/GZip archive './$TmpDir.tgz'"
+mputs $Ouf "\nCreate a Tar/GZip archive '$TmpDir.tgz'"
 
 # Delete files if "tar: file changed as we read it" error occurs
 if {[catch {exec tar -czf $Dir.tgz $Dir} ErrMsg]} {
     mputs $Ouf $ErrMsg
-    mputs $Ouf "\Remove the Tar/GZip archive: './$TmpDir.tgz'"
+    mputs $Ouf "\Remove the Tar/GZip archive: '$TmpDir.tgz'"
     exec rm -f $Dir.tgz
     mputs $Ouf "\nTar/GZip failed! Try Tar/GZip manually!\n"
     close $Ouf
     exit 1
 } else {
-    mputs $Ouf "Remove the temp directory: './$TmpDir'"
+    mputs $Ouf "Remove the temp directory: '$TmpDir'"
     exec rm -fr $Dir
     mputs $Ouf "Done!\n"
     close $Ouf

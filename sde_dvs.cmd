@@ -1,10 +1,10 @@
 !(
 
 #--- Get Tcl environment variables (double quotes are required!)
-#include ".mfj/varEnv.tcl"
+#include "varEnv.tcl"
 
 #--- Get Tcl global variables
-#include ".mfj/varSim.tcl"
+#include "varSim.tcl"
 
 # Load 'SimArr' in 11ctrlsim.tcl
 set inf [open 11ctrlsim.tcl r]
@@ -17,7 +17,7 @@ if {[regexp {array set SimArr \{(.+)\};\#} $str -> tmp]} {
 }
 
 # Source general procedures to reduce lengthy embedded code
-source $SimArr(FProc)
+source [file join $SimArr(CodeDir) $SimArr(FProc)]
 namespace import mfjProc::*
 
 # Retrieve more detailed information from 'mfjRegInfo'
@@ -71,7 +71,7 @@ if {[lindex $SimEnv 3] eq "Optical"} {
     # No dummy layers except the top one
     set XMax [lindex $RegGen end 2 0]
     if {$Dim == 1} {
-        set YMax [format %g [lindex $mfjDfltSet 0]]
+        set YMax [format %g $SimArr(DfltYMax)]
         set ZMax 0
     } elseif {$Dim == 2} {
         set YMax [lindex $RegGen end 2 1]
@@ -83,7 +83,7 @@ if {[lindex $SimEnv 3] eq "Optical"} {
 } else {
     if {$Dim == 1} {
         set XMax [lindex $RegGen end 1]
-        set YMax [format %g [lindex $mfjDfltSet 0]]
+        set YMax [format %g $SimArr(DfltYMax)]
         set ZMax 0
     } elseif {$Dim == 2} {
         if {[lindex $SimEnv 2] eq "Cylindrical"} {
@@ -101,9 +101,9 @@ if {[lindex $SimEnv 3] eq "Optical"} {
 }
 
 # Split 'FldAttr' to 'RegFld' and 'IntfFld' for easier handling
-# RegFld format: Region ID, (field ID, value), (field ID, value), ...
-# IntfFld format: rr, (profile file, lateral factor), ...
-#   (pp Vn), (profile file, lateral factor), ...
+# RegFld format: Region ID, (field ID, value, active?), ...
+# IntfFld format: rr, (profile file, scaling, lateral factor), ...
+#   (pp Vn), (profile file, scaling, lateral factor), ...
 set RegFld [list]
 set IntfFld [list]
 set FldAttr [lsort -index 0 [str2List "" $FldAttr]]
@@ -115,7 +115,7 @@ if {[llength [lsort -unique -index 0 $FldAttr]] < [llength $FldAttr]} {
 foreach grp $FldAttr {
     set val [lindex $grp 0]
 
-    # Axis normal interface: Append normal vector
+    # Axis normal interface: Append normal vector to explicit interfaces
     if {[string index $val 0] eq "p"} {
         set val [list [list $val [intfVn [string range $val 1 end]]]]
     }
@@ -130,11 +130,11 @@ foreach grp $FldAttr {
         } else {
             if {[llength $elm] && [lindex $grp 0] ne "Active"
                 && [lindex $grp 0] ne "!Active"} {
-                if {[file isfile $elm]} {
-                    append elm " 1 [lindex $mfjDfltSet 1]"
+                if {[llength $elm] == 1 && [file isfile $elm]} {
+                    append elm " 1 $SimArr(LatFac)"
                 } elseif {[llength $elm] == 2
                     && [file isfile [lindex $elm 0]]} {
-                    lappend elm [lindex $mfjDfltSet 1]
+                    lappend elm $SimArr(LatFac)
                 } elseif {[llength $elm] == 2
                     && ![regexp {^(x|y|Ab)} [lindex $elm 0]]} {
 
@@ -145,13 +145,13 @@ foreach grp $FldAttr {
             }
 
             # Translate abbreviations to Sentaurus scalar data names
-            if {[file isfile [lindex $grp 0]]} {
-                set elm [lindex $grp 0]
-            } elseif {[lindex $grp 0] eq "Active"} {
+            if {[lindex $grp 0] eq "Active"} {
                 lset elm 0 [lindex $elm 0]ActiveConcentration
                 lappend elm Active
             } elseif {[lindex $grp 0] eq "!Active"} {
                 lappend elm !Active
+            } elseif {[file isfile [lindex $grp 0]]} {
+                set elm [lindex $grp 0]
             } else {
                 set elm [lindex [split\
                     $mfjProc::tabArr([lindex $grp 0]) |] 0]
@@ -160,10 +160,10 @@ foreach grp $FldAttr {
         set grp [lrange $grp 1 end]
     }
     if {[llength $elm]} {
-        if {[file isfile $elm]} {
-            append elm " 1 [lindex $mfjDfltSet 1]"
+        if {[llength $elm] == 1 && [file isfile $elm]} {
+            append elm " 1 $SimArr(LatFac)"
         } elseif {[llength $elm] == 2 && [file isfile [lindex $elm 0]]} {
-            lappend elm [lindex $mfjDfltSet 1]
+            lappend elm $SimArr(LatFac)
         } elseif {[llength $elm] == 2
             && ![regexp {^(x|y|Ab)} [lindex $elm 0]]} {
 

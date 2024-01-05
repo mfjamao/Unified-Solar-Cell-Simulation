@@ -1,7 +1,7 @@
 !(
 
 #--- Get Tcl global variables
-#include ".mfj/varSim.tcl"
+#include "varSim.tcl"
 
 # Alert users to remove/combine duplicate vv#
 set PPAttr [lsort -index 0 [str2List "" $PPAttr]]
@@ -28,7 +28,7 @@ vputs -n -i-1 "
 )!
 
 #--- Source general procedures to reduce lengthy embedded code
-source $SimArr(FProc)
+source [file join $SimArr(CodeDir) $SimArr(FProc)]
 namespace import mfjProc::*
 set mfjProc::arr(FLog) [file rootname [info script]].mfj
 set mfjProc::arr(MaxVerb) 1
@@ -140,7 +140,7 @@ set RE_p (${RE_n}_){0,2}$RE_n
 if {[lindex $SimEnv 3] ne "Optical" && [regexp \\\{p$RE_p\\s $SS2Fld]} {
     foreach tdr [glob -d $SimArr(EtcDir) n@previous@_*_des.tdr] {
         set pCnt -1
-        regexp {/n@previous@_(\w+)_des.tdr$} $tdr -> fID
+        regexp {n@previous@_(\w+)_des.tdr$} $tdr -> fID
         vputs -i1 "\nExtract fields from '$tdr'"
         load_file $tdr -name TDRData_$fID
         create_plot -name PltFld_$fID -dataset TDRData_$fID
@@ -150,7 +150,8 @@ if {[lindex $SimEnv 3] ne "Optical" && [regexp \\\{p$RE_p\\s $SS2Fld]} {
             set grp0 [lindex $grp 0]
             if {[regexp {^p[^/]+$} $grp0]} {
                 set capFld "n@node@: 1D Fields at $grp0 from '$tdr' at $T K"
-                set fFld $SimArr(OutDir)/n@node@_${fID}_${grp0}_1DField.csv
+                set fFld [file join $SimArr(OutDir)\
+                    n@node@_${fID}_${grp0}_1DField.csv]
                 set pLst [split $grp0 _]
                 select_plots PltFld_$fID
                 if {[llength $pLst] == 3} {
@@ -277,7 +278,7 @@ foreach pp $PPAttr {
         continue
     }
     load_file ${pp0}_@plot@ -name Data_$pp0
-    set fRaw $SimArr(OutDir)/n@node@_${pp0}_raw.csv
+    set fRaw [file join $SimArr(OutDir) n@node@_${pp0}_raw.csv]
     vputs -i2 "Save raw data to '$fRaw'"
     export_variables -dataset Data_$pp0 -overwrite -filename $fRaw
 
@@ -303,12 +304,15 @@ foreach pp $PPAttr {
 
         # Initialise parameters
         set capRAT "n@node@_$pp0: R A T curves"
-        set fRAT $SimArr(OutDir)/n@node@_${pp0}_RAT.csv
-        set fGopWS $SimArr(OutDir)/n@node@_${pp0}_1DGop_WS.plx
-        set fGopARCWS $SimArr(OutDir)/n@node@_${pp0}_1DGop_ARC_WS.plx
-        set fGopSpec $SimArr(OutDir)/n@node@_${pp0}_1DGop_Spectral.plx
-        set fGopARCSpec $SimArr(OutDir)/n@node@_${pp0}_1DGop_ARC_Spectral.plx
-        set fGopSum $SimArr(OutDir)/n@node@_${pp0}_1DGop_Summary.csv
+        set fRAT [file join $SimArr(OutDir) n@node@_${pp0}_RAT.csv]
+        set fGopWS [file join $SimArr(OutDir) n@node@_${pp0}_1DGop_WS.plx]
+        set fGopARCWS [file join $SimArr(OutDir)\
+            n@node@_${pp0}_1DGop_ARC_WS.plx]
+        set fGopSpec [file join $SimArr(OutDir)\
+            n@node@_${pp0}_1DGop_Spectral.plx]
+        set fGopARCSpec [file join $SimArr(OutDir)\
+            n@node@_${pp0}_1DGop_ARC_Spectral.plx]
+        set fGopSum [file join $SimArr(OutDir) n@node@_${pp0}_1DGop_Summary.csv]
         create_plot -name PltRAT_$pp0 -1d
 
         # Get monochromatic light intensity
@@ -643,7 +647,8 @@ foreach pp $PPAttr {
             # Check each ARC material for its material group and retain
             # the first semiconductor layer onwards
             if {[info exists arr(ARCMat)]} {
-                set MatDB [readMatDB datexcodes.txt $iseroot_lib/datexcodes.txt]
+                set MatDB [readMatDB datexcodes.txt\
+                    [file join $iseroot_lib datexcodes.txt]]
                 set len [llength $arr(ARCMat)]
                 for {set i 0} {$i < $len} {incr i} {
                     set idx [lsearch -regexp [lindex $MatDB 0]\
@@ -931,7 +936,7 @@ foreach pp $PPAttr {
 
         # Initialise parameters
         set capJV "n@node@_${pp0}: J-V at $T K"
-        set fJV $SimArr(OutDir)/n@node@_${pp0}_JV.csv
+        set fJV [file join $SimArr(OutDir) n@node@_${pp0}_JV.csv]
 
         # Extract X axis and data trend (ascending or not)
         set xVar "$bCon OuterVoltage"
@@ -1099,7 +1104,7 @@ foreach pp $PPAttr {
         }
 
         if {[lindex $pp 1] eq "CV"} {
-            set fCV $SimArr(OutDir)/n@node@_${pp0}_CV.csv
+            set fCV [file join $SimArr(OutDir) n@node@_${pp0}_CV.csv]
             load_file ${pp0}_@acplot@ -name ACData_$pp0
             vputs -i2 "\nExtract capaitance and admittance vs. voltage"
             set fLst [get_variable_data -dataset ACData_$pp0 "frequency"]
@@ -1216,7 +1221,7 @@ foreach pp $PPAttr {
 
         # Initialise parameters
         set capQE "n@node@_${pp0}: QE at $T K"
-        set fQE $SimArr(OutDir)/n@node@_${pp0}_QE.csv
+        set fQE [file join $SimArr(OutDir) n@node@_${pp0}_QE.csv]
         create_plot -name PltQE_$pp0 -1d
         select_plots PltQE_$pp0
         vputs -i2 "Create wavelength variable \[um -> nm\]"
@@ -1341,13 +1346,13 @@ foreach pp $PPAttr {
 
         # Initialise parameters
         set captau "n@node@_${pp0}: lifetime at $T K"
-        set ftau $SimArr(OutDir)/n@node@_${pp0}_lifetime.csv
+        set ftau [file join $SimArr(OutDir) n@node@_${pp0}_lifetime.csv]
         set capiVoc "n@node@_${pp0}: iVoc at $T K"
-        set fiVoc $SimArr(OutDir)/n@node@_${pp0}_iVoc.csv
+        set fiVoc [file join $SimArr(OutDir) n@node@_${pp0}_iVoc.csv]
         set jVar JOG|mA*cm^-2
         set jCap $jVar
         set capJ0 "n@node@_${pp0}: J0 at $T K"
-        set fJ0 $SimArr(OutDir)/n@node@_${pp0}_J0.csv
+        set fJ0 [file join $SimArr(OutDir) n@node@_${pp0}_J0.csv]
         set var [format %g [expr $YMax/2.]]
         set dnLst [list]
 
@@ -1617,7 +1622,7 @@ foreach pp $PPAttr {
                             set fPR [lindex $tmp 2]
                         }
                     } else {
-                        if {$mat eq "Silicon"} {
+                        if {$mat eq "Silicon" || $mat eq "PolySilicon"} {
                             set aug 1
                             set pmi 1
                         }
@@ -1674,8 +1679,7 @@ foreach pp $PPAttr {
                 vputs -i3 J0_B2B|$reg
                 create_variable -name J0_B2B|$reg|fA*cm^-2 -dataset Data_$pp0\
                     -function "<Integr$reg RadiativeRecombination:Data_$pp0>\
-                    *1e15*$q/$intArea/<$DnPlt\
-                    Normd_pn:Data_$pp0>"
+                    *1e15*$q/$intArea/<$DnPlt Normd_pn:Data_$pp0>"
                 create_curve -name ${pp0}_4|J0_B2B|$reg -dataset Data_$pp0\
                     -axisX $xVar -axisY J0_B2B|$reg|fA*cm^-2 -plot PltJ0_$pp0
             }
@@ -1883,11 +1887,11 @@ foreach pp $PPAttr {
         if {[lindex $pp 1] eq "SunsVoc"} {
             vputs -i2 "\nPlot Suns-Voc curve"
             set capSuns "n@node@_${pp0}: Suns-Voc at $T K"
-            set fSuns $SimArr(OutDir)/n@node@_${pp0}_SunsVoc.csv
+            set fSuns [file join $SimArr(OutDir) n@node@_${pp0}_SunsVoc.csv]
         } else {
             vputs -i2 "\nPlot Suns-Jsc curve"
             set capSuns "n@node@_${pp0}: Suns-Jsc at $T K"
-            set fSuns $SimArr(OutDir)/n@node@_${pp0}_SunsJsc.csv
+            set fSuns [file join $SimArr(OutDir) n@node@_${pp0}_SunsJsc.csv]
         }
 
         # Extract the spectrum power [mW*cm^-2]
@@ -2028,11 +2032,14 @@ foreach pp $PPAttr {
     # Jloss, (J0 and lifetime) for known extraction and analysis
     if {[llength $pp] > 1} {
         set capJLoss "n@node@_${pp0}: JLoss for [lindex $pp 1] at $T K"
-        set fJLoss $SimArr(OutDir)/n@node@_${pp0}_[lindex $pp 1]_JLoss.csv
+        set fJLoss [file join $SimArr(OutDir)\
+            n@node@_${pp0}_[lindex $pp 1]_JLoss.csv]
         set capJ0 "n@node@_${pp0}: J0 for [lindex $pp 1] at $T K"
-        set fJ0 $SimArr(OutDir)/n@node@_${pp0}_[lindex $pp 1]_J0.csv
+        set fJ0 [file join $SimArr(OutDir)\
+            n@node@_${pp0}_[lindex $pp 1]_J0.csv]
         set captau "n@node@_${pp0}: lifetime for [lindex $pp 1] at $T K"
-        set ftau $SimArr(OutDir)/n@node@_${pp0}_[lindex $pp 1]_lifetime.csv
+        set ftau [file join $SimArr(OutDir)\
+            n@node@_${pp0}_[lindex $pp 1]_lifetime.csv]
 
         create_plot -name PltJLoss_$pp0 -1d
         windows_style -style max
@@ -2242,7 +2249,7 @@ foreach pp $PPAttr {
                             set fPR [lindex $tmp 2]
                         }
                     } else {
-                        if {$mat eq "Silicon"} {
+                        if {$mat eq "Silicon" || $mat eq "PolySilicon"} {
                             set aug 1
                             set pmi 1
                         }
@@ -2565,6 +2572,6 @@ foreach pp $PPAttr {
 
 } ;# end of foreach
 
-# Update the file 'SimArr(OutDir)/SimArr(FDOESum)'
+# Update the file 'SimArr(FDOESum)'
 gVar2DOESum gVarArr @node@
 vputs "\nProcessing time = [expr [clock seconds] - $tm] s\n"

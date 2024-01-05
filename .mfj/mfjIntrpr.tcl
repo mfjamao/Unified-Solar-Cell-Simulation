@@ -1,8 +1,8 @@
 ################################################################################
 # This namespace is designed to group procedures for converting a raw variable
-# file to a formatted variable TXT file. In the raw variable file, everything
-# except grammar is case insensitive. In the formatted file, however, everything
-# is case sensitive.
+# file, ::SimArr(FVarRaw), to a formatted variable text file, ::SimArr(FVarFmt).
+# In the raw variable file, everything except grammar is case insensitive.
+# In the formatted file, however, everything is case sensitive.
 #
 # Maintained by Dr. Fa-Jun MA (mfjamao@yahoo.com)
 ################################################################################
@@ -15,19 +15,17 @@ namespace eval mfjIntrpr {
     # Define a big array to handle all data exchange
     variable arr
     array set arr {
-        Host|ID "" Host|User "" Host|Email "" Host|ESuffix "" Host|JobSched ""
-        Host|STPath "" Host|STLicn "" Host|STLib "" Host|AllSTVer ""
-        Head "" Tail "" Raw|VarLst "" RawST|VarLst "" RawEnv|VarLst ""
-        Raw|STLst "" Brf|VarLst "" FmtRsvd|VarLst "" FmtEnv|VarLst ""
-        Fmt|VarLst "" FmtST|VarLst "" Fmt|STLst "" FmtVal|mfjDfltSet ""
-        FmtVal|mfjRegInfo "" FmtVal|mfjModTime "" FmtVal|mfjSTLst ""
+        Host|ID "" Host|User "" Host|Email "" Host|EmSufx "" Host|JobSched ""
+        Host|STPath "" Host|STLicn "" Host|STSLib "" Host|AllSTVer ""
+        Raw|VarLst "" RawST|VarLst "" RawEnv|VarLst "" Raw|STLst ""
+        Fmt|VarLst "" FmtST|VarLst "" FmtEnv|VarLst "" Fmt|STLst ""
+        FmtRsvd|VarLst "" Brf|VarLst "" Head "" Tail ""
         UpdateRaw false UpdateBrf false UpdateFmt false
     }
 }
 
 # mfjIntrpr::readRaw
 #     Read ::SimArr(FVarRaw) and update the corresponding variables in arr
-#     It is safer to assign value to a global variable
 #     Strictly treat each line as a string to preserve the original format
 #     Trim the trailing blank lines
 #     Use 'str2List' to properly convert a string to a list
@@ -40,228 +38,179 @@ proc mfjIntrpr::readRaw {} {
 
     # Set the following indentation as 2 (8 spaces)
     set mfjProc::arr(Indent1) 2
-    foreach Elm [list ReadCmnt ReadGrm ReadVar UpdateVar ReadHead ReadTail\
-        ReadTool UpdateTool] {
+
+    # Initialize variables
+    foreach Elm [list ReadCmnt ReadGrm ReadVar ReadHead ReadTail ReadST\
+        HeadEnd VarEnd STEnd BodyEnd] {
         upvar 0 $Elm Alias
         set Alias false
     }
-
-    # It is safer to assign values to global variables
-    foreach Elm [list VarName VarLvl VarVal VarCmnt VarCmnt1 VarCmnt2 VarGStr\
-        VarGLst STLbl STName STIdx Cmnt1 Cmnt2] {
-        upvar 0 $Elm Alias
-        set Alias ""
-    }
+    set CmntB4 ""
+    set CmntAf ""
+    set LineSeq 1
+    set VarIdx 0
+    set IDLst {COMMENT GRAMMAR VAR SENTAURUS HEAD TAIL}
+    set Str ""
 
     # Read all lines to memory as the variable file is small
     set Inf [open $::SimArr(FVarRaw) r]
     set Lines [split [read $Inf] \n]
     close $Inf
 
-    # Strictly treat each line as a string only insted of a list
-    set LineIdx 0
-    set LineEnd [llength $Lines]
-    incr LineEnd -1
-    set VarIdx 0
+    # Trick: Append an EOF line for the subsequent loop
+    set EOF <mfj>[clock seconds]
+    lappend Lines $EOF
+
+    # Strictly treat each line as a string instead of a list
     foreach Line $Lines {
 
         # Remove right side spaces for each line
         set Line [string trimright $Line]
 
-        # Three scenarios: ID line, comment line, and other lines
-        if {[regexp -nocase {^\s*<(HEAD|COMMENT|GRAMMAR|VAR|TOOL|TAIL)>(.+)}\
-            $Line -> ID Str]} {
+        # Four scenarios: ID line, comment line, last line, and other lines
+        if {[regexp -nocase ^\\s*<\([join $IDLst |]\)>\(.+\) $Line -> ID Tmp]} {
             switch -regexp -- $ID {
                 (?i)HEAD {
+                    if {$ReadCmnt || $ReadGrm || $ReadVar || $ReadST
+                        || $ReadTail} {
+                        error "head section not at the beginning!"
+                    }
                     if {$arr(Head) eq ""} {
                         vputs -v2 -i-1 "Reading the file head..."
                         set ReadHead true
-                        set HStr $Str
                     }
                 }
                 (?i)COMMENT {
                     set ReadCmnt true
-                    set Cmnt $Str
+                    if {$ReadVar} {
+                        set ReadVar false
+                        set VarEnd true
+                        set VarStr $Str
+                    } elseif {$ReadST} {
+                        set ReadST false
+                        set STEnd true
+                        set STStr $Str
+                    } elseif {[llength $arr(Raw|VarLst)] == 0} {
 
-                    # The 1st <COMMENT>
-                    if {[llength $VarName] == 0} {
-                        if {$arr(Head) eq ""} {
-                            if {$ReadHead} {
-                                set ReadHead false
-                                set arr(Head) [string trim $HStr]
-                                #vputs -v3 -c <HEAD>$arr(Head)\n
-                                vputs -v2 -i-1 "Reading simulation variables..."
-                            } else {
-
-                                # No <HEAD> found, update the variable file
-                                set arr(Head) "--- Describe your simulation"
-                                set arr(UpdateRaw) true
-                            }
-                        }
-                    } else {;# The rest <COMMENT>
-
-                        # Deal with the previous <TOOL> or <VAR>
-                        if {$ReadTool} {
-                            set ReadTool false
-                            set UpdateTool true
-                        } elseif {$ReadVar} {;# VarStr is dealt later
-                            set ReadVar false
-                            set UpdateVar true
-                        } else {
-                            error "variable missing before line [incr LineIdx]!"
-                        }
+                        # The 1st <COMMENT>
+                        set ReadHead false
+                        set HeadEnd true
+                        set HeadStr $Str
+                    } elseif {[llength $arr(Raw|VarLst)]
+                        || [llength $arr(Raw|STLst)]} {
+                        error "variable/tool missing before line $LineSeq!"
                     }
                 }
                 (?i)GRAMMAR {
                     set ReadGrm true
-                    set GrmStr $Str
 
                     # Deal with the previous <COMMENT>
                     if {$ReadCmnt} {
                         set ReadCmnt false
-                        lappend VarCmnt [string trim $Cmnt]
-                        #vputs -v3 -c <COMMENT>[lindex $VarCmnt end]\n
+                        set CmntStr [string trimright $Str]
                     } else {
-                        error "comment missing before line [incr LineIdx]!"
+                        error "comment missing before line $LineSeq!"
                     }
                 }
                 (?i)VAR {
                     set ReadVar true
-                    set VarStr $Str
-                    lappend VarCmnt1 $Cmnt1
-                    set Cmnt1 ""
 
                     # Deal with the previous <GRAMMAR>
                     if {$ReadGrm} {
                         set ReadGrm false
+                        set GrmStr [string trimright $Str]
                     } else {
-                        error "grammar missing before line [incr LineIdx]!"
+                        error "grammar missing before line $LineSeq!"
                     }
                 }
-                (?i)TOOL {
-                    set ReadTool true
-                    set STStr $Str
+                (?i)SENTAURUS {
+                    set ReadST true
 
                     # Deal with the previous <VAR>
                     if {$ReadVar} {;# VarStr is dealt later
                         set ReadVar false
-                        set UpdateVar true
-                    } else {
-                        error "variable missing before line [incr LineIdx]!"
+                        set VarEnd true
+                        set VarStr $Str
+                    } elseif {$ReadHead} {;# 1st tool, no environment variables
+                        set ReadHead false
+                        set HeadEnd true
+                        set HeadStr $Str
                     }
                 }
                 default {;# Tail
                     set ReadTail true
-                    set TStr [string trim $Str]
-
-                    # Deal with the previous <VAR> or <TOOL>
-                    if {$ReadVar} {
-                        set ReadVar false
-                        set UpdateVar true
-                    } elseif {$ReadTool} {
-                        set ReadTool false
-                        set UpdateTool true
-                    } else {
-                        error "variable missing before line [incr LineIdx]!"
-                    }
+                    set BodyEnd true
+                    set BodyStr $Str
                 }
             }
+            set Str [string trimleft $Tmp]
         } elseif {[regexp {^\s*#} $Line]} {
-            if {$ReadVar} {
-                if {$Cmnt2 eq ""} {
-                    set Cmnt2 $Line
+
+            # Ignore comment lines elsewhere
+            if {$ReadGrm} {
+                if {$CmntB4 eq ""} {
+                    set CmntB4 $Line
                 } else {
-                    append Cmnt2 \n$Line
+                    append CmntB4 \n$Line
                 }
+            } elseif {$ReadVar} {
+                if {$CmntAf eq ""} {
+                    set CmntAf $Line
+                } else {
+                    append CmntAf \n$Line
+                }
+            }
+        } elseif {$Line eq $EOF} {
+            if {$ReadTail} {
+                set arr(Tail) [string trimright $Str]
             } else {
-                if {$Cmnt1 eq ""} {
-                    set Cmnt1 $Line
-                } else {
-                    append Cmnt1 \n$Line
-                }
+
+                # No <TAIL> found, update the variable file
+                set arr(Tail) "No variables afterwards"
+                set arr(UpdateRaw) true
+                set BodyEnd true
+                set BodyStr $Str
             }
         } else {
 
-            # Ignore lines before <HEAD>
-            foreach Elm {ReadHead ReadCmnt ReadGrm ReadVar ReadTool ReadTail}\
-                Str {HStr Cmnt GrmStr VarStr STStr TStr} {
-                upvar 0 $Elm Alias
-                if {$Alias} {
+            # Append lines but ignore lines before <HEAD>
+            if {$ReadCmnt || $ReadGrm || $ReadVar || $ReadST
+                || $ReadHead || $ReadTail} {
 
-                    # Preserve the original format of each line
-                    append $Str \n$Line
-                    break
-                }
+                # Preserve the original format of each line
+                append Str \n$Line
             }
         }
 
-        # Last line
-        if {$LineIdx == $LineEnd} {
-            if {$ReadCmnt} {
-                error "grammar missing before the last line!"
+        # Deal with 'BodyEnd' signal to enable 'VarEnd' or 'STEnd'
+        if {$BodyEnd} {
+            if {$ReadVar} {
+                set ReadVar false
+                set VarEnd true
+                set VarStr $BodyStr
+            } elseif {$ReadST} {
+                set ReadST false
+                set STEnd true
+                set STStr $BodyStr
+            } elseif {$ReadCmnt} {
+                error "grammar missing before line $LineSeq!"
             } elseif {$ReadGrm} {
-                error "variable missing before the last line!"
-            } elseif {$ReadVar} {
-                set UpdateVar true
-
-                # No <TAIL> found, update the variable file
-                set arr(Tail) "--- No variables afterwards"
-                set arr(UpdateRaw) true
-            } elseif {$ReadTool} {
-                set UpdateTool true
-
-                # No <TAIL> found, update the variable file
-                set arr(Tail) "--- No variables afterwards"
-                set arr(UpdateRaw) true
-            } elseif {$ReadTail} {
-                set arr(Tail) $TStr
+                error "variable missing before line $LineSeq!"
             } else {
-                error "invalid '$::SimArr(FVarRaw)'!"
+                error "variable/tool missing before line $LineSeq!"
             }
         }
-        if {$UpdateTool} {
 
-            # Replace multiple spaces within the sentence with a single space
-            set STStr [regsub -all {\s+} $STStr " "]
-            if {[regexp -nocase ^$::SimArr(STDfltID)$ [string trim $STStr]\
-                -> Lbl Tool]} {
-
-                # Check against pre-defined tool names
-                set Tmp [lsearch -regexp $::SimArr(STTools) (?i)^$Tool$]
-                if {$Tmp == -1} {
-                    error "unknown ST tool '$Tool'!"
-                } else {
-                    lappend STName [lindex $::SimArr(STTools) $Tmp]
-                }
-
-                # Update the case for tool label by checking the command file
-                set FCmd $Lbl[lindex $::SimArr(STSuffix) $Tmp]
-                if {[catch {iFileExists FCmd}]} {
-                    error "invalid tool label '$Lbl'!"
-                } else {
-                    set Lbl [string range $FCmd 0 end-8]
-                }
-                lappend STLbl $Lbl
-                lappend STIdx $VarIdx
-                vputs -v3 "ST tool: '[lindex $STName end]'\tlabel:\
-                    '$Lbl'\tindex: '$VarIdx'\n"
-            } else {
-                error "invalid ST settings '$STStr'!"
-            }
-            if {$ReadTail} {
-                vputs -v2 -i-1 "Reading the file tail..."
-            }
-            set UpdateTool false
-        }
-        if {$UpdateVar} {
-            if {[llength $VarStr] == 0} {
+        if {$VarEnd} {
+            set Var [lindex $VarStr 0]
+            set Len [llength $VarStr]
+            if {$Len == 0} {
                 error "no variable and value!"
-            } elseif {[llength $VarStr] == 1} {
-                error "no value assigned to variable '$VarStr'!"
+            } elseif {$Len == 1} {
+                error "no value assigned to variable '$Var'!"
             } else {
 
-                # Valid variable name: [a-zA-Z0-9_]
-                set Var [lindex $VarStr 0]
+                # Validate variable name: [a-zA-Z0-9_]
                 if {![regexp {^\w+$} $Var]} {
                     error "invalid variable name '$Var'. only characters\
                         'a-zA-Z0-9_' are allowed!"
@@ -276,108 +225,104 @@ proc mfjIntrpr::readRaw {} {
                     set Var $Tmp
                 }
 
-                # Properly convert a grammar string to a list
-                lappend VarGStr [string trim $GrmStr]
-                #vputs -v3 -c <GRAMMAR>[lindex $VarGStr end]\n
-                lappend VarGLst [str2List "$Var: Grammar" $GrmStr]
-                if {[lindex $VarCmnt1 end] ne ""} {
-                    #vputs -v3 -c [lindex $VarCmnt1 end]\n
+                # Update raw elements in array
+                lappend arr(Raw|VarLst) $Var
+                if {[llength $arr(Raw|STLst)]} {
+                    lappend arr(RawST|VarLst) $Var
+                    set Tool [lindex $arr(Raw|STLst) end]
+                    lappend arr(Raw$Tool|VarLst) $Var
+                } else {
+                    lappend arr(RawEnv|VarLst) $Var
                 }
+                set arr(RawGStr|$Var) $GrmStr
+
+                # Properly convert a grammar string to a list
+                set Tmp "[format %02d $VarIdx] $Var: Grammar"
+                set arr(RawGLst|$Var) [str2List $Tmp $GrmStr]
+                set arr(RawCmnt|$Var) $CmntStr
+                set arr(RawCmntB4|$Var) $CmntB4
+                set CmntB4 ""
+                set arr(RawCmntAf|$Var) $CmntAf
+                set CmntAf ""
 
                 # Convert strings properly to lists for variable values
                 # in spite of levels of nesting
                 # For variables before ST tools, multiple levels are dropped
-                # Multiple-level: LvlLen > 1
-                set Len [llength $VarStr]
-                lappend VarName $Var
-                if {$Len == 2 || $STIdx eq ""} {
-                    lappend VarLvl 1
-                    lappend VarVal [str2List "$Var: Value" [lindex $VarStr 1]]
+                set Tmp "[format %02d $VarIdx] $Var: Value"
+                if {$Len == 2 || [llength $arr(Raw|STLst)] == 0} {
+                    set arr(RawLvl|$Var) 1
+                    set arr(RawVal|$Var) [str2List $Tmp [lindex $VarStr 1]]
                 } else {
-                    lappend VarLvl [incr Len -1]
-                    lappend VarVal [str2List "$Var: Value"\
-                        [lrange $VarStr 1 end]]
+                    set arr(RawLvl|$Var) [incr Len -1]
+                    set arr(RawVal|$Var) [str2List $Tmp [lrange $VarStr 1 end]]
                 }
             }
-            lappend VarCmnt2 $Cmnt2
-            if {$Cmnt2 ne ""} {
-                #vputs -v3 -c $Cmnt2\n
-            }
-            set Cmnt2 ""
-            if {$ReadTail} {
-                vputs -v2 -i-1 "Reading the file tail..."
-            }
-            set UpdateVar false
+            set VarEnd false
             incr VarIdx
+            if {$BodyEnd && $ReadTail} {
+                vputs -i-1 "'[llength $arr(Raw|VarLst)]' variables found!"
+                vputs -v2 -i-1 "Reading the file tail..."
+                set BodyEnd false
+            }
+        } elseif {$STEnd} {
+
+            # Reduce unnecessary spaces, tab, newline symbols
+            # Replace multiple spaces within the sentence with a single space
+            set STStr [regsub -all {\s+} [string trim $STStr] " "]
+            if {[regexp -nocase ^$::SimArr(STDfltID)$ $STStr -> Lbl Tool]} {
+
+                # Check against pre-defined tool names
+                set Idx [lsearch -regexp $::SimArr(ST|Tools) (?i)^$Tool$]
+                if {$Idx == -1} {
+                    error "unknown ST tool '$Tool'!"
+                } else {
+                    set Tool [lindex $::SimArr(ST|Tools) $Idx]
+                }
+                lappend arr(Raw|STLst) $Tool
+                set arr(RawLbl|$Tool) $Lbl
+                vputs -v2 "Sentaurus tool: '$Tool'\tlabel: '$Lbl'\n"
+                if {$BodyEnd && $ReadTail} {
+                    vputs -i-1 "'[llength $arr(Raw|VarLst)]' variables found!"
+                    vputs -v2 -i-1 "Reading the file tail..."
+                    set BodyEnd false
+                }
+            } else {
+                error "invalid ST settings '$STStr'!"
+            }
+            set STEnd false
+        } elseif {$HeadEnd} {
+            if {$arr(Head) eq ""} {
+                set arr(Head) [string trimright $HeadStr]
+                vputs -v2 -i-1 "Reading simulation variables..."
+            }
+            if {$arr(Head) eq ""} {
+
+                # No <HEAD> found, update the variable file
+                set arr(Head) "Describe your simulation project..."
+                set arr(UpdateRaw) true
+            }
+            set HeadEnd false
         }
-        incr LineIdx
+        incr LineSeq
     }
     set mfjProc::arr(Indent1) 0
-    if {[llength $VarName]} {
 
-        # Case-insensitive lsort (find duplicate variables)
-        set Tmp [lsort -unique [string tolower $VarName]]
-        if {[llength $VarName] ne [llength $Tmp]} {
-            error "no duplicate variable name allowed!"
-        }
-
-        # Pass essential variables to array 'arr'
-        set VarIdx 0
-        set Idx 0
-        set Len [llength $STName]
-        if {$Len == 0} {
-            error "no ST tools found!"
-        }
-        foreach Var $VarName Len $VarLvl Val $VarVal Cmnt $VarCmnt\
-            Cmnt1 $VarCmnt1 Cmnt2 $VarCmnt2 GStr $VarGStr GLst $VarGLst {
-            lappend arr(Raw|VarLst) $Var
-            set arr(RawLvl|$Var) $Len
-            set arr(RawVal|$Var) $Val
-            set arr(RawCmnt|$Var) $Cmnt
-            set arr(RawCmnt1|$Var) $Cmnt1
-            set arr(RawCmnt2|$Var) $Cmnt2
-            set arr(RawGStr|$Var) $GStr
-            set arr(RawGLst|$Var) $GLst
-            if {$VarIdx < [lindex $STIdx 0]} {
-                lappend arr(RawEnv|VarLst) $Var
-            } elseif {$VarIdx == [lindex $STIdx $Idx]} {
-                set Tool [lindex $STName $Idx]
-                lappend arr(Raw|STLst) $Tool
-                lappend arr(RawST|VarLst) $Var
-                lappend arr(Raw$Tool|VarLst) $Var
-                set arr(RawLbl|$Tool) [lindex $STLbl $Idx]
-                incr Idx
-            } else {
-                lappend arr(RawST|VarLst) $Var
-                lappend arr(Raw$Tool|VarLst) $Var
-            }
-            incr VarIdx
-        }
-
-        # In case no variables or the rest tools have no variables
-        while {$Idx < $Len && $VarIdx == [lindex $STIdx $Idx]} {
-            set Tool [lindex $STName $Idx]
-            lappend arr(Raw|STLst) $Tool
-            set arr(RawLbl|$Tool) [lindex $STLbl $Idx]
-            set arr(Raw$Tool|VarLst) [list]
-            incr Idx
-        }
-    } else {
-        error "no variables in '$::SimArr(FVarRaw)'!"
+    # Case-insensitive lsort (find duplicate variables)
+    set Tmp [lsort -unique [string tolower $arr(Raw|VarLst)]]
+    if {[llength $arr(Raw|VarLst)] ne [llength $Tmp]} {
+        error "no duplicate variable name allowed!"
     }
-
-    # Remove trailing blank lines in the tail section
-    set arr(Tail) [string trim $arr(Tail)]
-    #vputs -v3 -c <TAIL>$arr(Tail)
     vputs
 }
 
 # mfjIntrpr::readBrf
-    # Read variables and their values if the brief version exists and
-    # is more recent than ::SimArr(FVarRaw)
-    # The brief version only has variables and their value
+    # Read variables and their values if the brief version exists. If this file
+    # is more recent than ::SimArr(FVarRaw), update the raw file.
+    # The brief version only has variables and their corresponding values
     # There is no way to distinguish environment and simulation variables
-    # So the environment variables have to be placed in front
+    # So the names of environment variables have to be known first. No multiple
+    # values are allowed for environment variables.
+    # Blank and comment lines can be added anywhere but they are skipped.
 proc mfjIntrpr::readBrf {} {
     variable arr
     set FVarBrf [file rootname $::SimArr(FVarRaw)]-brief.txt
@@ -393,68 +338,79 @@ proc mfjIntrpr::readBrf {} {
         set Lines [split [read $Inf] \n]
         close $Inf
 
-        # Strictly treat each line as a string only insted of a list
-        # Each variable should be seperated at least a blank or comment line
-        # Comment lines are skipped and will not be saved when updating the file
-        set LineIdx 0
-        set LineEnd [llength $Lines]
-        incr LineEnd -1
-        set Str ""
-        foreach Line $Lines {
+        # Trick: Append an EOF line for the subsequent loop
+        set EOF <mfj>[clock seconds]
+        lappend Lines $EOF
 
-            # Trim leading and trailing spaces
-            set Line [string trim $Line]
-            set Char [string index $Line 0]
-            if {$Char ne "#" && $Line ne ""} {
+        # Strictly treat each line as a string instead of a list
+        # For briefness, those lines are not restored when updating
+        set Str ""
+        set Var ""
+        set VarIdx 0
+        set VarEnd false
+        foreach Line $Lines {
+            set Line [string trimleft $Line]
+
+            # Skip comment lines
+            if {[string index $Line 0] eq "#"} {
+                continue
+            } elseif {$Line eq "" || $Line eq $EOF} {
+                if {$Str ne ""} {
+                    set VarEnd true
+                    set VarStr $Str
+                    set VarName $Var
+                    set Str ""
+                }
+            } elseif {[regexp {^(\w+)\s+} $Line -> Tmp]} {
+
+                # Update the case when detecting a variable name
+                set Idx [lsearch -regexp $::SimArr(VarName) (?i)^$Tmp$]
+                if {$Idx == -1} {
+                    append Str " $Line"
+                } else {
+                    if {$Str ne ""} {
+                        set VarEnd true
+                        set VarStr $Str
+                        set VarName $Var
+                    }
+                    set Var [lindex $::SimArr(VarName) $Idx]
+                    set Str $Line
+                }
+            } else {
                 append Str " $Line"
             }
-
-            # String list duality
-            # Three conditions to extract variables values: comment line,
-            # blank line or the last line
-            # Ignore comment lines
-            if {$Char eq "#" || $Line eq "" || $LineIdx == $LineEnd} {
-                if {[llength $Str] == 0} {
-                    incr LineIdx
-                    continue
-                }
-                if {[llength $Str] == 1} {
-                    error "no value assigned to variable '$Str'!"
-                }
-
-                # Valid variable name: [a-zA-Z0-9_]
-                set Var [lindex $Str 0]
-                set Val [lrange $Str 1 end]
-                set Str ""
-                if {![regexp {^\w+$} $Var]} {
-                    error "invalid variable name '$Var'. only characters\
-                        'a-zA-Z0-9_' are allowed!"
-                }
-
-                # Update the case for each variable name
-                set Tmp [lsearch -inline -regexp $::SimArr(VarName) (?i)^$Var$]
-                if {$Tmp eq ""} {
-                    error "variable name '$Var' not found in\
-                        '::SimArr(VarName)' of '11ctrlsim.tcl'!"
+            if {$VarEnd} {
+                if {[llength $VarStr] == 0} {
+                    error "variable #$VarIdx absent!"
+                } elseif {[llength $VarStr] == 1} {
+                    error "no value assigned to variable "[lindex $VarStr 0]!"
                 } else {
-                    set Var $Tmp
-                }
+                    if {![string equal -nocase $VarName [lindex $VarStr 0]]} {
+                        error "variable name '[lindex $VarStr 0]' not found in\
+                            '::SimArr(VarName)' of '11ctrlsim.tcl'!"
+                    }
+                    set Val [lrange $VarStr 1 end]
 
-                # Convert strings properly to lists for values
-                lappend arr(Brf|VarLst) $Var
-                set Len [llength $Val]
-                if {$Len == 1 || $Var eq "SimEnv"} {
-                    set arr(BrfLvl|$Var) 1
-                    set arr(BrfVal|$Var) [str2List "$Var:" [lindex $Val 0]]
-                } else {
-                    set arr(BrfLvl|$Var) $Len
-                    set arr(BrfVal|$Var) [str2List "$Var:" $Val]
+                    # Convert strings properly to lists for values
+                    lappend arr(Brf|VarLst) $VarName
+                    set Len [llength $Val]
+                    set Tmp "[format %02d $VarIdx] $VarName:"
+                    if {$Len == 1 || $VarName eq "SimEnv"} {
+                        set arr(BrfLvl|$VarName) 1
+                        set arr(BrfVal|$VarName) [str2List $Tmp [lindex $Val 0]]
+                    } else {
+                        set arr(BrfLvl|$VarName) $Len
+                        set arr(BrfVal|$VarName) [str2List $Tmp $Val]
+                    }
+                    set VarEnd false
+                    incr VarIdx
                 }
             }
-            incr LineIdx
         }
         set mfjProc::arr(Indent1) 0
-        if {[llength $arr(Brf|VarLst)]} {
+        set Len [llength $arr(Brf|VarLst)]
+        if {$Len} {
+            vputs -i1 "'$Len' variables found!"
 
             # Case-insensitive lsort
             set Tmp [lsort -unique [string tolower $arr(Brf|VarLst)]]
@@ -557,25 +513,32 @@ proc mfjIntrpr::rawvsBrf {} {
 #   Read simulator settings on the current host
 proc mfjIntrpr::readHost {} {
     variable arr
-    set arr(Host|ID) [lindex [split $::env(HOSTNAME) .] 0]
+    set arr(Host|ID) [exec hostname]
     vputs "Extracting settings from host '$arr(Host|ID)'..."
     set arr(Host|User) $::env(USER)
-    vputs -v3 -i1 "User: $arr(Host|User)"
-    foreach Name $::SimArr(STHosts) Sufx $::SimArr(ESuffix) {
-        if {[string index $Name 0] eq [string index $arr(Host|ID) 0]} {
-            set arr(Host|ESuffix) $Sufx
-            break
-        }
-    }
+    vputs -v3 -i1 "User: '$arr(Host|User)'"
 
     # Email format: local-part@domain
     # local-part: \w!#$%&'*+-/=?^_`{|}~.
     # domain: \w-
-    if {![regexp {([\w.%+-]+@(\w+[\.-])+[a-zA-Z]{2,4})}\
-        [exec getent passwd $arr(Host|User)] -> arr(Host|Email)]} {
-        set arr(Host|Email) $arr(Host|User)@$arr(Host|ESuffix)
+    if {$::SimArr(Email) ne ""} {
+        set arr(Host|Email) $::SimArr(Email)
+    } else {
+        if {![regexp {([\w.%+-]+@(\w+[\.-])+[a-zA-Z]{2,4})}\
+            [exec getent passwd $arr(Host|User)] -> arr(Host|Email)]} {
+            foreach Name $::SimArr(ST|Hosts) Sufx $::SimArr(Email|Sufx) {
+                if {[string index $Name 0] eq [string index $arr(Host|ID) 0]} {
+                    set arr(Host|EmSufx) $Sufx
+                    break
+                }
+            }
+            if {$arr(Host|EmSufx) eq ""} {
+                error "unknown host! Update ST|Hosts in 11ctrlsim.tcl"
+            }
+            set arr(Host|Email) $arr(Host|User)@$arr(Host|EmSufx)
+        }
     }
-    vputs -v3 -i1 "Email: $arr(Host|Email)"
+    vputs -v3 -i1 "Email: '$arr(Host|Email)'"
 
     # Check available job schedulers
     if {[eval {auto_execok qsub}] ne ""} {
@@ -584,7 +547,11 @@ proc mfjIntrpr::readHost {} {
     if {[eval {auto_execok sbatch}] ne ""} {
         lappend arr(Host|JobSched) SLURM
     }
-    vputs -v3 -i1 "Job scheduler available: $arr(Host|JobSched)"
+    if {$arr(Host|JobSched) eq ""} {
+        vputs -v3 -i1 "Job scheduler not available!"
+    } else {
+        vputs -v3 -i1 "Job scheduler available: '$arr(Host|JobSched)'"
+    }
 
     # Retrieve Sentaurus TCAD related settings
     set FoundPath true
@@ -592,8 +559,8 @@ proc mfjIntrpr::readHost {} {
         set arr(Host|STPath) [file dirname $::env(STROOT)]
         set arr(Host|STLicn) [lindex [split $::env(LM_LICENSE_FILE) :] 0]
     } else {
-        foreach Name $::SimArr(STHosts) Path $::SimArr(STPaths)\
-            Licn $::SimArr(STLicns) {
+        foreach Name $::SimArr(ST|Hosts) Path $::SimArr(ST|Paths)\
+            Licn $::SimArr(ST|Licns) {
             if {[string index $Name 0] eq [string index $arr(Host|ID) 0]} {
                 if {[string index $Path end] eq "/"} {
                     set Path [string range $Path 0 end-1]
@@ -604,26 +571,36 @@ proc mfjIntrpr::readHost {} {
             }
         }
     }
-    vputs -v3 -i1 "ST license: $arr(Host|STLicn)"
-    foreach Name $::SimArr(STHosts) Lib $::SimArr(STLib) {
-        if {[string index $Name 0] eq [string index $arr(Host|ID) 0]
-            && [iFileExists Lib]} {
-            set arr(Host|STLib) $Lib
-            break
+    if {$arr(Host|STLicn) eq ""} {
+        vputs -v3 -i1 "Sentaurus license not found!"
+    } else {
+        vputs -v3 -i1 "Sentaurus license: $arr(Host|STLicn)"
+    }
+    foreach Name $::SimArr(ST|Hosts) Path $::SimArr(ST|Paths) {
+        if {[string index $Name 0] eq [string index $arr(Host|ID) 0]} {
+            set SLib [file join $Path sharedlib]
+            if {[iFileExists SLib]} {
+                set arr(Host|STSLib) $SLib
+                break
+            }
         }
     }
-    vputs -v3 -i1 "ST shared libraries: $arr(Host|STLib)"
+    if {$arr(Host|STSLib) eq ""} {
+        vputs -v3 -i1 "Sentaurus shared libraries not available!"
+    } else {
+        vputs -v3 -i1 "Sentaurus shared libraries: $arr(Host|STSLib)"
+    }
 
     # Check Sentaurus TCAD path
     if {[catch {iFileExists arr(Host|STPath)}]} {
         set FoundPath false
-        vputs -v3 -i1 "ST path: Invalid '$arr(Host|STPath)'"
+        vputs -v3 -i1 "Sentaurus path not found!"
     } else {
         if {![file isdirectory $arr(Host|STPath)]} {
             set FoundPath false
-            vputs -v3 -i1 "ST path: Invalid '$arr(Host|STPath)'"
+            vputs -v3 -i1 "Sentaurus path not found!"
         } else {
-            vputs -v3 -i1 "ST path: $arr(Host|STPath)"
+            vputs -v3 -i1 "Sentaurus path: '$arr(Host|STPath)'"
         }
     }
 
@@ -635,14 +612,18 @@ proc mfjIntrpr::readHost {} {
                 lappend arr(Host|AllSTVer) $Elm
             }
         }
+        set arr(Host|AllSTVer) [lsort $arr(Host|AllSTVer)]
     }
-    set arr(Host|AllSTVer) [lsort $arr(Host|AllSTVer)]
-    vputs -v3 -i1 "ST versions: $arr(Host|AllSTVer)"
+    if {$arr(Host|AllSTVer) eq ""} {
+        vputs -v3 -i1 "Sentaurus version not found!"
+    } else {
+        vputs -v3 -i1 "Sentaurus versions: $arr(Host|AllSTVer)"
+    }
     vputs
 }
 
 # mfjIntrpr::activateRR
-    # Check arr(RawVarVal) and arr(RawVarGLst) to activate the replace and
+    # Check arr(RawVal|$Var) and arr(RawGLst|$Var) to activate the replace and
     # then reuse features if necessary.
 proc mfjIntrpr::activateRR {} {
     variable arr
@@ -650,7 +631,7 @@ proc mfjIntrpr::activateRR {} {
     vputs "Activate replacing features in multiple-level variables if any..."
     set NewLst [list]
     set Sum 0
-    foreach Var $arr(RawST|VarLst) {
+    foreach Var $arr(Raw|VarLst) {
 
         # Only check variables with multiple levels
         if {$arr(RawLvl|$Var) == 1} continue
@@ -776,15 +757,13 @@ proc mfjIntrpr::sortVar {} {
     # For 'ProcSeq', update rules with advanced calibration versions
 proc mfjIntrpr::updateGrm {} {
     variable arr
-
     vputs "Update grammar for 'SimEnv' if necessary..."
 
     # Check and update job scheduler settings in 'SimEnv'
     set UpdateGrm false
     set SimGrm $arr(RawGLst|SimEnv)
-
     if {$arr(Host|AllSTVer) eq ""} {
-        error "no ST version available!"
+        error "no Sentaurus version available!"
     }
 
     # Set the default version to the latest (a == latest)
@@ -958,14 +937,34 @@ proc mfjIntrpr::validateVar {} {
             vputs -v3 -i2 "After validation: \{$VarVal\}"
             set arr(RawVal|SimEnv) $VarVal
             incr SimIdx
+            if {[lindex $VarVal 0] eq "Sentaurus"} {
 
-            # Extract material database from the selected software version
-            if {[string equal -nocase [lindex $arr(RawVal|SimEnv) 0]\
-                "Sentaurus"]} {
-                vputs -i2 "Identifying material database from [lindex\
-                    $arr(RawVal|SimEnv) 0] [lindex $arr(RawVal|SimEnv) 1]..."
-                set FMat $arr(Host|STPath)/[lindex $arr(RawVal|SimEnv)\
-                    1]/tcad/[lindex $arr(RawVal|SimEnv) 1]/lib/datexcodes.txt
+                # Update the case for tool label by checking the command file
+                foreach Tool $arr(Raw|STLst) {
+                    set FCmd $arr(RawLbl|$Tool)$::SimArr($Tool|Sufx)
+                    if {[catch {iFileExists FCmd}]} {
+                        error "invalid tool label '$Lbl'!"
+                    } else {
+                        set arr(RawLbl|$Tool) [string range $FCmd 0 end-8]
+                    }
+
+                    # Include key Sentaurus files in ::SimArr(ModTime)
+                    if {$Tool eq "sdevice"} {
+                        if {[file isfile sdevice.par]} {
+                            lappend ::SimArr(ModTime) [list sdevice.par\
+                                [file mtime sdevice.par]]
+                        } else {
+                            error "'sdevice.par' not found!"
+                        }
+                    }
+                    lappend ::SimArr(ModTime) [list $FCmd [file mtime $FCmd]]
+                }
+
+                # Extract material database from the selected software version
+                vputs -i2 "Identifying material database from\
+                    [lrange $VarVal 0 1]..."
+                set FMat [file join $arr(Host|STPath) [lindex $VarVal 1] tcad\
+                    [lindex $VarVal 1] lib datexcodes.txt]
                 set ::SimArr(MatDB) [readMatDB datexcodes.txt $FMat]
                 vputs
             }
@@ -1140,26 +1139,10 @@ proc mfjIntrpr::validateVar {} {
         incr SimIdx
     }
 
-    # Include key ST files in ::SimArr(ModTime)
-    if {$arr(Raw|STLst) ne ""} {
-        foreach Tool $arr(Raw|STLst) {
-            set Idx [lsearch -exact $::SimArr(STTools) $Tool]
-            set FCmd $arr(RawLbl|$Tool)[lindex $::SimArr(STSuffix) $Idx]
-            if {$Tool eq "sdevice"} {
-                if {[file isfile sdevice.par]} {
-                    lappend ::SimArr(ModTime) [list sdevice.par\
-                        [file mtime sdevice.par]]
-                } else {
-                    error "'sdevice.par' not found!"
-                }
-            }
-            lappend ::SimArr(ModTime) [list $FCmd [file mtime $FCmd]]
-        }
-    }
-
     # Include key Tcl files, datexcodes.txt, Molefraction.txt and PMI files
     foreach Elm [concat 11ctrlsim.tcl datexcodes.txt Molefraction.txt\
-        [glob -nocomplain .mfj/mfj*.tcl $::SimArr(PMIDir)/*.\[cC\]]] {
+        [glob -nocomplain [file join $::SimArr(CodeDir) mfj*.tcl]\
+        [file join $::SimArr(PMIDir) *.\[cC\]]]] {
         lappend ::SimArr(ModTime) [list $Elm [file mtime $Elm]]
     }
     vputs -v3 -i1 "Files for simulation and their modification time:"
@@ -1612,9 +1595,8 @@ proc mfjIntrpr::valRegGen {} {
 }
 
 # mfjIntrpr::readFmt
-    # Read ::SimArr(FVarFmt) and update the following variables in arr:
-    # FmtVarName FmtVarVal FmtSTLbl FmtSTName FmtSTIdx
-    # FmtSimEnv FmtModTime FmtRegInfo
+    # Read ::SimArr(FVarFmt) and update the corresponding variables in arr
+    # Variables and tools are seperated by one blank line
 proc mfjIntrpr::readFmt {} {
     variable arr
     vputs "Reading the formatted variable file '$::SimArr(FVarFmt)'..."
@@ -1623,11 +1605,11 @@ proc mfjIntrpr::readFmt {} {
         set Str ""
         set Flg true
         set Inf [open $::SimArr(FVarFmt) r]
+        set Lines [split [read $Inf] \n]
+        close $Inf
         vputs -v3 -i1 "Reserved variables:"
-        while {[gets $Inf Line] != -1} {
-            if {[regexp {\S} $Line]} {
-                append Str "[string trimleft $Line] "
-            } else {
+        foreach Line $Lines {
+            if {$Line eq ""} {
                 if {$Str ne ""} {
                     if {[string index $Str 0] eq "#"} {
                         if {[regexp -nocase $::SimArr(STDfltID) $Str\
@@ -1636,7 +1618,8 @@ proc mfjIntrpr::readFmt {} {
                             lappend arr(Fmt|STLst) $Tool
                             set arr(FmtLbl|$Tool) $Lbl
                             set arr(Fmt$Tool|VarLst) [list]
-                            vputs -v3 -i1 "ST tool: '$Tool'\tlabel: '$Lbl'"
+                            vputs -v3 -i1 "Sentaurus tool: '$Tool'\tlabel:\
+                                '$Lbl'"
                         }
                     } else {
                         set Var [lindex $Str 0]
@@ -1667,9 +1650,11 @@ proc mfjIntrpr::readFmt {} {
                     }
                 }
                 set Str ""
+            } else {
+                append Str "[string trimleft $Line] "
             }
         }
-        close $Inf
+        vputs -i1 "'[llength $arr(Fmt|VarLst)]' variables found!"
     } else {
         vputs -i1 "The formatted variable file '$::SimArr(FVarFmt)' not found!"
         set arr(UpdateFmt) true
@@ -1708,153 +1693,177 @@ proc mfjIntrpr::fmtvsRaw {} {
     if {!$arr(UpdateFmt)} {
         vputs "Comparing '$::SimArr(FVarFmt)' against '$::SimArr(FVarRaw)'..."
         set Msg "'$::SimArr(FVarFmt)' is different from '$::SimArr(FVarRaw)'!"
-        foreach Tool {Rsvd Env} Str {Reserved Environment} {
 
-            # Variable sequence doesn't matter
-            foreach Var $arr(Fmt$Tool|VarLst) {
-                if {[lsearch -exact $arr(Raw$Tool|VarLst) $Var] == -1} {
-                    if {!$arr(UpdateFmt)} {
-                        set arr(UpdateFmt) true
-                        vputs -i1 $Msg
-                    }
-                    vputs -v3 -i2 "$Str variable '$Var' in\
-                        '$::SimArr(FVarRaw)' removed!"
-                    continue
-                }
-                if {$arr(FmtVal|$Var) ne $arr(RawVal|$Var)} {
-                    if {!$arr(UpdateFmt)} {
-                        set arr(UpdateFmt) true
-                        vputs -i1 $Msg
-                    }
-                    vputs -v3 -i2 "$Str variable '$Var' has a value of\
-                        '$arr(FmtVal|$Var)' different from\
-                        '$arr(RawVal|$Var)'!"
-                }
-
-                # Remove all compiled PMI share objects if version changes
-                if {$Var eq "SimEnv" && [lindex $arr(FmtVal|SimEnv) 1]\
-                    ne [lindex $arr(RawVal|SimEnv) 1]} {
-                    foreach Elm [glob -nocomplain $::SimArr(PMIDir)/*.so.*] {
-                        vputs -i2 "File '$Elm' deleted!"
-                        file delete $Elm
-                    }
-                }
-
-                # List detailed file changes
-                if {$Var eq "mfjModTime"} {
-                    set ModTime $arr(RawVal|mfjModTime)
-                    foreach Elm $arr(FmtVal|mfjModTime) {
-                        set Lst [list]
-                        set FmtFlg false
-                        foreach Grp $ModTime {
-                            if {[lindex $Elm 0] eq [lindex $Grp 0]} {
-                                set FmtFlg true
-                                if {[lindex $Elm 1] != [lindex $Grp 1]} {
-                                    if {!$arr(UpdateFmt)} {
-                                        set arr(UpdateFmt) true
-                                        vputs -i1 $Msg
-                                    }
-                                    vputs -i3 "File '[lindex $Elm 0]' updated!"
-
-                                    # If PMI files are updated, remove the
-                                    # corresponding share objects
-                                    if {[string equal -nocase .c\
-                                        [file extension [lindex $Elm 0]]]} {
-                                        set Obj [glob -nocomplain [file\
-                                            rootname [lindex $Elm 0]].so.*]
-                                        if {$Obj ne ""} {
-                                            vputs -i3 "File '$Obj' deleted!"
-                                            file delete $Obj
-                                        }
-                                    }
-                                }
-                            } else {
-                                lappend Lst $Grp
-                            }
-                        }
-
-                        # Update ModTime to remove the matched file
-                        set ModTime $Lst
-
-                        # Output each file removed
-                        if {!$FmtFlg} {
-                            if {!$arr(UpdateFmt)} {
-                                set arr(UpdateFmt) true
-                                vputs -i1 $Msg
-                            }
-                            vputs -i3 "File '[lindex $Elm 0]' removed!"
-                        }
-                    }
-
-                    # Output the remaining files in ::SimArr(ModTime)
-                    foreach Elm $ModTime {
-                        if {!$arr(UpdateFmt)} {
-                            set arr(UpdateFmt) true
-                            vputs -i1 $Msg
-                        }
-                        vputs -i3 "File '[lindex $Elm 0]' added!"
-                    }
-                }
-            }
-            foreach Var $arr(Raw$Tool|VarLst) {
-                if {[lsearch -exact $arr(Fmt$Tool|VarLst) $Var] == -1} {
-                    if {!$arr(UpdateFmt)} {
-                        set arr(UpdateFmt) true
-                        vputs -i1 $Msg
-                    }
-                    vputs -v3 -i2 "$Str variable '$Var' in\
-                        '$::SimArr(FVarRaw)' added!"
-                }
-            }
-        }
-
-        # Check ST tools and variables. Tools should have the same sequence
-        if {$arr(Fmt|STLst) ne $arr(Raw|STLst)} {
-            if {!$arr(UpdateFmt)} {
-                set arr(UpdateFmt) true
-                vputs -i1 $Msg
-            }
-            vputs -v3 -i2 "ST tools '$arr(Fmt|STLst)' different from\
-                '$arr(Raw|STLst)'!"
-        }
-        foreach Tool $arr(Fmt|STLst) {
-            if {$arr(FmtLbl|$Tool) ne $arr(RawLbl|$Tool)} {
+        # Variable sequence doesn't matter for reserved variables
+        foreach Var $arr(FmtRsvd|VarLst) {
+            if {[lsearch -exact $arr(RawRsvd|VarLst) $Var] == -1} {
                 if {!$arr(UpdateFmt)} {
                     set arr(UpdateFmt) true
                     vputs -i1 $Msg
                 }
-                vputs -v3 -i2 "ST tool label '$arr(FmtLbl|$Tool)' different\
-                    from '$arr(RawLbl|$Tool)'!"
+                vputs -v3 -i2 "Reserved variable '$Var' in\
+                    '$::SimArr(FVarRaw)' removed!"
+                continue
+            }
+            if {$arr(FmtVal|$Var) ne $arr(RawVal|$Var)} {
+                if {!$arr(UpdateFmt)} {
+                    set arr(UpdateFmt) true
+                    vputs -i1 $Msg
+                }
+                vputs -v3 -i2 "Reserved variable '$Var' has a value of\
+                    '$arr(FmtVal|$Var)' different from\
+                    '$arr(RawVal|$Var)'!"
             }
 
-            # Variable sequence for each tool doesn't matter
-            foreach Var $arr(Fmt$Tool|VarLst) {
-                if {[lsearch -exact $arr(Raw$Tool|VarLst) $Var] == -1} {
-                    if {!$arr(UpdateFmt)} {
-                        set arr(UpdateFmt) true
-                        vputs -i1 $Msg
-                    }
-                    vputs -v3 -i2 "Simulation variable '$Var' of '$Tool'\
-                        removed!"
-                    continue
-                }
-                if {$arr(FmtVal|$Var) ne $arr(RawVal|$Var)} {
-                    if {!$arr(UpdateFmt)} {
-                        set arr(UpdateFmt) true
-                        vputs -i1 $Msg
-                    }
-                    vputs -v3 -i2 "Simulation variable '$Var' has a value of\
-                        '$arr(FmtVal|$Var)' different from\
-                        '$arr(RawVal|$Var)'!"
+            # Remove all compiled PMI share objects if version changes
+            if {$Var eq "SimEnv" && [lindex $arr(FmtVal|SimEnv) 1]\
+                ne [lindex $arr(RawVal|SimEnv) 1]} {
+                foreach Elm [glob -nocomplain [file join $::SimArr(PMIDir)\
+                    *.so.*]] {
+                    vputs -i2 "File '$Elm' deleted!"
+                    file delete $Elm
                 }
             }
-            foreach Var $arr(Raw$Tool|VarLst) {
-                if {[lsearch -exact $arr(Fmt$Tool|VarLst) $Var] == -1} {
+
+            # List detailed file changes
+            if {$Var eq "mfjModTime"} {
+                set ModTime $arr(RawVal|mfjModTime)
+                foreach Elm $arr(FmtVal|mfjModTime) {
+                    set Lst [list]
+                    set FmtFlg false
+                    foreach Grp $ModTime {
+                        if {[lindex $Elm 0] eq [lindex $Grp 0]} {
+                            set FmtFlg true
+                            if {[lindex $Elm 1] != [lindex $Grp 1]} {
+                                if {!$arr(UpdateFmt)} {
+                                    set arr(UpdateFmt) true
+                                    vputs -i1 $Msg
+                                }
+                                vputs -i3 "File '[lindex $Elm 0]' updated!"
+
+                                # If PMI files are updated, remove the
+                                # corresponding share objects
+                                if {[string equal -nocase .c\
+                                    [file extension [lindex $Elm 0]]]} {
+                                    set Obj [glob -nocomplain [file\
+                                        rootname [lindex $Elm 0]].so.*]
+                                    if {$Obj ne ""} {
+                                        vputs -i3 "File '$Obj' deleted!"
+                                        file delete $Obj
+                                    }
+                                }
+                            }
+                        } else {
+                            lappend Lst $Grp
+                        }
+                    }
+
+                    # Update ModTime to remove the matched file
+                    set ModTime $Lst
+
+                    # Output each file removed
+                    if {!$FmtFlg} {
+                        if {!$arr(UpdateFmt)} {
+                            set arr(UpdateFmt) true
+                            vputs -i1 $Msg
+                        }
+                        vputs -i3 "File '[lindex $Elm 0]' removed!"
+                    }
+                }
+
+                # Output the remaining files in ::SimArr(ModTime)
+                foreach Elm $ModTime {
                     if {!$arr(UpdateFmt)} {
                         set arr(UpdateFmt) true
                         vputs -i1 $Msg
                     }
-                    vputs -v3 -i2 "Simulation variable '$Var' of '$Tool' added!"
+                    vputs -i3 "File '[lindex $Elm 0]' added!"
+                }
+            }
+        }
+        foreach Var $arr(RawRsvd|VarLst) {
+            if {[lsearch -exact $arr(FmtRsvd|VarLst) $Var] == -1} {
+                if {!$arr(UpdateFmt)} {
+                    set arr(UpdateFmt) true
+                    vputs -i1 $Msg
+                }
+                vputs -v3 -i2 "Reserved variable '$Var' in\
+                    '$::SimArr(FVarRaw)' added!"
+            }
+        }
+
+        # Generally check variables irrespective of simulators
+        foreach Var $arr(Fmt|VarLst) {
+            if {[lsearch -exact $arr(Raw|VarLst) $Var] == -1} {
+                if {!$arr(UpdateFmt)} {
+                    set arr(UpdateFmt) true
+                    vputs -i1 $Msg
+                }
+                vputs -v3 -i2 "Simulation variable '$Var' removed!"
+                continue
+            }
+            if {$arr(FmtVal|$Var) ne $arr(RawVal|$Var)} {
+                if {!$arr(UpdateFmt)} {
+                    set arr(UpdateFmt) true
+                    vputs -i1 $Msg
+                }
+                vputs -v3 -i2 "Simulation variable '$Var' has a value of\
+                    '$arr(FmtVal|$Var)' different from '$arr(RawVal|$Var)'!"
+            }
+        }
+        foreach Var $arr(Raw|VarLst) {
+            if {[lsearch -exact $arr(Fmt|VarLst) $Var] == -1} {
+                if {!$arr(UpdateFmt)} {
+                    set arr(UpdateFmt) true
+                    vputs -i1 $Msg
+                }
+                vputs -v3 -i2 "Simulation variable '$Var' added!"
+            }
+        }
+
+        # For simulators, specifically check tools and variables
+        if {[lindex $arr(RawVal|SimEnv) 0] eq "Sentaurus"} {
+
+            # Tools should have the same sequence
+            if {$arr(Fmt|STLst) ne $arr(Raw|STLst)} {
+                if {!$arr(UpdateFmt)} {
+                    set arr(UpdateFmt) true
+                    vputs -i1 $Msg
+                }
+                vputs -v3 -i2 "ST tools '$arr(Fmt|STLst)' different from\
+                    '$arr(Raw|STLst)'!"
+            }
+            foreach Tool $arr(Fmt|STLst) {
+                if {$arr(FmtLbl|$Tool) ne $arr(RawLbl|$Tool)} {
+                    if {!$arr(UpdateFmt)} {
+                        set arr(UpdateFmt) true
+                        vputs -i1 $Msg
+                    }
+                    vputs -v3 -i2 "ST tool label '$arr(FmtLbl|$Tool)' different\
+                        from '$arr(RawLbl|$Tool)'!"
+                }
+
+                # Variable sequence for each tool doesn't matter
+                foreach Var $arr(Fmt$Tool|VarLst) {
+                    if {[lsearch -exact $arr(Raw$Tool|VarLst) $Var] == -1} {
+                        if {!$arr(UpdateFmt)} {
+                            set arr(UpdateFmt) true
+                            vputs -i1 $Msg
+                        }
+                        vputs -v3 -i2 "Simulation variable '$Var' of '$Tool'\
+                            removed!"
+                        continue
+                    }
+                }
+                foreach Var $arr(Raw$Tool|VarLst) {
+                    if {[lsearch -exact $arr(Fmt$Tool|VarLst) $Var] == -1} {
+                        if {!$arr(UpdateFmt)} {
+                            set arr(UpdateFmt) true
+                            vputs -i1 $Msg
+                        }
+                        vputs -v3 -i2 "Simulation variable '$Var' of '$Tool'\
+                            added!"
+                    }
                 }
             }
         }
@@ -1869,16 +1878,20 @@ proc mfjIntrpr::fmtvsRaw {} {
         # Perform an efficient update of all related variables
         set arr(FmtRsvd|VarLst) $arr(RawRsvd|VarLst)
         set arr(FmtEnv|VarLst) $arr(RawEnv|VarLst)
-        set arr(FmtST|VarLst) $arr(RawST|VarLst)
         set arr(Fmt|VarLst) $arr(Raw|VarLst)
         foreach Var [concat $arr(FmtRsvd|VarLst) $arr(Fmt|VarLst)] {
             set arr(FmtVal|$Var) $arr(RawVal|$Var)
             set arr(FmtLvl|$Var) $arr(RawLvl|$Var)
         }
-        set arr(Fmt|STLst) $arr(Raw|STLst)
-        foreach Tool $arr(Fmt|STLst) {
-            set arr(FmtLbl|$Tool) $arr(RawLbl|$Tool)
-            set arr(Fmt$Tool|VarLst) $arr(Raw$Tool|VarLst)
+
+        # Simulator-related variables
+        if {[lindex $arr(RawVal|SimEnv) 0] eq "Sentaurus"} {
+            set arr(FmtST|VarLst) $arr(RawST|VarLst)
+            set arr(Fmt|STLst) $arr(Raw|STLst)
+            foreach Tool $arr(Fmt|STLst) {
+                set arr(FmtLbl|$Tool) $arr(RawLbl|$Tool)
+                set arr(Fmt$Tool|VarLst) $arr(Raw$Tool|VarLst)
+            }
         }
     }
 }
@@ -1979,54 +1992,78 @@ proc mfjIntrpr::rawvsFmt {} {
     if {!$arr(UpdateRaw)} {
         vputs "Comparing '$::SimArr(FVarRaw)' against '$::SimArr(FVarFmt)'..."
 
-        # Check ST Tools and variables. Tools should have the same sequence
-        set Msg "'$::SimArr(FVarRaw)' is different from '$::SimArr(FVarFmt)'!"
-        if {$arr(Raw|STLst) ne $arr(Fmt|STLst)} {
-            if {!$arr(UpdateRaw)} {
-                set arr(UpdateRaw) true
-                vputs -i1 $Msg
-            }
-            vputs -v3 -i2 "ST tools '$arr(Raw|STLst)' different from\
-                '$arr(Fmt|STLst)'!"
-        }
-        foreach Tool $arr(Raw|STLst) {
-            if {$arr(RawLbl|$Tool) ne $arr(FmtLbl|$Tool)} {
+        # Generally check variables irrespective of simulators
+        foreach Var $arr(Raw|VarLst) {
+            if {[lsearch -exact $arr(Fmt|VarLst) $Var] == -1} {
                 if {!$arr(UpdateRaw)} {
                     set arr(UpdateRaw) true
                     vputs -i1 $Msg
                 }
-                vputs -v3 -i2 "ST tool label '$arr(RawLbl|$Tool)' different\
-                    from '$arr(FmtLbl|$Tool)'!"
+                vputs -v3 -i2 "Simulation variable '$Var' removed!"
+                continue
             }
+            if {$arr(RawVal|$Var) ne $arr(FmtVal|$Var)} {
+                if {!$arr(UpdateRaw)} {
+                    set arr(UpdateRaw) true
+                    vputs -i1 $Msg
+                }
+                vputs -v3 -i2 "Simulation variable '$Var' has a value of\
+                    '$arr(RawVal|$Var)' different from '$arr(FmtVal|$Var)'!"
+            }
+        }
+        foreach Var $arr(Fmt|VarLst) {
+            if {[lsearch -exact $arr(Raw|VarLst) $Var] == -1} {
+                if {!$arr(UpdateRaw)} {
+                    set arr(UpdateRaw) true
+                    vputs -i1 $Msg
+                }
+                vputs -v3 -i2 "Simulation variable '$Var' added!"
+            }
+        }
 
-            # Variable sequence for each tool doesn't matter
-            foreach Var $arr(Raw$Tool|VarLst) {
-                if {[lsearch -exact $arr(Fmt$Tool|VarLst) $Var] == -1} {
-                    if {!$arr(UpdateRaw)} {
-                        set arr(UpdateRaw) true
-                        vputs -i1 $Msg
-                    }
-                    vputs -v3 -i2 "Simulation variable '$Var' of '$Tool'\
-                        removed!"
-                    continue
+        # For simulators, specifically check tools and variables
+        if {[lindex $arr(FmtVal|SimEnv) 0] eq "Sentaurus"} {
+
+            # Tools should have the same sequence
+            set Msg "'$::SimArr(FVarRaw)' is different from '$::SimArr(FVarFmt)'!"
+            if {$arr(Raw|STLst) ne $arr(Fmt|STLst)} {
+                if {!$arr(UpdateRaw)} {
+                    set arr(UpdateRaw) true
+                    vputs -i1 $Msg
                 }
-                if {$arr(RawVal|$Var) ne $arr(FmtVal|$Var)} {
-                    if {!$arr(UpdateRaw)} {
-                        set arr(UpdateRaw) true
-                        vputs -i1 $Msg
-                    }
-                    vputs -v3 -i2 "Simulation variable '$Var' has a value of\
-                        '$arr(RawVal|$Var)' different from\
-                        '$arr(FmtVal|$Var)'!"
-                }
+                vputs -v3 -i2 "ST tools '$arr(Raw|STLst)' different from\
+                    '$arr(Fmt|STLst)'!"
             }
-            foreach Var $arr(Raw$Tool|VarLst) {
-                if {[lsearch -exact $arr(Fmt$Tool|VarLst) $Var] == -1} {
+            foreach Tool $arr(Raw|STLst) {
+                if {$arr(RawLbl|$Tool) ne $arr(FmtLbl|$Tool)} {
                     if {!$arr(UpdateRaw)} {
                         set arr(UpdateRaw) true
                         vputs -i1 $Msg
                     }
-                    vputs -v3 -i2 "Simulation variable '$Var' of '$Tool' added!"
+                    vputs -v3 -i2 "ST tool label '$arr(RawLbl|$Tool)' different\
+                        from '$arr(FmtLbl|$Tool)'!"
+                }
+
+                # Variable sequence for each tool doesn't matter
+                foreach Var $arr(Raw$Tool|VarLst) {
+                    if {[lsearch -exact $arr(Fmt$Tool|VarLst) $Var] == -1} {
+                        if {!$arr(UpdateRaw)} {
+                            set arr(UpdateRaw) true
+                            vputs -i1 $Msg
+                        }
+                        vputs -v3 -i2 "Simulation variable '$Var' of '$Tool'\
+                            removed!"
+                        continue
+                    }
+                }
+                foreach Var $arr(Raw$Tool|VarLst) {
+                    if {[lsearch -exact $arr(Fmt$Tool|VarLst) $Var] == -1} {
+                        if {!$arr(UpdateRaw)} {
+                            set arr(UpdateRaw) true
+                            vputs -i1 $Msg
+                        }
+                        vputs -v3 -i2 "Simulation variable '$Var' of '$Tool' added!"
+                    }
                 }
             }
         }
@@ -2044,10 +2081,15 @@ proc mfjIntrpr::rawvsFmt {} {
             set arr(RawVal|$Var) $arr(FmtVal|$Var)
             set arr(RawLvl|$Var) $arr(FmtLvl|$Var)
         }
-        set arr(Raw|STLst) $arr(Fmt|STLst)
-        foreach Tool $arr(Raw|STLst) {
-            set arr(RawLbl|$Tool) $arr(FmtLbl|$Tool)
-            set arr(Raw$Tool|VarLst) $arr(Fmt$Tool|VarLst)
+
+        # Simulator-related variables
+        if {[lindex $arr(FmtVal|SimEnv) 0] eq "Sentaurus"} {
+            set arr(RawST|VarLst) $arr(FmtST|VarLst)
+            set arr(Raw|STLst) $arr(Fmt|STLst)
+            foreach Tool $arr(Raw|STLst) {
+                set arr(RawLbl|$Tool) $arr(FmtLbl|$Tool)
+                set arr(Raw$Tool|VarLst) $arr(Fmt$Tool|VarLst)
+            }
         }
 
         # Update the brief file as well
@@ -2083,28 +2125,32 @@ proc mfjIntrpr::updateRaw {} {
         vputs -v3 -c '$MaxLen'
 
         # Include at least one space between a variable and its value
-        set MaxLen [expr {int(ceil(($MaxLen+1.)/4.))*4}]
+        set MaxLen [expr {int(ceil(($MaxLen+6.)/4.))*4}]
 
-        set Ptn [string map {(\\S+) %s} $::SimArr(STDfltID)]
-        foreach Tool [concat Env $arr(Raw|STLst)] {
+        # Simulator-specific settings
+        set ToolLst Env
+        if {[lindex $arr(RawVal|SimEnv) 0] eq "Sentaurus"} {
+            set Ptn [string map {(\\S+) %s} $::SimArr(STDfltID)]
+            set ToolLst [concat $ToolLst $arr(Raw|STLst)]
+        }
+        foreach Tool $ToolLst {
             if {$Tool ne "Env"} {
-                puts $Ouf [format <TOOL>$Ptn\n $arr(RawLbl|$Tool) $Tool]
+                if {[lindex $arr(RawVal|SimEnv) 0] eq "Sentaurus"} {
+                    puts $Ouf [format <SENTAURUS>$Ptn\n $arr(RawLbl|$Tool)\
+                        $Tool]
+                }
             }
             foreach Var $arr(Raw$Tool|VarLst) {
                 if {[info exists arr(RawCmnt|$Var)]
                     && $arr(RawCmnt|$Var) ne ""} {
                     puts $Ouf <COMMENT>$arr(RawCmnt|$Var)\n
                 } else {
-                    puts $Ouf "<COMMENT>--- Put comments for $Var\n"
+                    puts $Ouf "<COMMENT>Put comments for $Var\n"
                 }
-                if {[info exists arr(RawGStr|$Var)]} {
-                    puts $Ouf <GRAMMAR>$arr(RawGStr|$Var)\n
-                } else {
-                    puts $Ouf <GRAMMAR>\n
-                }
-                if {[info exists arr(RawCmnt1|$Var)]
-                    && $arr(RawCmnt1|$Var) ne ""} {
-                    puts $Ouf $arr(RawCmnt1|$Var)\n
+                puts $Ouf <GRAMMAR>$arr(RawGStr|$Var)\n
+                if {[info exists arr(RawCmntB4|$Var)]
+                    && $arr(RawCmntB4|$Var) ne ""} {
+                    puts $Ouf $arr(RawCmntB4|$Var)\n
                 }
 
                 # Increase nested level for a single level value
@@ -2115,10 +2161,10 @@ proc mfjIntrpr::updateRaw {} {
                 }
 
                 # Preserve each value so it is the same as in the brief file
-                puts $Ouf [wrapText [format <VAR>%-${MaxLen}s%s\n $Var $Val]]
-                if {[info exists arr(RawCmnt2|$Var)]
-                    && $arr(RawCmnt2|$Var) ne ""} {
-                    puts $Ouf $arr(RawCmnt2|$Var)\n
+                puts $Ouf [wrapText [format %-${MaxLen}s%s\n <VAR>$Var $Val]]
+                if {[info exists arr(RawCmntAf|$Var)]
+                    && $arr(RawCmntAf|$Var) ne ""} {
+                    puts $Ouf $arr(RawCmntAf|$Var)\n
                 }
             }
         }
@@ -2192,10 +2238,19 @@ proc mfjIntrpr::updateFmt {} {
 
         # No extra trailing spaces
         puts $Ouf "$::SimArr(Prefix) Variables with validated values\n"
-        set Ptn [string map {(\\S+) %s} $::SimArr(STDfltID)]
-        foreach Tool [concat Rsvd Env $arr(Fmt|STLst)] {
+
+        # Simulator-specific settings
+        set ToolLst [list Rsvd Env]
+        if {[lindex $arr(FmtVal|SimEnv) 0] eq "Sentaurus"} {
+            set Ptn [string map {(\\S+) %s} $::SimArr(STDfltID)]
+            set ToolLst [concat $ToolLst $arr(Fmt|STLst)]
+        }
+        foreach Tool $ToolLst {
             if {$Tool ne "Rsvd" && $Tool ne "Env"} {
-                puts $Ouf [format "# $Ptn\n" $arr(FmtLbl|$Tool) $Tool]
+                if {[lindex $arr(FmtVal|SimEnv) 0] eq "Sentaurus"} {
+                    puts $Ouf [format "# Sentaurus $Ptn\n" $arr(FmtLbl|$Tool)\
+                        $Tool]
+                }
             }
             foreach Var $arr(Fmt$Tool|VarLst) {
 
@@ -2218,9 +2273,9 @@ proc mfjIntrpr::updateFmt {} {
 # mfjIntrpr::raw2Fmt
     # Do all the heavy lifting here by performing many small tasks. Mainly:
     # 1. Read variables and their values
-    # 2. Apply convenient features to expand values
-    # 3. Apply format rules to further validate values
-    # 4. Compare variables in the raw file and those in the formatted file
+    # 2. Apply replace/reuse features to expand values
+    # 3. Apply grammar rules to further validate values
+    # 4. Compare variables in the formatted file to those in the raw file
 proc mfjIntrpr::raw2Fmt {} {
     foreach Elm {readHost readRaw readBrf rawvsBrf updateBrf activateRR sortVar
         updateGrm validateVar readFmt fmtvsRaw updateFmt updateRaw} {

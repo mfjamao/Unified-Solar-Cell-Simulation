@@ -53,11 +53,12 @@ Thumbs.db
 *.end
 
 # Unified-Solar-Cell-Simulation
-.mfj/var*.*
+var*.*
 .mfj/preproc.sh
 .mfj/batch.sh
-.mfj/.*
-.mfj/*.mfj
+.mfj/lock
+.mfj/siminfo
+*.mfj
 *.out
 *.backup
 *.sav
@@ -65,9 +66,10 @@ Thumbs.db
 *.dat
 *.BAK
 *.bak
+*.prf
+.*
 eqm*
 pbs*
-*.prf
 n[0-9]*
 pp[0-9]*
 v[0-9]*
@@ -78,11 +80,5 @@ v[0-9]*
 05etc*
 06out*
 07tpl*
-.database
-.history
-.organization
-.project
-.status
 g*.*
-11ctrlsim.mfj
 cmlog.txt

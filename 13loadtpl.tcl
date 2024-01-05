@@ -5,7 +5,7 @@
 # overwrite the current project. If the target files are the same or newer,
 # they are not updated. Regardless the modification time, 10variables-brief.txt
 # will be updated. Special treatment is applied to 11ctrlsim.tcl so that
-# settings of STHosts, STPaths, STLicns, STLib and ESuffix are still preserved
+# settings of ST|Hosts, ST|Paths, ST|Licns, and Email|Sufx are still preserved
 # in the target file.
 #
 # Maintained by Dr. Fa-Jun MA (mfjamao@yahoo.com)
@@ -44,11 +44,10 @@ if {[file isfile $FOut] && [file size $FOut]} {
 }
 set Ouf [open $FOut w]
 mputs $Ouf "\n[clock format [clock seconds] -format "%Y-%b-%d %A %H:%M:%S"]\
-    \t'$::env(USER)@$::env(HOSTNAME)'"
+    \t'$::env(USER)@$::env(HOSTNAME)' on '$tcl_platform(platform)' platform"
 
+# Try the current project directory in case of no argument
 if {![llength $argv]} {
-
-    # Try the current directory
     set argv [glob -nocomplain *.tgz]
     if {![llength $argv]} {
         mputs $Ouf "\nArgument missing! Usage: [info script] xxx.tgz\n"
@@ -71,8 +70,8 @@ if {![file isdirectory $TplDir]} {
 set Flg false
 if {[file isfile $argv]} {
     set Flg true
-} elseif {[file isfile $TplDir/$argv]} {
-    set argv $TplDir/$argv
+} elseif {[file isfile [file join $TplDir $argv]]} {
+    set argv [file join $TplDir $argv]
     set Flg true
 } else {
 
@@ -98,12 +97,13 @@ if {[file isfile $argv]} {
 }
 
 if {$Flg} {
-    mputs $Ouf "Located the Tar/GZip file: './$argv'"
+    mputs $Ouf "Located the Tar/GZip file: '$argv'"
     if {[lindex [file split $argv] 0] ne $TplDir} {
-        mputs $Ouf "${Tab}Move '$argv' to './$TplDir'!"
-        file copy -force $argv $TplDir/[file tail $argv]
+        mputs $Ouf "${Tab}Move '$argv' to '$TplDir'!"
+        set FTgt [file join $TplDir [file tail $argv]]
+        file copy -force $argv $FTgt
         file delete $argv
-        set argv $TplDir/[file tail $argv]
+        set argv $FTgt
     }
 } else {
     mputs $Ouf "\n'$argv' not found!\n"
@@ -113,7 +113,7 @@ if {$Flg} {
 
 # Unpack the archive file
 set TmpDir [file rootname $argv]
-mputs $Ouf "Extract it to a temp directory './$TmpDir'"
+mputs $Ouf "Extract it to a temp directory '$TmpDir'"
 exec tar -xzf $argv -C [file dirname $argv]
 
 mputs $Ouf "Loading key simulation files to '[pwd]'..."
@@ -125,7 +125,8 @@ mputs -n $Ouf [format "%s%04d $FStr -> $FStr" $Tab [incr Cnt]]
 if {[file isfile $FStr]} {
     file copy -force $FStr $FStr.backup
 }
-if {[catch {file copy -force $TmpDir/$FStr $FStr} ErrMsg]} {
+set FSrc [file join $TmpDir $FStr]
+if {[catch {file copy -force $FSrc $FStr} ErrMsg]} {
     mputs $Ouf $ErrMsg
     close $Ouf
     error $ErrMsg
@@ -137,22 +138,23 @@ if {[catch {file copy -force $TmpDir/$FStr $FStr} ErrMsg]} {
 }
 
 # Special treatment for loading 11ctrlsim.tcl
-# Preserve settings of STHosts, STPaths, STLicns, STLib and ESuffix in 'SimArr'
+# Preserve settings of ST|Hosts, ST|Paths, ST|Licns, and Email|Sufx in 'SimArr'
 set FStr 11ctrlsim.tcl
+set FSrc [file join $TmpDir $FStr]
 mputs -n $Ouf [format "%s%04d $FStr -> $FStr" $Tab [incr Cnt]]
 if {[file isfile $FStr]} {
-    if {[file mtime $TmpDir/$FStr] == [file mtime $FStr]} {
+    if {[file mtime $FSrc] == [file mtime $FStr]} {
         mputs $Ouf ": Same, skipped!"
-    } elseif {[file mtime $TmpDir/$FStr] < [file mtime $FStr]} {
+    } elseif {[file mtime $FSrc] < [file mtime $FStr]} {
         mputs $Ouf ": Target newer, skipped!"
     } else {
         file copy -force $FStr $FStr.backup
-        foreach Elm [list $TmpDir/$FStr $FStr] Tmp {Str Txt} {
+        foreach Elm [list $FSrc $FStr] Tmp {Str Txt} {
             set Inf [open $Elm r]
             set $Tmp [read $Inf]
             close $Inf
         }
-        foreach Elm {STHosts STPaths STLicns STLib ESuffix} {
+        foreach Elm {ST|Hosts ST|Paths ST|Licns Email|Sufx} {
 
             # Both REs work, yet the 2nd RE is more generetic than the 1st
             if {[regexp $Elm\\s+\\\{(\[\\w./@\\n\ -\]+)\\\} $Str -> Val]} {
@@ -174,7 +176,7 @@ if {[file isfile $FStr]} {
         mputs $Ouf ": Copied!"
     }
 } else {
-    if {[catch {file copy $TmpDir/$FStr $FStr} ErrMsg]} {
+    if {[catch {file copy $FSrc $FStr} ErrMsg]} {
         mputs $Ouf $ErrMsg
         close $Ouf
         error $ErrMsg
@@ -191,35 +193,35 @@ if {![file executable $FStr]} {
 # Optional load: Only copy the missing or newer regular files
 set Len [string length $TmpDir]
 incr Len
-foreach Src [exec find $TmpDir -type f] {
+foreach FSrc [exec find $TmpDir -type f] {
 
     # remove the prefix "TmpDir/"
-    set Dst [string range $Src $Len end]
+    set FTgt [string range $FSrc $Len end]
 
     # Skip 10variables-brief.txt, 11ctrlsim.tcl
-    if {[file tail $Dst] eq "11ctrlsim.tcl"
-        || [file tail $Dst] eq "10variables-brief.txt"} {
+    if {[file tail $FTgt] eq "11ctrlsim.tcl"
+        || [file tail $FTgt] eq "10variables-brief.txt"} {
         continue
     }
-    mputs -n $Ouf [format "%s%04d %s -> %s" $Tab [incr Cnt] $Dst $Dst]
-    if {[file isfile $Dst]} {
-        if {[file mtime $Src] == [file mtime $Dst]} {
+    mputs -n $Ouf [format "%s%04d %s -> %s" $Tab [incr Cnt] $FTgt $FTgt]
+    if {[file isfile $FTgt]} {
+        if {[file mtime $FSrc] == [file mtime $FTgt]} {
             mputs $Ouf ": Same, skipped!"
             continue
-        } elseif {[file mtime $Src] < [file mtime $Dst]} {
+        } elseif {[file mtime $FSrc] < [file mtime $FTgt]} {
             mputs $Ouf ": Target newer, skipped!"
             continue
         } else {
-            file copy -force $Dst $Dst.backup
+            file copy -force $FTgt $FTgt.backup
         }
     }
 
     # Make subdirectories if necessary
-    set Dir [file dirname $Dst]
+    set Dir [file dirname $FTgt]
     if {$Dir ne "." && ![file isdirectory $Dir]} {
         file mkdir $Dir
     }
-    if {[catch {file copy -force $Src $Dst} ErrMsg]} {
+    if {[catch {file copy -force $FSrc $FTgt} ErrMsg]} {
         mputs $Ouf $ErrMsg
         close $Ouf
         error $ErrMsg
@@ -228,7 +230,7 @@ foreach Src [exec find $TmpDir -type f] {
     }
 }
 
-mputs $Ouf "\nRemove the temp directory: './$TmpDir'"
+mputs $Ouf "\nRemove the temp directory: '$TmpDir'"
 cd [file dirname $TmpDir]
 exec rm -fr [file tail $TmpDir]
 mputs $Ouf "Done!\n"

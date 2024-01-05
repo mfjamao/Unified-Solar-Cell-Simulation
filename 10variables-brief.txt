@@ -1,12 +1,14 @@
-SimEnv      {Sentaurus T-2022.03 !Cylindrical Electrical}
+SimEnv      {Sentaurus T-2022.03 !Cylindrical Electrical PBS 1 5 8}
 
-RegGen      {{iaSi 0.006 50} {Silicon 165 @0/2} @0 {paSi 0.02 45}
-    {naSi @0/2-@3/2} {Gas 0.1 44.5} {Gas (@3/2-@5/2)*2} {Gas @0/2-@5/2-@6/1}}
+RegGen      {{iaSi 0.006 50} {Silicon 165 50} {iaSi 0.006 50} {paSi 0.02 45}
+    {naSi 5} {Gas 0.1 44.5} {Gas 1} {Gas 4.5}}
 
 FldAttr     {{r2 P 1.56e+15} {r4 B 1.41e+19} {r5 P 1.45e+19}}
 
-IntfAttr    {{r4/6 c0} {r5/8 c1} {r0/1 1e12 1e5} {r4,5/7 0 1e7} {r1,3/2 0 190}}
-    0/2/1,2=0|0
+IntfAttr    {{r4/6 c0 Ohmic 0 0 0 1e7} {r5/8 c1 Ohmic 0 0 0 1e7} {r0/1 1e+12
+    100000} {r4/7 0 10000000} {r5/7 0 10000000} {r1/2 0 190} {r3/2 0 190}}
+    {{r4/6 c0 Ohmic 0 0 0 1e7} {r5/8 c1 Ohmic 0 0 0 1e7} {r0/1 0 0} {r4/7 0
+    10000000} {r5/7 0 10000000} {r1/2 0 190} {r3/2 0 190}}
 
 GopAttr     {{r0/1 External 02opt/HJT_165um_a-Si-i_6nm_Spectral.plx} {Spectrum
     02opt/AM1.5g_IEC60904-3_2008.txt 0.3 1.2 0.01} {Monochromatic 0.3 0.001}}
@@ -15,17 +17,17 @@ DfltAttr    {{Mesh 10 0.05 8 0.001 8 1.5 0.001 1.1} {Numeric 64} {Other 25}}
 
 ProcSeq     {}
 
-ModPar      {{r2 01mdb/Si_298.15K_2022Green.par SRH 0.0088 Aug Niewelt 0.55}
-    {r1,3 01mdb/a-Si-i_2015Ling.par Trap 03exp/Traps/Bulk_a-Si-i_2015Ling.txt
-        SRH !}
-    {r4 01mdb/a-Si-p_2015Ling.par Trap 03exp/Traps/Bulk_a-Si-p_2015Ling.txt
-        SRH !}
-    {r5 01mdb/a-Si-n_2015Ling.par Trap 03exp/Traps/Bulk_a-Si-n_2015Ling.txt
-        SRH !}}
+ModPar      {{r2 01mdb/Si_298.15K_2022Green.par SRH 0.0088 Aug Niewelt 0.55} {r1
+    01mdb/a-Si-i_2015Ling.par Trap 03exp/Traps/Bulk_a-Si-i_2015Ling.txt SRH !}
+    {r3 01mdb/a-Si-i_2015Ling.par Trap 03exp/Traps/Bulk_a-Si-i_2015Ling.txt SRH
+    !} {r4 01mdb/a-Si-p_2015Ling.par Trap 03exp/Traps/Bulk_a-Si-p_2015Ling.txt
+    SRH !} {r5 01mdb/a-Si-n_2015Ling.par Trap
+    03exp/Traps/Bulk_a-Si-n_2015Ling.txt SRH !}}
 
 VarVary     {{SpecScaling 0.3 0} {MonoScaling 1 1} {Wavelength 1.2 90}
     {MonoScaling 0 0} {SpecScaling 1 0} {c0 0.8 160}}
 
-GetFld      {{p5_0/160_50 Average Dn} {p0_20&0_48 1 2 Band}}
+GetFld      {{p5_0/160_50 Average Dn} {p0_20 1 2 Band} {p0_48 1 2 Band}}
 
 PPAttr      {{v2 QE} {v5 JV}}
+
