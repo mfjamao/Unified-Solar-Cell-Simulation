@@ -594,6 +594,7 @@ vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
 (define IntfRat (list-ref MeshAttr 5))    ;# Ratio <= 1.5
 (define Var '())
 (define Val '())
+(define Tmp '())
 (define Vn '())
 (define Lst '())
 (define Str "")
@@ -686,14 +687,32 @@ vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
                     ;# Due to the strange behaviour of 'create-pyramid' in UCS,
                     ;# the coordinate system is set to DFISE (0) instead
                     (sde:set-process-up-direction 0)
+                    ;# Calculate pyramidal parameters:
+                    ;#  centre position, height, base radius
+                    (set! Lst (list (list-ref RGen 6)
+                        (* (list-ref RGen 5) 2) Mat Reg))
+
+                    ;# Convert angle degrees to radians
+                    (set! Var (* (list-ref RGen 4) (/ (asin 1) 90)))
+                    (set! Val (* (/ (- (car Lst) 2.) (car Lst)) (asin 1)))
+
+                    ;# In case the top is a surface, calculate the height
+                    ;# It is not clear for this in the manual
+                    (set! Tmp (* (list-ref RGen 5) (tan Var) (sin Val)))
+                    (set! Tmp (+ Tmp ((mfj:compose gvector:length
+                        gvector:from-to) (apply position P1)
+                        (apply position P2))))
+
+                    ;# Calculate the radius of the pyramid base
+                    (set! Var (/ Tmp (tan Var) (sin Val)))
+                    (set! Lst (cons (* Var (list-ref RGen 7)) Lst))
+                    (set! Lst (cons Var Lst))
+                    (set! Lst (cons Tmp Lst))
                     (set! Var (gvector:from-to (apply position P1)
                         (apply position P2)))
-                    (set! Val (+ (* 5 ZMax) (mfj:half (gvector:length Var))))
-                    (sdegeo:create-pyramid
-                        (position:+ (apply position P1) (position 0 0 Val))
-                        (gvector:length Var) (list-ref RGen 4)
-                        (* (list-ref RGen 4) (list-ref RGen 7))
-                        (list-ref RGen 6) (list-ref RGen 5) Mat Reg)
+                    (set! Val (+ (* 5 ZMax) (mfj:half Tmp)))
+                    (apply sdegeo:create-pyramid (position:+
+                        (apply position P1) (position 0 0 Val)) Lst)
 
                     ;# Mirror according to the interface normal to gvector
                     ;# and to the direction of gvector

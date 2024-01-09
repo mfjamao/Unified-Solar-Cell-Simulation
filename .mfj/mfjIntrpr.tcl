@@ -518,28 +518,6 @@ proc mfjIntrpr::readHost {} {
     set arr(Host|User) $::env(USER)
     vputs -v3 -i1 "User: '$arr(Host|User)'"
 
-    # Email format: local-part@domain
-    # local-part: \w!#$%&'*+-/=?^_`{|}~.
-    # domain: \w-
-    if {$::SimArr(Email) ne ""} {
-        set arr(Host|Email) $::SimArr(Email)
-    } else {
-        if {![regexp {([\w.%+-]+@(\w+[\.-])+[a-zA-Z]{2,4})}\
-            [exec getent passwd $arr(Host|User)] -> arr(Host|Email)]} {
-            foreach Name $::SimArr(ST|Hosts) Sufx $::SimArr(Email|Sufx) {
-                if {[string index $Name 0] eq [string index $arr(Host|ID) 0]} {
-                    set arr(Host|EmSufx) $Sufx
-                    break
-                }
-            }
-            if {$arr(Host|EmSufx) eq ""} {
-                error "unknown host! Update ST|Hosts in 11ctrlsim.tcl"
-            }
-            set arr(Host|Email) $arr(Host|User)@$arr(Host|EmSufx)
-        }
-    }
-    vputs -v3 -i1 "Email: '$arr(Host|Email)'"
-
     # Check available job schedulers
     if {[eval {auto_execok qsub}] ne ""} {
         lappend arr(Host|JobSched) PBS
@@ -551,6 +529,29 @@ proc mfjIntrpr::readHost {} {
         vputs -v3 -i1 "Job scheduler not available!"
     } else {
         vputs -v3 -i1 "Job scheduler available: '$arr(Host|JobSched)'"
+        if {$::SimArr(Email) ne ""} {
+            set arr(Host|Email) $::SimArr(Email)
+        } else {
+
+            # Extract email from database following format: local-part@domain
+            # local-part: \w!#$%&'*+-/=?^_`{|}~.
+            # domain: \w-
+            if {![regexp {([\w.%+-]+@(\w+[\.-])+[a-zA-Z]{2,4})}\
+                [exec getent passwd $arr(Host|User)] -> arr(Host|Email)]} {
+                foreach Name $::SimArr(ST|Hosts) Sufx $::SimArr(Email|Sufx) {
+                    if {[string index $Name 0]
+                        eq [string index $arr(Host|ID) 0]} {
+                        set arr(Host|EmSufx) $Sufx
+                        break
+                    }
+                }
+                if {$arr(Host|EmSufx) eq ""} {
+                    error "unknown host! Update ST|Hosts in 11ctrlsim.tcl"
+                }
+                set arr(Host|Email) $arr(Host|User)@$arr(Host|EmSufx)
+            }
+        }
+        vputs -v3 -i1 "Email: '$arr(Host|Email)'"
     }
 
     # Retrieve Sentaurus TCAD related settings

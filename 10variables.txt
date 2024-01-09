@@ -1,7 +1,9 @@
-<HEAD>This plain text file contains essential variables to construct a 1/2/3D
+<HEAD>This plain text file contains 11 essential variables to construct a 1/2/3D
     homo-/hetero-/single-/multi-junction solar cell and to optimise cell
-    performance by simulating typical optical and electrical behaviours such
-    as JV, Suns-Voc, QE, QSSPC, etc. via varying one or more parameters.
+    performance by simulating typical process, optical and electrical behaviours
+    such as JV, Suns-Voc, QE, QSSPC, etc. via varying one or more parameters.
+    On Windows system, it is recommended to use WinSCP as it requires the least
+    knowledge of Unix system to complete typical operations.
 
             Design of experiments (DOE) using WinSCP
 1. Login to a server hosting the desired simulator and find this text file
@@ -96,15 +98,16 @@ Specifications for regions employing the explicit method:
         major base radius and optional top radius and MinR/MaxR:
         mat Cone Keep px1_y1_z1/x2_y2_z2 BaseR [TopR MinR/MaxR]
     Pyramid (3D) specify its base centre to its top centre/vertex followed by
-        the major base radius and optional top radius, sides and MinR/MaxR:
-        mat Pyramid Keep px1_y1_z1/x2_y2_z2 BaseR [TopR NSides MinR/MaxR]
+        the optional slant angle [°] and top radius, sides and MinR/MaxR:
+        mat Pyramid Keep px1_y1_z1/x2_y2_z2 [Angle TopR NSides MinR/MaxR]
 
 <GRAMMAR>m
 {`!a & n & `> 0 | s E<llipse> V<ertices> P<yramid> C<one> Block}
 {n v1 & (a | `n & `> 0) | `!a & s K<eep>  M<erge> Remove}
 {n v1 & (a | `n & `> 0) | `!a & (== v1 Vertices & `p | `pp)}
 {(n v1 | == v1 Block) & `a | == v1 Ellipse & (a = 1 | `n & `> 0 & `<= 1)
-    | `!a & == v1 (Pyramid|Cone) & (`n & `> 0) | `p}
+    | == v1 Pyramid & (a = 54.74 | `n & `> 0 & `< 90)
+    | `!a & (== v1 Cone & (`n & `> 0) | `p)}
 {(n v1 | == v1 (Block|Ellipse) ) & `a
     | == v1 (Pyramid|Cone) & (a = 0 | `n & `>= 0) | `!a & `p}
 {(n v1 | == v1 (Block|Ellipse) ) & `a | == v1 Cone & (a = 1 | `n & `> 0
@@ -248,8 +251,8 @@ Specification for a monochromatic light for all optical solvers:
 Specification for incidence angles and a shading fraction for all solvers:
     0 Optical ID: Inci<dence>
     1 Fraction of shading (0 <= n <= 1): 0
-    2 Incident angle (0 <= n <= 90) (Theta): 0
-    3 Incident angle (0 <= n <= 90) (Phi): 0
+    2 Incident angle (0° <= n <= 90°) (Theta): 0
+    3 Incident angle (0° <= n <= 90°) (Phi): 0
 
 <GRAMMAR>{pp | rr | o}
 {== v0 Spectrum & (a = 02opt/am15g_IEC60904-3-2008.txt | `f)
@@ -352,8 +355,8 @@ Specification for implant:
     1 Implant species: As | B | P
     2 Energy (n > 0) [keV]: 250
     3 Dose (n > 0) [cm^-2]: 1e14
-    4 Optional rotation angle (-360 <= n <= 360) of the substrate [°]: -90
-    5 Optional tilt angle (0 <= n < 90) normal to the substrate [°]: 7
+    4 Optional rotation angle (-360° <= n <= 360°) of the substrate [°]: -90
+    5 Optional tilt angle (0° <= n < 90°) normal to the substrate [°]: 7
 Specification for initialization:
     0 ID: Ini<t>
     1 Materal: Silicon
