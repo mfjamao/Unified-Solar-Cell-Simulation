@@ -23,8 +23,8 @@ ModPar      {{r2 01mdb/Si_298.15K_2022Green.par SRH 0.0088 Aug Niewelt 0.55}
     {r5 01mdb/a-Si-n_2015Ling.par Trap 03exp/Traps/Bulk_a-Si-n_2015Ling.txt
         SRH !}}
 
-VarVary     {{SpecScaling 0.3 0} {MonoScaling 1 1} {Wavelength 1.2 90}
-    {MonoScaling 0 0} {SpecScaling 1 0} {c0 0.8 160}}
+VarVary     {{SpecScaling 0.3} {MonoScaling 1 1} {Wavelength 1.2 90}
+    {MonoScaling 0} {SpecScaling 1} {c0 0.8 160}}
 
 GetFld      {{p5_0/160_50 Average Dn} {p0_20&0_48 1 2 Band}}
 

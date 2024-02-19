@@ -1,21 +1,43 @@
-# A collaborative framework for unifying multidimensional solar cell simulations
-Typical simulations of 2/3D homo-/hetero-/single-/multi-junction solar cells
-    follow the similar procedures. These procedures can be well delineated by
-    eleven variables to easily carry out process, optical and electrical
-    simulations. This project is designed to first verify these variable values
-    based on ammendable grammar rules and then pass the formatted variables to
-    commercial simulators to perform various simulations like ramping up contact
-    properties, illumination settings, etc. Currently only Sentaurus TCAD is
-    supported.
+# UniSolar: Unifying typical multidimensional solar cell simulations
+UniSolar is a collaborative framework, designed to streamline the utilization of
+    commercial software packages such as Sentaurus TCAD. Drawing from extensive
+    experience spanning over a decade in various solar cell architectures and
+    technologies, it capitalizes on the finding that typical simulation
+    workflows encompass no more than 11 common steps. As a result, relevant
+    details crucial for process, optical, and electrical simulations are
+    systematically organized into these 11 steps, each represented by a variable
+    accepting a list as its value. By simply tuning values for these variables
+    in a plain text file (e.g., 10variables.txt or 10variables-brief.txt),
+    multidimensional process, optical, and electrical simulations for a wide
+    range of solar cells can be easily performed without even knowing Sentaurus.
+    With UniSolar, simulations are entirely managed by a solitary command file
+    (11ctrlsim.tcl), responsible for key tasks such as grammar checks, variable
+    conversion, Sentaurus interaction, and job execution/termination.
+    Furthermore, UniSolar provides two auxiliary command files (12savetpl.tcl
+    and 13loadtpl.tcl) to archive relevant files into and retrieve them from
+    a Tar/GZip format, thus facilitating efficient preservation of previous
+    simulations and swift initiation of new ones.
 
-Once all the files are uploaded to a linux server, open '11ctrlsim.tcl'
-    with any text editor and update the settings for 'ST|Hosts', 'ST|Paths',
-    and 'ST|Licns' according to your own set up of Sentaurus TCAD.
-    Save and make sure '11ctrlsim.tcl' is executable.
+Currently only Sentaurus TCAD is supported. In your home directory on your
+    Linux server, create and enter a directory "STDB". Download the entire
+    project there from Github using the following git command:
+        git clone https://github.com/mfjamao/Unified-Solar-Cell-Simulation.git
+    Afterwards, enter the subdirectory "Unified-Solar-Cell-Simulation", make
+    sure '11ctrlsim.tcl' is executable. Open '11ctrlsim.tcl' with any text
+    editor and update the values for keys 'ST|Hosts', 'ST|Paths', and 'ST|Licns'
+    in the array 'SimArr' according to your own set up of Sentaurus TCAD.
 
-# Design of experiments (DOE) using WinSCP
-1. Login to a server hosting the desired simulator and find 10variables.txt
-2. Edit variable values following the comments within the text file
+# Citation for UniSolar
+If UniSolar promotes your research, kindly cite the following references in your
+    publication:
+    [1] Ma F-J, Wang S, Yi C, Zhou L, Hameiri Z, Bremner S, Hao X, and Hoex B.
+    A collaborative framework for unifying typical multidimensional solar cell
+    simulations – Part I. Ten common simulation steps and representing
+    variables. Prog Photovolt Res Appl. 2024; 1‐16. doi:10.1002/pip.3779
+
+# Perform design of experiments (DOE) with UniSolar using WinSCP
+1. Login to your server and find 10variables.txt or 10variables-brief.txt
+2. Edit variable values following the comments within 10variables.txt
 3. Add desired comments and save the text file to finalize DOE
 4. Right click 11ctrlsim.tcl and select 'execute' to start batch running
 5. Check 11ctrlsim.out or job scheduler output file for job progress
@@ -32,7 +54,7 @@ Note 2: Case insensitiveness do NOT apply to grammar rules. Only savvy users
     are supposed to modify grammar rules.
 Note 3: Problem or issue? Please email Dr. Fa-Jun MA (mfjamao@yahoo.com)
 
-# Essential files for the codes and Sentaurus TCAD working properly
+# Essential files for UniSolar to work properly
 .mfj/mfjGrm.tcl
 .mfj/mfjIntrpr.tcl
 .mfj/mfjProc.tcl
@@ -57,7 +79,8 @@ Material, spectra and experimental files are also required if appeared in
 
 # Version history
 2.2     04/01/2024
-    Enhancement: Process simulations are supported like diffusion, implantation
+    Enhancement: Process simulations are integrated into UniSolar. Processes
+        like diffusion, implantation are supported.
 2.1     04/03/2023
     Enhancement: The majority of planned features are finally implemented.
         Optical simulation: OBAM, TMM, Raytracing

@@ -7,8 +7,8 @@
 # no job is running, carry out the following four steps:
 #   1. Convert the raw variable file (case insensitive) to a formatted file
 #   2. Convert the formatted file to simulator specific files
-#   3. Start preprocessing for the simulator
-#   4. Submit the job locally or to a job scheduler
+#   3. Start preprocessing with the simulator
+#   4. Run the job locally or submit it to a job scheduler
 #
 # Maintained by Dr. Fa-Jun MA (mfjamao@yahoo.com). Only Sentaurus is supported
 # now. Other simulators will be supported in future.
@@ -57,20 +57,30 @@ array set SimArr {
     STDfltID {Tool_label = (\S+) Tool_name = (\S+)}
 };# End of 'SimArr'
 
+# The script is designed to work properly in the project directory
+# Make the project directory as the working directory
 set FScript [info script]
-if {![file executable $FScript]} {
+cd [file dirname $FScript]
+set WD [pwd]
+
+# Ensure it is executable under unix platform
+if {$tcl_platform(platform) eq "unix" && ![file executable $FScript]} {
     exec chmod u+x $FScript
 }
 
-# Ensure 'pwd' is the directory of the script
-cd [file dirname $FScript]
-
 # Keep waiting in case the previous script is still running
-set FLock [file join $SimArr(CodeDir) $SimArr(FLock)]
+set FLock $SimArr(CodeDir)/$SimArr(FLock)
 if {[file isfile $FLock]} {
-    set PID [exec cat $FLock]
+    set Inf [open $FLock r]
+    gets $Inf PID
+    close $Inf
     set Lock false
-    foreach Elm [split [exec ps -ef] \n] {
+    if {$tcl_platform(platform) eq "unix"} {
+        set Lst [split [exec ps -ef] \n]
+    } else {
+        set Lst [split [exec tasklist] \n]
+    }
+    foreach Elm $Lst {
         if {[lindex $Elm 1] == $PID} {
             set Lock true
             break
@@ -88,18 +98,20 @@ if {[file isfile $FLock]} {
 }
 
 # Create a file lock to prevent running another '11simctrl.tcl'
-exec echo [pid] > $FLock
+set Ouf [open $FLock w]
+puts $Ouf [pid]
+close $Ouf
 
 # Load key files
 foreach Elm [list $SimArr(FProc) $SimArr(FIntrpr) $SimArr(FST) $SimArr(FGrm)] {
-    set Elm [file join $SimArr(CodeDir) $Elm]
+    set Elm $SimArr(CodeDir)/$Elm
     if {![file isfile $Elm]} {
-        error "Key file '$Elm' missing in directory '[file tail [pwd]]'!"
+        error "Key file '$Elm' missing in directory '[file tail $WD]'!"
     } else {
         source $Elm
     }
 }
-namespace import mfjProc::*
+namespace import [file rootname $SimArr(FProc)]::*
 
 # Create directories if not present
 foreach Elm [list $SimArr(MDBDir) $SimArr(OptDir) $SimArr(ExpDir)\
@@ -112,18 +124,17 @@ foreach Elm [list $SimArr(MDBDir) $SimArr(OptDir) $SimArr(ExpDir)\
 # Make SimArr(FSave) and SimArr(FLoad) executable
 foreach Elm [list $SimArr(FSave) $SimArr(FLoad)] {
     if {[file isfile $Elm]} {
-        if {![file executable $Elm]} {
+        if {$tcl_platform(platform) eq "unix" && ![file executable $Elm]} {
             exec chmod u+x $Elm
         }
     } else {
-        error "'$Elm' missing in directory '[file tail [pwd]]'!"
+        error "'$Elm' missing in directory '[file tail $WD]'!"
     }
 }
 
 # Define log files (mfjProc::arr(FOut) and mfjProc::arr(FLog))
-set FScript [file rootname [file tail $FScript]]
-set mfjProc::arr(FOut) $FScript.out
-set mfjProc::arr(FLog) $FScript.mfj
+set mfjProc::arr(FOut) [file rootname [file tail $FScript]].out
+set mfjProc::arr(FLog) [file rootname [file tail $FScript]].mfj
 
 # Process command-line arguments if any. Update variables MaxVerb in
 # mfjProc::arr and FVarRaw in mfjIntrpr::arr and variables Raw2Fmt, TXT2Sim,
@@ -176,8 +187,13 @@ while {[llength $argv]} {
             set argv [lrange $argv 2 end]
         }
         default {
-            vputs -w "Usage: $FScript.tcl \[-a\] \[-f file\] \[-v #\]\
-                \[-r #\] \[-t #\]\n"
+            if {$tcl_platform(platform) eq "unix"} {
+                vputs -w "Usage: ./[file tail $FScript] \[-a\] \[-f file\]\
+                    \[-v #\] \[-r #\] \[-t #\]\n"
+            } else {
+                vputs -w "Usage: [file tail $FScript] \[-a\] \[-f file\]\
+                    \[-v #\] \[-r #\] \[-t #\]\n"
+            }
             exit 1
         }
     }
@@ -188,7 +204,7 @@ if {!$SimArr(Append)} {
     vputs -n -w ""
 }
 vputs "\n[clock format [clock seconds] -format "%Y-%b-%d %A %H:%M:%S"]\
-    \t'$::env(USER)@[exec hostname]' on '$tcl_platform(platform)' platform"
+    \t'$tcl_platform(user)@[exec hostname]' on '$tcl_platform(platform)' platform"
 vputs -n "Tcl: [info nameofexecutable], version: [info tclversion], >= 8.4? "
 if {[info tclversion] >= 8.4} {
     vputs -c "Yes!"
@@ -209,19 +225,28 @@ if {$SimArr(Inverse)} {
 }
 
 # Determine simulator and job scheduler. Default: Sentaurus Local
-set FInfo [file join $SimArr(CodeDir) $SimArr(FInfo)]
+set FInfo $SimArr(CodeDir)/$SimArr(FInfo)
 if {[file isfile $FInfo]} {
-    set InfoLst [split [exec cat $FInfo] |]
+    set Inf [open $FInfo r]
+    gets $Inf Line
+    close $Inf
+    set InfoLst [split $Line |]
 } else {
     set InfoLst {Sentaurus Local}
 }
-vputs -n "Checking project '[file tail [pwd]]' status: '[lindex $InfoLst 0]', "
-set StatLst [list [clock seconds] [exec hostname] $::env(USER) unknown [pid]]
+vputs -n "Checking project '[file tail $WD]' status: '[lindex $InfoLst 0]', "
+set StatLst [list [clock seconds] [exec hostname] $tcl_platform(user) unknown\
+    [pid]]
 if {[lindex $InfoLst 0] eq "Sentaurus"} {
     if {[file isfile $SimArr(FSTStat)]} {
-        set StatLst [split [exec cat $SimArr(FSTStat)] |]
+        set Inf [open $SimArr(FSTStat) r]
+        gets $Inf Line
+        close $Inf
+        set StatLst [split $Line |]
     } else {
-        exec echo [join $StatLst |] > $SimArr(FSTStat)
+        set Ouf [open $SimArr(FSTStat) w]
+        puts $Ouf [join $StatLst |]
+        close $Ouf
     }
 }
 vputs -c '[lindex $StatLst 3]'\n
@@ -230,10 +255,14 @@ vputs -c '[lindex $StatLst 3]'\n
 # to 'running' when the project is running. Yet, it typically requires some
 # queue time before a scheduler completes arrangement of desired resources.
 set Queue false
-set FSTBatch [file join $SimArr(CodeDir) $SimArr(FSTBatch)]
+set FSTBatch $SimArr(CodeDir)/$SimArr(FSTBatch)
 set FSTBatchOut [file rootname $FSTBatch].out
 if {[file isfile $FSTBatchOut]} {
-    set BatOut [exec head -1 $FSTBatchOut]
+    set Inf [open $FSTBatchOut r]
+    while {[gets $Inf Line] != -1} {
+        set BatOut $Line
+    }
+    close $Inf
 } else {
     set BatOut ""
 }
@@ -283,9 +312,13 @@ if {[lindex $InfoLst 0] eq "Sentaurus"
         }
     } else {
         vputs -i1 "Stop the previous batch at the current node...\n"
-        if {[string is integer -strict [lindex $StatLst 4]]} {
-            vputs -i2 "Killing PID: [lindex $StatLst 4]\n"
-            if {[catch {exec kill [lindex $StatLst 4] >$FNull 2>@1}]} {
+        set PID [lindex $StatLst 4]
+        if {[string is integer -strict $PID]} {
+            vputs -i2 "Killing PID: $PID\n"
+            if {($tcl_platform(platform) eq "unix"
+                && [catch {exec kill $PID >$FNull 2>@1}])
+                || ($tcl_platform(platform) eq "windows"
+                && [catch {exec taskkill /pid $PID >$FNull 2>@1}])} {
                 vputs -i2 "Failed! Maybe PID no longer active\n"
             } else {
                 vputs -i2 "PID killed successfully!\n"
@@ -296,8 +329,10 @@ if {[lindex $InfoLst 0] eq "Sentaurus"
     }
     after 1000
     lset StatLst 3 aborted
-    exec echo [join $StatLst |] > $SimArr(FSTStat)
-    exec true > $FSTBatchOut
+    set Ouf [open $SimArr(FSTStat) w]
+    puts $Ouf [join $StatLst |]
+    close $Ouf
+    close [open $FSTBatchOut w]
     vputs -i2 "Project status was changed to 'aborted'. Bye :)\n"
 
     # Remove the file lock
@@ -319,7 +354,9 @@ if {$SimArr(0Raw2Fmt)} {
         [lindex $mfjIntrpr::arr(FmtVal|SimEnv) 4]]
     if {$InfoLst ne $Lst} {
         set InfoLst $Lst
-        exec echo [join $InfoLst |] > $FInfo
+        set Ouf [open $FInfo w]
+        puts $Ouf [join $InfoLst |]
+        close $Ouf
     }
     vputs -i1 "Processing time = [expr [clock seconds]-$::SimArr(Time)] s\n"
 }
@@ -346,9 +383,9 @@ if {$SimArr(1Fmt2Sim)} {
 # Perform preprocess
 if {$SimArr(2PreProc) && [lindex $InfoLst 0] eq "Sentaurus"} {
     vputs "Preprocessing with 'Sentaurus Workbench spp'...\n"
-    set FSTPP [file join $SimArr(CodeDir) $SimArr(FSTPP)]
+    set FSTPP $SimArr(CodeDir)/$SimArr(FSTPP)
     set FSTPPOut [file rootname $FSTPP].out
-    exec true > $FSTPPOut
+    close [open $FSTPPOut w]
     if {[catch {exec $FSTPP >$FSO | tee -a $FSTPPOut\
         $mfjProc::arr(FOut) $mfjProc::arr(FLog)} ErrMsg]} {
         vputs -c "\nerror: $ErrMsg\n"
@@ -359,7 +396,7 @@ if {$SimArr(2PreProc) && [lindex $InfoLst 0] eq "Sentaurus"} {
 # Run trials at the current node or summit them to a job scheduler
 if {$SimArr(3Batch) && [lindex $InfoLst 0] eq "Sentaurus"} {
     vputs "Running single/multiple trials with 'Sentaurus Workbench gsub'...\n"
-    exec true > $FSTBatchOut
+    close [open $FSTBatchOut w]
     if {[lindex $InfoLst 1] eq "SLURM"} {
         vputs -i1 "Hand over the simulation job to SLURM...\n"
         exec sbatch $FSTBatch >$FSO\

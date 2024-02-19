@@ -340,8 +340,8 @@ proc mfjST::ReadSWB {} {
     # Bat|MaxTime Bat|MaxMem Bat|RunNode UpdateBat
 proc mfjST::readBatch {} {
     variable arr
-    set FSTPP [file join $::SimArr(CodeDir) $::SimArr(FSTPP)]
-    set FSTBatch [file join $::SimArr(CodeDir) $::SimArr(FSTBatch)]
+    set FSTPP $::SimArr(CodeDir)/$::SimArr(FSTPP)
+    set FSTBatch $::SimArr(CodeDir)/$::SimArr(FSTBatch)
     vputs "Reading batch file '$FSTBatch'..."
     if {[file isfile $FSTPP] && [file isfile $FSTBatch]} {
 
@@ -1323,8 +1323,8 @@ proc mfjST::updatePP_Bat {} {
     variable arr
 
     if {$arr(UpdateBat)} {
-        set FSTPP [file join $::SimArr(CodeDir) $::SimArr(FSTPP)]
-        set FSTBatch [file join $::SimArr(CodeDir) $::SimArr(FSTBatch)]
+        set FSTPP $::SimArr(CodeDir)/$::SimArr(FSTPP)
+        set FSTBatch $::SimArr(CodeDir)/$::SimArr(FSTBatch)
         vputs "Updating '$FSTPP' and '$FSTBatch'..."
         foreach Elm [list FSTPP FSTBatch] {
             upvar 0 $Elm Alias
@@ -1332,7 +1332,9 @@ proc mfjST::updatePP_Bat {} {
 
                 # 'file copy' overwrites file permission, different from 'cp'
                 file copy -force $Alias $Alias.backup
-                exec chmod u-x $Alias.backup
+                if {$::tcl_platform(platform) eq "unix"} {
+                    exec chmod u-x $Alias.backup
+                }
             }
             set Ouf [open $Alias.mfj w]
             puts $Ouf "#!/bin/bash\n"
@@ -1413,7 +1415,9 @@ proc mfjST::updatePP_Bat {} {
             file rename -force $Alias.mfj $Alias
 
             # Default file permission 'rw', also depending on 'umask' setting
-            exec chmod u+x $Alias
+            if {$::tcl_platform(platform) eq "unix"} {
+                exec chmod u+x $Alias
+            }
         }
         vputs
     }
@@ -1449,8 +1453,8 @@ proc mfjST::miscTask {} {
     if {$arr(StartIdx) == 0} {
 
         # Remove all old results
-        foreach Junk [glob -nocomplain [file join $::SimArr(EtcDir) n*_*]\
-            [file join $::SimArr(OutDir) n*_*] *_n*_des.plt] {
+        foreach Junk [glob -nocomplain $::SimArr(EtcDir)/n*_*\
+            $::SimArr(OutDir)/n*_* *_n*_des.plt] {
             file delete $Junk
             vputs -v5 -i2 "'$Junk' deleted"
         }
@@ -1460,8 +1464,8 @@ proc mfjST::miscTask {} {
         foreach Node $arr(Bat|RunNode) {
             if {[string is integer -strict $Node]} {
                 foreach Junk [glob -nocomplain pp${Node}_* n${Node}_*\
-                    *_n${Node}_* [file join $::SimArr(EtcDir) n${Node}_*]\
-                    [file join $::SimArr(OutDir) n${Node}_*]] {
+                    *_n${Node}_* $::SimArr(EtcDir)/n${Node}_*\
+                    $::SimArr(OutDir)/n${Node}_*] {
                     file delete $Junk
                     vputs -v5 -i2 "'$Junk' deleted"
                 }
@@ -1518,7 +1522,7 @@ proc mfjST::updateDOESum {} {
     variable arr
 
     if {$arr(UpdateTcl)} {
-        set FDOESum [file join $::SimArr(OutDir) $::SimArr(FDOESum)]
+        set FDOESum $::SimArr(OutDir)/$::SimArr(FDOESum)
         vputs "Recording Trial nodes and variables in '$FDOESum'..."
         if {[file isfile $FDOESum]} {
             file copy -force $FDOESum $FDOESum.backup

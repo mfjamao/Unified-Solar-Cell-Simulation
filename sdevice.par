@@ -106,6 +106,26 @@ foreach grp $ModPar {
                         Eg0= [lindex $lst 1] * eV
                     \}"
             }
+        } elseif {[lindex $lst 0] eq "WF"} {
+            if {![regexp {\{EF\s+[^\}]+\}} $grp]} {
+                vputs -n -i-4 "
+                    Bandgap \{
+                        WorkFunction= [lindex $lst 1] * eV
+                    \}"
+            }
+        } elseif {[lindex $lst 0] eq "EF"} {
+            if {[regexp {\{WF\s+([^\s\}]+)\}} $grp -> val]} {
+                vputs -n -i-4 "
+                    Bandgap \{
+                        WorkFunction= $val * eV
+                        FermiEnergy= [lindex $lst 1] * eV
+                    \}"
+            } else {
+                vputs -n -i-4 "
+                    Bandgap \{
+                        FermiEnergy= [lindex $lst 1] * eV
+                    \}"
+            }
         } elseif {[lindex $lst 0] eq "NC300"} {
             vputs -n -i-4 "
                     eDOSMass \{

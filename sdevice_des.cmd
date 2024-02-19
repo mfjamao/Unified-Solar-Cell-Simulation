@@ -472,12 +472,12 @@ CurrentPlot {
                 && !$LoadTDR} continue
             if {$elm eq "PD"} {
                 vputs -n -i-5 "
-                        [lindex [split $mfjProc::tabArr($elm) |] 0] (
+                        [lindex [split $TabArr($elm) |] 0] (
                             Integrate (Semiconductor)
                             Integrate (EveryWhere)"
             } else {
                 vputs -n -i-5 "
-                        [lindex [split $mfjProc::tabArr($elm) |] 0] (
+                        [lindex [split $TabArr($elm) |] 0] (
                             Integrate (Semiconductor)
                             Average (Semiconductor)"
             }
@@ -560,7 +560,7 @@ CurrentPlot {
         } elseif {[regexp {^(n|p|ni_eff)$} $elm]} {
             if {[lindex $SimEnv 3] eq "Optical"} continue
             vputs -n -i-5 "
-                        [lindex [split $mfjProc::tabArr($elm) |] 0] ("
+                        [lindex [split $TabArr($elm) |] 0] ("
 
             # By default, monitor average e h ni_eff in each semicon region
             foreach grp $RegGen {
@@ -642,7 +642,7 @@ CurrentPlot {
         } elseif {[regexp {^(UA|UB|US|UP|UD|UT)$} $elm]} {
             if {[lindex $SimEnv 3] eq "Optical"} continue
             vputs -n -i-5 "
-                        [lindex [split $mfjProc::tabArr($elm) |] 0] (
+                        [lindex [split $TabArr($elm) |] 0] (
                             Integrate (Semiconductor)"
 
             # By default, integrate recombination in each semiconductor region
@@ -723,7 +723,7 @@ CurrentPlot {
 
             # No defaults, apply settings in 'VV2Fld'
             vputs -n -i-5 "
-                        [lindex [split $mfjProc::tabArr($elm) |] 0] ("
+                        [lindex [split $TabArr($elm) |] 0] ("
             foreach str $val {
                 if {![regexp \\s$elm $str]} continue
                 if {[regexp {^p[^/]+$} [lindex $str 0]]} {
@@ -1688,7 +1688,7 @@ if {[lindex $SimEnv 3] eq "Optical"} {
     # set var {Coupled {Poisson Electron Hole
         # eQuantumPotential hQuantumPotential}}
     set var {Coupled {Poisson Electron Hole}}
-    set ouf [file join $SimArr(EtcDir) n@node@_Eqm]
+    set ouf $SimArr(EtcDir)/n@node@_Eqm
     vputs -n -i-1 "
         Coupled (LineSearchDamping=0.01 Iterations= 5000) \{Poisson\}\n
         NewCurrentPrefix= \"eqm_\"
@@ -1720,10 +1720,9 @@ foreach grp $VarVary {
                             /([lindex $grp 1]-[lindex $val 1])]
                     }
                     set lst [lsort -real $lst]
-                    set ouf [file join $SimArr(EtcDir) n@node@_v$idx]
-                    append str "\n[string repeat $mfjProc::arr(Tab) 6]Plot\
-                        (FilePrefix= \"$ouf\"\
-                        Time= ([join $lst {; }]) noOverwrite)"
+                    set ouf $SimArr(EtcDir)/n@node@_v$idx
+                    append str "\n[string repeat $Tab 6]Plot (FilePrefix=\
+                        \"$ouf\" Time= ([join $lst {; }]) noOverwrite)"
                 } else {
                     set str "CurrentPlot (Time= (-1))"
                 }
@@ -1822,9 +1821,8 @@ foreach grp $VarVary {
                     /([lindex $grp 1]-$val)]
             }
             set lst [lsort -real $lst]
-            set ouf [file join $SimArr(EtcDir) n@node@_v$idx]
-            append str "\n[string repeat $mfjProc::arr(Tab)\
-                6]Plot (FilePrefix= \"$ouf\"\
+            set ouf $SimArr(EtcDir)/n@node@_v$idx
+            append str "\n[string repeat $Tab 6]Plot (FilePrefix= \"$ouf\"\
                 Time= ([join $lst {; }]) noOverwrite)"
             if {[lindex $grp 2] == 0} {
                 set str "CurrentPlot (Time= (-1))"
@@ -1892,9 +1890,8 @@ foreach grp $VarVary {
                         /([lindex $grp 1]-[lindex $val 1])]
                 }
                 set lst [lsort -real $lst]
-                set ouf [file join $SimArr(EtcDir) n@node@_v$idx]
-                append str "\n[string repeat $mfjProc::arr(Tab) 6]Plot\
-                    (FilePrefix= \"$ouf\"\
+                set ouf $SimArr(EtcDir)/n@node@_v$idx
+                append str "\n[string repeat $Tab 6]Plot (FilePrefix= \"$ouf\"\
                     Time= ([join $lst {; }]) noOverwrite)"
             } else {
                 set str "CurrentPlot (Time= (-1))"

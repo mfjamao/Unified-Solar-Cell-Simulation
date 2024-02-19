@@ -383,7 +383,7 @@ proc mfjIntrpr::readBrf {} {
                 if {[llength $VarStr] == 0} {
                     error "variable #$VarIdx absent!"
                 } elseif {[llength $VarStr] == 1} {
-                    error "no value assigned to variable "[lindex $VarStr 0]!"
+                    error "no value assigned to variable '[lindex $VarStr 0]'!"
                 } else {
                     if {![string equal -nocase $VarName [lindex $VarStr 0]]} {
                         error "variable name '[lindex $VarStr 0]' not found in\
@@ -515,7 +515,7 @@ proc mfjIntrpr::readHost {} {
     variable arr
     set arr(Host|ID) [exec hostname]
     vputs "Extracting settings from host '$arr(Host|ID)'..."
-    set arr(Host|User) $::env(USER)
+    set arr(Host|User) $::tcl_platform(user)
     vputs -v3 -i1 "User: '$arr(Host|User)'"
 
     # Check available job schedulers
@@ -579,7 +579,7 @@ proc mfjIntrpr::readHost {} {
     }
     foreach Name $::SimArr(ST|Hosts) Path $::SimArr(ST|Paths) {
         if {[string index $Name 0] eq [string index $arr(Host|ID) 0]} {
-            set SLib [file join $Path sharedlib]
+            set SLib $Path/sharedlib
             if {[iFileExists SLib]} {
                 set arr(Host|STSLib) $SLib
                 break
@@ -1142,8 +1142,8 @@ proc mfjIntrpr::validateVar {} {
 
     # Include key Tcl files, datexcodes.txt, Molefraction.txt and PMI files
     foreach Elm [concat 11ctrlsim.tcl datexcodes.txt Molefraction.txt\
-        [glob -nocomplain [file join $::SimArr(CodeDir) mfj*.tcl]\
-        [file join $::SimArr(PMIDir) *.\[cC\]]]] {
+        [glob -nocomplain $::SimArr(CodeDir)/mfj*.tcl\
+        $::SimArr(PMIDir)/*.\[cC\]]] {
         lappend ::SimArr(ModTime) [list $Elm [file mtime $Elm]]
     }
     vputs -v3 -i1 "Files for simulation and their modification time:"
@@ -1200,8 +1200,8 @@ proc mfjIntrpr::valRegGen {} {
         # Update region name and region ID with this format: material, region,
         # group, region ID. User-specified regions are indexed from 1 and
         # created from (0 0 0) to (XMax YMax ZMax). A to-be-removed region is
-        # assigned a negative index and a to-be-merged region is assigned a
-        # negative index suffixed with 'm'.
+        # assigned a negative index and a to-be-merged region is assigned the
+        # the previous region index plus a region name of "Merge_Mat".
         set Seq 1
         set RegID ""
         foreach OldReg $OldLvl {
@@ -1719,8 +1719,7 @@ proc mfjIntrpr::fmtvsRaw {} {
             # Remove all compiled PMI share objects if version changes
             if {$Var eq "SimEnv" && [lindex $arr(FmtVal|SimEnv) 1]\
                 ne [lindex $arr(RawVal|SimEnv) 1]} {
-                foreach Elm [glob -nocomplain [file join $::SimArr(PMIDir)\
-                    *.so.*]] {
+                foreach Elm [glob -nocomplain $::SimArr(PMIDir)/*.so.*] {
                     vputs -i2 "File '$Elm' deleted!"
                     file delete $Elm
                 }

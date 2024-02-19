@@ -51,7 +51,7 @@ namespace eval mfjGrm {
                     # Negative index with reference to the current index
                     incr Idx $valIdx
                     if {$Idx < 0} {
-                        error "negative index '$Idx'!"
+                        error "'$Elm' index out of range !"
                     }
                 }
                 set Val [lindex $varVal $Idx]
@@ -66,7 +66,7 @@ namespace eval mfjGrm {
                     # No 'RegIdx' verification for index 0
                     set RegIdx [string range $Val 1 end]
 
-                    # Skip regions of negative ID from 'RegInfo'
+                    # Skip to-be-removed and to-be-merged regions from 'RegInfo'
                     set RegInfo [list]
                     foreach Reg [lindex $::SimArr(RegInfo) $::SimArr(RegLvl)] {
                         if {[string index [lindex $Reg 0 1] 0] ne "M"
@@ -102,7 +102,7 @@ namespace eval mfjGrm {
                     # Negative index with reference to the current index
                     incr Idx $valIdx
                     if {$Idx < 0} {
-                        error "negative index '$Idx'!"
+                        error "'$DfltStr' index out of range!"
                     }
                 }
                 regsub {v-?\d+} $DfltStr [lindex $varVal $Idx] DfltStr
@@ -192,16 +192,18 @@ namespace eval mfjGrm {
             if {$varName ne "RegGen" && [regexp {[prxyz]} $Test]} {
 
                 # Get values from global array 'SimArr'.
-                # Remove regions of negative ID from 'RegInfo'
-                set RegInfo [list]
-                foreach Reg [lindex $::SimArr(RegInfo) $::SimArr(RegLvl)] {
-                    if {[lindex $Reg 0 end] >= 0} {
-                        lappend RegInfo $Reg
+                # Skip to-be-removed and to-be-merged regions from 'RegInfo'
+                if {![info exists RegInfo]} {
+                    set RegInfo [list]
+                    foreach Reg [lindex $::SimArr(RegInfo) $::SimArr(RegLvl)] {
+                        if {[string index [lindex $Reg 0 1] 0] ne "M"
+                            && [lindex $Reg 0 end] >= 0} {
+                            lappend RegInfo $Reg
+                        }
                     }
                 }
                 set DimLen $::SimArr(DimLen)
-                set RegEnd [llength $RegInfo]
-                incr RegEnd -1
+                set RegLen [llength $RegInfo]
 
                 # Extract the boundaries of the simulation domain (including
                 # dummy gaseous layers)
@@ -515,13 +517,13 @@ namespace eval mfjGrm {
                                 # No multiple levels for 'RampAttr'
                                 if {[llength $::SimArr(VarLen)] == 1} {
                                     if {[catch {set Idx [readIdx $VStr\
-                                        [expr $::SimArr(VarLen)-1]]}]} {
+                                        $::SimArr(VarLen)]}]} {
                                         error "'$Val' index out of range!"
                                     }
                                 } else {
                                     foreach Len $::SimArr(VarLen) {
                                         if {[catch {set Idx [readIdx $VStr\
-                                            [incr Len -1]]}]} {
+                                            $Len]}]} {
                                             error "'$Val' index out of range!"
                                         }
                                     }
@@ -729,22 +731,12 @@ namespace eval mfjGrm {
                                 set Bool [expr "$Inv false"]
                             }
                         } else {
-
-                            # Skip regions of negative ID from 'RegInfo'
-                            set RegInfo [list]
-                            foreach Reg [lindex $::SimArr(RegInfo)\
-                                $::SimArr(RegLvl)] {
-                                if {[lindex $Reg 0 end] >= 0} {
-                                    lappend RegInfo $Reg
-                                }
-                            }
-                            set Len [llength $RegInfo]
-                            incr Len -1
                             set RE_r {(-?\d+[:,])*-?\d+}
                             if {[regexp -nocase ^r($RE_r)$ $Val -> RStr]} {
 
                                 # Read an index string and verify region indices
-                                if {[catch {set IdxLst [readIdx $RStr $Len]}]} {
+                                if {[catch {set IdxLst [readIdx $RStr\
+                                    $RegLen]}]} {
                                     error "'$Val' index out of range!"
                                 }
                                 set Bool [expr "$Inv true"]
@@ -788,21 +780,10 @@ namespace eval mfjGrm {
                                 set Bool [expr "$Inv false"]
                             }
                         } else {
-
-                            # Skip regions of negative ID from 'RegInfo'
-                            set RegInfo [list]
-                            foreach Reg [lindex $::SimArr(RegInfo)\
-                                $::SimArr(RegLvl)] {
-                                if {[lindex $Reg 0 end] >= 0} {
-                                    lappend RegInfo $Reg
-                                }
-                            }
-                            set Len [llength $RegInfo]
                             if {[regexp {^[rR](\d+/\d+)$} $Val -> RStr]} {
 
                                 # Read an index string and verify region indices
-                                if {[catch {set Idx [readIdx $RStr\
-                                    [incr Len -1]]}]} {
+                                if {[catch {set Idx [readIdx $RStr $RegLen]}]} {
                                     error "'$Val' index out of range!"
                                 }
                                 set Bool [expr "$Inv true"]

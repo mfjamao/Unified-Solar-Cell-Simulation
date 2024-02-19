@@ -20,7 +20,7 @@ namespace eval mfjProc {
     }
 
     # Refer to Tables 162 and 163 in sdevice manual
-    array set tabArr {
+    array set TabArr {
         Al Aluminum|cm^-3 As Arsenic|cm^-3 B Boron|cm^-3 C Carbon|cm^-3
         F Fluorine|cm^-3 Ge Germanium|cm^-3 In Indium|cm^-3 N Nitrogen|cm^-3
         P Phosphorus|cm^-3 Sb Antimony|cm^-3 x xMoleFraction|1
@@ -405,18 +405,18 @@ proc mfjProc::wrapText {Text {Lead ""} {Trail ""} {HangIdt ""} } {
     # Example: 0/1,3:5 -> (0 1) (0 3) (0 4) (0 5)
 # Arguments
     # IdxStr        A string of indices
-    # MaxIdx        The maximum index if any
+    # IdxLen        The length of indices if any
 # Result: Return the interpreted list of indices/combination
-proc mfjProc::readIdx {IdxStr {MaxIdx ""}} {
+proc mfjProc::readIdx {IdxStr {IdxLen ""}} {
 
     # Validate arguments
-    if {[regexp {^\d+$} $MaxIdx]} {
+    if {[regexp {^\d+$} $IdxLen]} {
 
-        # Format the index to remove leading zeroes
+        # Format the length to remove leading zeroes
         # and convert octal(0#) and hexadecimal(0x#) to decimal
-        set MaxIdx [format %d $MaxIdx]
+        set IdxLen [format %d $IdxLen]
     } else {
-        set MaxIdx -1
+        set IdxLen 0
     }
 
     # Verify, convert or expand if necessary
@@ -433,21 +433,17 @@ proc mfjProc::readIdx {IdxStr {MaxIdx ""}} {
     foreach Char [split $IdxStr, ""] {
         if {$Char eq "/" || $Char eq ":" || $Char eq ","} {
             if {[string is integer -strict $Idx1]} {
-                if {[string index $Idx1 0] eq "-"} {
 
-                    # Preserve minus sign if any (-0 different from 0!)
-                    set Idx1 -[format %d [string range $Idx1 1 end]]
-                } else {
-                    set Idx1 [format %d $Idx1]
-                }
+                # Align with python convention (-0 is the same as 0!)
+                set Idx1 [format %d $Idx1]
 
-                # A negative index is converted to positive if MaxIdx present
-                if {$MaxIdx > -1} {
-                    if {abs($Idx1) > $MaxIdx} {
-                        error "index '$Idx1' in '$IdxStr' > $MaxIdx!"
-                    }
+                # A negative index is converted to positive if IdxLen present
+                if {$IdxLen > 0} {
                     if {[string index $Idx1 0] eq "-"} {
-                        incr Idx1 $MaxIdx
+                        incr Idx1 $IdxLen
+                    }
+                    if {$Idx1 < 0 || $Idx1 >= $IdxLen} {
+                        error "'$IdxStr' index out of range '$IdxLen'!"
                     }
                 }
                 if {$Char eq ":"} {
@@ -580,7 +576,19 @@ proc mfjProc::replace {VarName VarVal} {
                 } else {
                     set Lvl [lindex $Elm 0]
                 }
-                lappend Lst [lrange $Elm 1 end]
+
+                # Replace '-1' with 'end' and '-#' with 'end[incr -#]'
+                set Tmp [list]
+                foreach Idx [lrange $Elm 1 end] {
+                    if {$Idx == -1} {
+                        lappend Tmp end
+                    } elseif {$Idx < 0} {
+                        lappend Tmp end[incr $Idx]
+                    } else {
+                        lappend Tmp $Idx
+                    }
+                }
+                lappend Lst $Tmp
                 set Elm [join $Elm /]
                 if {$RefLvl == -1} {
                     if {$Lvl < 0 || $Lvl >= $LvlIdx} {
@@ -593,9 +601,7 @@ proc mfjProc::replace {VarName VarVal} {
                     }
                 }
             }
-
-            # Replace '-0' with 'end' and '-#' with 'end-#'
-            set IdxLst [string map {-0 end - end-} $Lst]
+            set IdxLst $Lst
             set IdxLen [llength $IdxLst]
 
             # Convert a |-seperated string to a value list
@@ -723,9 +729,9 @@ proc mfjProc::reuse {VarName VarVal SubLst {Lvl ""} {OldIdx ""} {InLvl ""}} {
                             } else {
 
                                 # Not the current index anymore
-                                # so discard 'Ref' and 'End' is indeed 'end'
+                                # so discard 'Ref' and 'End' is list length
                                 set Ref ""
-                                set End [expr [llength $Val]-1]
+                                set End [llength $Val]
                             }
                         }
 
@@ -808,10 +814,11 @@ proc mfjProc::iFileExists {VarName args} {
                 # Negative index is allowed
                 # Format the index to remove leading zeroes
                 # and convert octal(0#) and hexadecimal(0x#) to decimal
-                if {[string index $Elm 0] eq "-"} {
-
-                    # Preserve minus sign if any (-0 different from 0!)
-                    set Elm -[format %d [string range $Elm 1 end]]
+                # Replace '-1' with 'end' and '-#' with 'end[incr -#]'
+                if {$Elm == -1} {
+                    set Elm end
+                } elseif {$Elm < 0} {
+                    set Elm end[incr Elm]
                 } else {
                     set Elm [format %d $Elm]
                 }
@@ -821,9 +828,6 @@ proc mfjProc::iFileExists {VarName args} {
             }
             lappend IdxLst $Elm
         }
-
-        # Replace '-0' with 'end' and '-#' with 'end-#'
-        set IdxLst [string map {-0 end - end-} $IdxLst]
         set ElmVal [lindex $VarVal $IdxLst]
 
         # Verify the list index by setting the value back
@@ -839,31 +843,55 @@ proc mfjProc::iFileExists {VarName args} {
             should be an existing file!"
     }
 
-    # Analyse the file path
     if {[llength $ElmVal]} {
-        if {![file exists $ElmVal]} {
+
+        # Remove . and .. from the path
+        set DirLst [file split $ElmVal]
+        if {[lindex $DirLst 0] eq ".."} {
+            set Path [file dirname [pwd]]
+            set DirLst [lrange $DirLst 1 end]
+        } else {
             set Path ""
-            foreach Elm [file split $ElmVal] {
-                set Tmp [file join $Path $Elm]
-
-                # Accept special directories '.', '..', '/'
-                if {[regexp {^(\.{1,2}|/)$} $Elm]} {
-                    set Path $Tmp
-                } else {
-
-                    # Resolve the right case for each file path
-                    set Path [lsearch -inline -regexp [glob -nocomplain\
-                        -directory $Path *] (?i)^$Tmp$]
-                    if {$Path eq ""} {
-                        error $Msg
-                    }
-                }
+        }
+        foreach Elm $DirLst {
+            if {$Elm eq ".."} {
+                set Path [file dirname $Path]
+            } elseif {$Elm ne "."} {
+                set Path [file join $Path $Elm]
             }
-            if {[llength $IdxLst]} {
-                lset VarVal $IdxLst $Path
+        }
+        set ElmVal $Path
+
+        # Analyse the path
+        if {![file exists $ElmVal]} {
+            set DirLst [file split [file dirname $ElmVal]]
+            if {[file pathtype $ElmVal] eq "absolute"} {
+                set Path [lindex $DirLst 0]
+                set DirLst [lrange $DirLst 1 end]
             } else {
-                set VarVal $Path
+                set Path ""
             }
+            foreach Elm $DirLst {
+                set Str [lsearch -inline -regexp [glob -nocomplain -tails\
+                    -directory $Path -type d *] (?i)^$Elm$]
+                if {$Str eq ""} {
+                    error $Msg
+                }
+                set Path [file join $Path $Str]
+            }
+
+            # if parent directories match, check file tail match
+            set Str [lsearch -inline -regexp [glob -nocomplain -tails\
+                -directory $Path *] (?i)^[file tail $ElmVal]$]
+            if {$Str eq ""} {
+                error $Msg
+            }
+            set Path [file join $Path $Str]
+        }
+        if {[llength $IdxLst]} {
+            lset VarVal $IdxLst $Path
+        } else {
+            set VarVal $Path
         }
         return 1
     } else {
@@ -1536,19 +1564,19 @@ proc mfjProc::groupValues {VarName VarVal GrpID LvlIdx LvlLen} {
 
     # Extract boundaries of simulation domain for GID 'p', 'r'
     # Get values from global array 'SimArr'.
-    # Remove regions of negative ID from 'RegInfo'
+    # Skip to-be-removed and to-be-merged regions from 'RegInfo'
     if {[regexp {[pr]} $GStr]} {
         set RegInfo [list]
         foreach Reg [lindex $::SimArr(RegInfo) $::SimArr(RegLvl)] {
-            if {[lindex $Reg 0 end] >= 0} {
+            if {[string index [lindex $Reg 0 1] 0] ne "M"
+                && [lindex $Reg 0 end] >= 0} {
                 lappend RegInfo $Reg
             }
         }
         # set RegMat [lindex $::SimArr(RegMat) $::SimArr(RegLvl)]
         # set RegIdx [lindex $::SimArr(RegIdx) $::SimArr(RegLvl)]
         set DimLen $::SimArr(DimLen)
-        set RegEnd [llength $RegInfo]
-        incr RegEnd -1
+        set RegLen [llength $RegInfo]
 
         # Extract the boundaries of the simulation domain (including
         # dummy gaseous layers)
@@ -1815,8 +1843,7 @@ proc mfjProc::groupValues {VarName VarVal GrpID LvlIdx LvlLen} {
                         if {$VarLen == 0} {
                             error "no varying variable in 'VarVary'!"
                         }
-                        if {[catch {set IdxLst [readIdx $VStr\
-                            [expr $VarLen-1]]}]} {
+                        if {[catch {set IdxLst [readIdx $VStr $VarLen]}]} {
                             error "'$Val' index out of range!"
                         }
                     } else {
@@ -1829,7 +1856,7 @@ proc mfjProc::groupValues {VarName VarVal GrpID LvlIdx LvlLen} {
                                     of 'VarVary'!"
                             }
                             if {[catch {set IdxLst [readIdx $VStr\
-                                [expr [lindex $VarLen $LvlIdx]-1]]}]} {
+                                [lindex $VarLen $LvlIdx]]}]} {
                                 error "'$Val' index out of range!"
                             }
                         } else {
@@ -1839,8 +1866,7 @@ proc mfjProc::groupValues {VarName VarVal GrpID LvlIdx LvlLen} {
                                     error "no varying variable in level '$Idx'\
                                         of 'VarVary'!"
                                 }
-                                if {[catch {set IdxLst [readIdx $VStr\
-                                    [incr Elm -1]]}]} {
+                                if {[catch {set IdxLst [readIdx $VStr $Elm]}]} {
                                     error "'$Val' index out of range!"
                                 }
                                 incr Idx
@@ -1998,7 +2024,7 @@ proc mfjProc::groupValues {VarName VarVal GrpID LvlIdx LvlLen} {
                 foreach Str [split [string range $Val 1 end] &] {
 
                     # Read an index string and verify region indices
-                    if {[catch {set IdxLst [readIdx $Str $RegEnd]}]} {
+                    if {[catch {set IdxLst [readIdx $Str $RegLen]}]} {
                         error "element 'r$Str' index out of range!"
                     }
                     foreach Lst $IdxLst {
@@ -3251,7 +3277,7 @@ proc mfjProc::cut1D {FTDR FldStruct RegDim YDflt FCSV FCnt} {
                 -scale_font_size 16 -scale_format preferred -type linear
             set j 0
             foreach Elm [lrange $Grp 3 end] {
-                set Elm $mfjProc::tabArr($Elm)
+                set Elm $mfjProc::TabArr($Elm)
                 vputs -i1 "Extracting $Elm at [lindex $Grp 0]..."
                 create_curve -name X${i}_F$j -dataset C1D${FCnt}_$i\
                     -axisX X -axisY [lindex [split $Elm |] 0]
@@ -3285,7 +3311,7 @@ proc mfjProc::gVar2DOESum {GVarArr TrialNode {FDOESum ""}} {
 
     # Validate arguments
     if {$FDOESum eq ""} {
-        set FDOESum [file join 06out DOESummary.csv]
+        set FDOESum 06out/DOESummary.csv
     }
     if {![regexp {^\d+$} $TrialNode]} {
         error "'$TrialNode' should be a positive integer or zero!"

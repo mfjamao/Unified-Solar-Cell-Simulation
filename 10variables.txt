@@ -250,14 +250,14 @@ Specification for a monochromatic light for all optical solvers:
     2 Intensity or power of monochromatic light (n > 0) [Wcm^-2]: 1e-3
 Specification for incidence angles and a shading fraction for all solvers:
     0 Optical ID: Inci<dence>
-    1 Fraction of shading (0 <= n <= 1): 0
+    1 Fraction of shading (n <= 1): 0
     2 Incident angle (0° <= n <= 90°) (Theta): 0
     3 Incident angle (0° <= n <= 90°) (Phi): 0
 
 <GRAMMAR>{pp | rr | o}
 {== v0 Spectrum & (a = 02opt/am15g_IEC60904-3-2008.txt | `f)
     | == v0 Monochromatic & (a = 0.3 | `n & `> 0)
-    | == v0 Incidence & (a = 0 | `n & `>= 0 & `<= 1)
+    | == v0 Incidence & (a = 0 | `n & `<= 1)
     | !a & rr v0 & (n & `>= 0 & `<= 1 | `s A<RC> F<resnel> O<BAM> R<aytrace>
      T<MM> E<xternal>) | `s O<BAM> R<aytrace> T<MM> E<xternal>}
 {== v0 Spectrum & (a = 0.3 | `n & `> 0)
@@ -449,8 +449,8 @@ Specifications for models and parameters for regions:
     0 Material or region: ri | mat
     1 Material model parameter file: 01mdb/silicon.par
     2 Individual model: EA0 | Eg0 | NC300 | NV300 | DC | mt | mu | BGN
-        | Aug | Rad | tau | Trap
-    3 Model parameter for EA0, Eg0, NC300, NV300, DC, mt: value
+        | Aug | Rad | tau | Trap | WF | EF
+    3 Model parameter for EA0, Eg0, NC300, NV300, DC, mt, WF, EF: value
       Models for BGN (bandgap narrowing): B<enettWilson>, d<elAlamo>,
         J<ainRoulston>, S<lotboom>, T<ableBGN>
     4 Same as index 4
@@ -491,9 +491,9 @@ Specification for a trap file for SRH recombination:
     6 Optional hole capture cross section ratio (n > 0) (multiple traps): 1
 
 <GRAMMAR>{m | r} {`!a & `f}
-{a | r v0 & (== g0 Insulator & `s EA0 Eg0 DC mt | == g0 Semiconductor
-    & `s EA0 Eg0 NC300 NV300 DC mt mu BGN SRH Trap Aug Rad)}
-{e v2 & `a | == v-1 (EA0|Eg0|NC300|NV300|DC|mt) & (`!a & `n & `> 0)
+{a | r v0 & (== g0 Semiconductor & `s EA0 Eg0 NC300 NV300 DC mt mu BGN SRH Trap
+    Aug Rad | == g0 Insulator & `s EA0 Eg0 DC mt | `s WF EF)}
+{e v2 & `a | == v-1 (EA0|Eg0|NC300|NV300|DC|mt|WF|EF) & (`!a & `n & `> 0)
     | == v-1 mu & (`!a & n & `> 0 | `s A<rora> M<asetti>)
     | == v-1 BGN & `!a & `s B<enettWilson> d<elAlamo> J<ainRoulston>
         S<lotboom> T<ableBGN>
@@ -513,6 +513,7 @@ Specification for a trap file for SRH recombination:
     | == v-2 mt & (a | n & `> 0 | (== g0 Insulator & `s EA0 Eg0 DC
         | == g0 Semiconductor & `s EA0 Eg0 NC300 NV300 DC mu BGN SRH Trap Aug
         Rad))
+    | == v-2 (WF|EF) & (a | `s WF EF)
     | == v-2 NC300 & (a | `s EA0 Eg0 NV300 DC mt mu BGN SRH Trap Aug Rad)
     | == v-2 NV300 & (a | `s EA0 Eg0 NC300 DC mt mu BGN SRH Trap Aug Rad)
     | == v-2 mu & (a | n & `> 0

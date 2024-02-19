@@ -62,8 +62,7 @@ if {[llength $ProcSeq]} {
                 while {[llength $grp]} {
                     if {[regexp {^(Al|As|B|C|F|Ge|In|N|P|Sb)$}\
                         [lindex $grp 0]]} {
-                        set val [lindex [split\
-                            $mfjProc::tabArr([lindex $grp 0]) |] 0]
+                        set val [lindex [split $TabArr([lindex $grp 0]) |] 0]
                     }
                     if {$var eq ""} {
                         append var "$val= [lindex $grp 1]"
@@ -176,8 +175,7 @@ if {[llength $ProcSeq]} {
                     append str " wafer.orient= 100"
                 }
                 if {[llength $grp] == 6} {
-                    set val [lindex [split\
-                        $mfjProc::tabArr([lindex $grp 4]) |] 0]
+                    set val [lindex [split $TabArr([lindex $grp 4]) |] 0]
                     append str " field= $val concentration= [lindex $grp 5]"
                 }
                 puts $ouf $str
@@ -228,7 +226,7 @@ if {[llength $ProcSeq]} {
             }
             write {
                 set var [split [string range [lindex $grp 1] 1 end] _]
-                set val [file join $SimArr(OutDir) n@node@_p${idx}_1DCut.plx]
+                set val $SimArr(OutDir)/n@node@_p${idx}_1DCut.plx
                 set str "WritePlx $val"
                 if {$Dim == 1} {
                     append str " y= [expr $YMax*0.5]"
@@ -250,10 +248,10 @@ if {[llength $ProcSeq]} {
 
     # Convert .plx files from process simulaton to .CSV files
     if {[llength $lst]} {
-        puts $ouf "source \[file join $SimArr(CodeDir) $SimArr(FProc)\]"
+        puts $ouf "source $SimArr(CodeDir)/$SimArr(FProc)"
     }
     foreach elm $lst {
-        puts $ouf "mfjProc::plx2CSV $elm"
+        puts $ouf "[file rootname $SimArr(FProc)]::plx2CSV $elm"
     }
 } else {
     puts $ouf "file copy -force n@previous@_msh.tdr n@node@_fps.tdr"

@@ -17,8 +17,10 @@ if {[regexp {array set SimArr \{(.+)\};\#} $str -> tmp]} {
 }
 
 # Source general procedures to reduce lengthy embedded code
-source [file join $SimArr(CodeDir) $SimArr(FProc)]
-namespace import mfjProc::*
+source $SimArr(CodeDir)/$SimArr(FProc)
+namespace import [file rootname $SimArr(FProc)]::*
+array set TabArr [array get [file rootname $SimArr(FProc)]::TabArr]
+set Tab [set [file rootname $SimArr(FProc)]::arr(Tab)]
 
 # Retrieve more detailed information from 'mfjRegInfo'
 # Remove negative RID from 'RegGen'; App1 -> 'RegApp1'; App2 -> 'RegApp2'
@@ -153,8 +155,7 @@ foreach grp $FldAttr {
             } elseif {[file isfile [lindex $grp 0]]} {
                 set elm [lindex $grp 0]
             } else {
-                set elm [lindex [split\
-                    $mfjProc::tabArr([lindex $grp 0]) |] 0]
+                set elm [lindex [split $TabArr([lindex $grp 0]) |] 0]
             }
         }
         set grp [lrange $grp 1 end]
@@ -1131,7 +1132,8 @@ vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
 )
 
 ;# Set refinement properties for curved boundaries
-(sde:setrefprops 0.001 15 0 0)
+(sde:setrefprops -1 15 0 0)         ;# Default
+# (sde:setrefprops 0.001 90 0 0)      ;# Tight
 
 ;# Stick to axis aligned mesh for block type of regions. If a non-block region
 ;# found, enable offsetting mesh

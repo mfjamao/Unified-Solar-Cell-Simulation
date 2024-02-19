@@ -199,5 +199,10 @@ Materials {
         group= Semiconductor
         color= #a6d6d6, #b36b6b
     }
+    Perovskite {
+        label= "Perovskite"
+        group= Semiconductor
+        color= #a6d6d6, #b36b6b
+    }
 
 }
