@@ -63,6 +63,8 @@ if {[llength $ProcSeq]} {
                     if {[regexp {^(Al|As|B|C|F|Ge|In|N|P|Sb)$}\
                         [lindex $grp 0]]} {
                         set val [lindex [split $TabArr([lindex $grp 0]) |] 0]
+                    } else {
+                        set val [lindex $grp 0]
                     }
                     if {$var eq ""} {
                         append var "$val= [lindex $grp 1]"
@@ -74,7 +76,7 @@ if {[llength $ProcSeq]} {
                 if {$var ne ""} {
                     append str " fields.values= \{$var\}"
                 }
-                puts $ouf $str
+                puts $ouf $str\n
             }
             diffuse {
                 puts $ouf "temp_ramp name= temp$idx\
@@ -82,13 +84,13 @@ if {[llength $ProcSeq]} {
                 set val [lindex $grp 2]
                 set grp [lrange $grp 3 end]
                 if {[llength $grp] == 0} {
-                    puts $ouf "diffuse temp.ramp= temp$idx"
+                    puts $ouf "diffuse temp.ramp= temp$idx\n"
                 } elseif {[llength $grp] == 2} {
                     if {[string equal -nocase [lindex $grp 0] N2]} {
-                        puts $ouf "diffuse temp.ramp= temp$idx"
+                        puts $ouf "diffuse temp.ramp= temp$idx\n"
                     } else {
                         puts $ouf "diffuse temp.ramp= temp$idx [lindex $grp 0]\
-                            pressure= [lindex $grp 1]<$val>"
+                            pressure= [lindex $grp 1]<$val>\n"
                     }
                 } else {
                     set var [list]
@@ -98,7 +100,7 @@ if {[llength $ProcSeq]} {
                     }
                     puts $ouf "gas_flow name= flow$idx\
                         partial.pressure= \"$var\""
-                    puts $ouf "diffuse temp.ramp= temp$idx gas.flow= flow$idx"
+                    puts $ouf "diffuse temp.ramp= temp$idx gas.flow= flow$idx\n"
                 }
             }
             etch {
@@ -113,7 +115,7 @@ if {[llength $ProcSeq]} {
                     && [lindex $grp 4] <= $cnt} {
                     append str " mask= \"M[lindex $grp 4]\""
                 }
-                puts $ouf $str
+                puts $ouf $str\n
             }
            implant {
                 set str "implant species= $arr([lindex $grp 1])\
@@ -124,40 +126,40 @@ if {[llength $ProcSeq]} {
                 if {[llength $grp] >= 6} {
                     append str " tilt=[lindex $grp 5]"
                 }
-                puts $ouf $str
+                puts $ouf $str\n
             }
             init {
                 set var [string map {p \{ _ " " / "\} \{"} [lindex $grp 2]]\}
                 set val [lindex $var 1 0]
-                puts $ouf "line x loc= 0.0 Spa= 0.001 tag= top"
+                puts $ouf "line x loc= 0.0 spac= 0.001 tag= top"
                 if {$val > 0.05} {
-                    puts $ouf "line x loc= 0.05 Spa= 0.005"
+                    puts $ouf "line x loc= 0.05 spac= 0.005"
                 }
                 if {$val > 1} {
-                    puts $ouf "line x loc= 1.0 Spa= 0.05"
+                    puts $ouf "line x loc= 1.0 spac= 0.05"
                 }
-                puts $ouf "line x loc= $val Spa= 0.05 tag= bot"
+                puts $ouf "line x loc= $val spac= 0.05 tag= bot"
                 if {$Dim > 1} {
                     set val [lindex $var 1 1]
-                    puts $ouf "line y loc= 0.0 Spa= 0.001 tag= left"
+                    puts $ouf "line y loc= 0.0 spac= 0.001 tag= left"
                     if {$val > 0.05} {
-                        puts $ouf "line y loc= 0.05 Spa= 0.005"
+                        puts $ouf "line y loc= 0.05 spac= 0.005"
                     }
                     if {$val > 1} {
-                        puts $ouf "line y loc= 1.0 Spa= 0.05"
+                        puts $ouf "line y loc= 1.0 spac= 0.05"
                     }
-                    puts $ouf "line y loc= $val Spa= 0.05 tag= right"
+                    puts $ouf "line y loc= $val spac= 0.05 tag= right"
                 }
                 if {$Dim == 3} {
                     set val [lindex $var 1 2]
-                    puts $ouf "line z loc= 0.0 Spa= 0.001 tag= far"
+                    puts $ouf "line z loc= 0.0 spac= 0.001 tag= far"
                     if {$val > 0.05} {
-                        puts $ouf "line z loc= 0.05 Spa= 0.005"
+                        puts $ouf "line z loc= 0.05 spac= 0.005"
                     }
                     if {$val > 1} {
-                        puts $ouf "line z loc= 1.0 Spa= 0.05"
+                        puts $ouf "line z loc= 1.0 spac= 0.05"
                     }
-                    puts $ouf "line z loc= $val Spa= 0.05 tag= near"
+                    puts $ouf "line z loc= $val spac= 0.05 tag= near"
                 }
                 if {$Dim == 1} {
                     puts $ouf "region [lindex $grp 1] xlo= top xhi= bot"
@@ -178,7 +180,7 @@ if {[llength $ProcSeq]} {
                     set val [lindex [split $TabArr([lindex $grp 4]) |] 0]
                     append str " field= $val concentration= [lindex $grp 5]"
                 }
-                puts $ouf $str
+                puts $ouf $str\n
             }
             mask {
                 if {[lindex $grp 3] eq "clear"} {
@@ -203,7 +205,7 @@ if {[llength $ProcSeq]} {
                             right= [lindex $var 1 1] front= [lindex $var 0 2]\
                             back= [lindex $var 1 2]"
                     }
-                    puts $ouf $str
+                    puts $ouf $str\n
                 }
             }
             select {
@@ -218,11 +220,11 @@ if {[llength $ProcSeq]} {
                 } else {
                     append str " Silicon"
                 }
-                puts $ouf $str
+                puts $ouf $str\n
             }
             transform {
                 puts $ouf "transform [lindex $grp 1]\
-                    location= [string range [lindex $grp 2] 1 end]"
+                    location= [string range [lindex $grp 2] 1 end]\n"
             }
             write {
                 set var [split [string range [lindex $grp 1] 1 end] _]
@@ -235,7 +237,7 @@ if {[llength $ProcSeq]} {
                 } else {
                     append str " y= [lindex $var 1] z= [lindex $var 2]"
                 }
-                puts $ouf $str
+                puts $ouf $str\n
                 lappend lst [lindex $str 1]
             }
             default {

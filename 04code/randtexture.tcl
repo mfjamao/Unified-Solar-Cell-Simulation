@@ -41,7 +41,7 @@ if {[file isfile $Dir/11ctrlsim.tcl]} {
 }
 
 # Source general procedures to reduce lengthy embedded code
-source $SimArr(CodeDir)/$SimArr(FProc)
+source $Dir/$SimArr(CodeDir)/$SimArr(FProc)
 namespace import [file rootname $SimArr(FProc)]::*
 
 set NPyr 60

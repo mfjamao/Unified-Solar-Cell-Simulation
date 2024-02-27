@@ -419,7 +419,7 @@ Specification for write 1D profile along x:
     | == v0 Init & (a | `s Al As B C F Ge In N P Sb)
     | == v0 Select & (a = Silicon | `m)}
 {== v0 (Calibrate|Etch|Mask|Select|Transform|Write) & `a
-    | == v0 Deposit & (a | `s Al As B C F Ge In N P Sb)
+    | == v0 Deposit & (a | `== {\w+} )
     | == v0 Diffuse & (a | `s Cl2 H2 H2O HCl N2 N2O O2)
     | == v0 Implant & (a = 7 | `n & `>= 0 & `< 90)
     | == v0 Init & (e v-1 & `a | `!a & `n & `> 0)}
@@ -427,7 +427,7 @@ Specification for write 1D profile along x:
     | == v0 Deposit & (e v-1 & `a | `!a & `n & `> 0)
     | == v0 Diffuse & (e v-1 & `a | `!a & `n & `> 0 & `< 1)}
 {== v0 (Calibrate|Etch|Implant|Init|Mask|Select|Transform|Write) & `a
-    | == v0 Deposit & (n v-1 & (a | `s Al As B C F Ge In N P Sb)
+    | == v0 Deposit & (n v-1 & (a | `== {\w+} )
         | e v-1 & `a | `!a & `n & `> 0)
     | == v0 Diffuse & (n v-1 & (a | `s Cl2 H2 H2O HCl N2 N2O O2)
         | e v-1 & `a | `!a & `n & `> 0)}
