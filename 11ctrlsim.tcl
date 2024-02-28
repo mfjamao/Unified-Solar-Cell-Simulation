@@ -47,9 +47,9 @@ array set SimArr {
     Prefix "# ---"
     Email|Sufx {unsw.edu.au unsw.edu.au}
     ST|Hosts {katana tyrion}
-    ST|Paths {/srv/scratch/z3505796/apps/sentaurus
+    ST|Paths {/srv/scratch/z5344214/apps/sentaurus
         /share/scratch/z3505796/apps/sentaurus}
-    ST|Licns {27105@license1.restech.unsw.edu.au
+    ST|Licns {27020@license2e.restech.unsw.edu.au
         27105@licence.eng.unsw.edu.au}
     ST|Tools {sde sdevice svisual inspect sprocess}
     sde|Sufx _dvs.cmd sdevice|Sufx _des.cmd svisual|Sufx _vis.tcl
