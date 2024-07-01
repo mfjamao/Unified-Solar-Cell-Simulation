@@ -1150,8 +1150,12 @@ proc mfjST::updateTcl {} {
                 if {$arr(TclLvl|$Var) == 1
                     && [string index $::SimArr(Node4All) 0] ne "!"
                     || $arr(TclLvl|$Var) > 1} {
+                    set Val $arr(TclVal|$Var)
+                    if {$arr(TclLvl|$Var) > 1} {
+                        set Val \{[join $Val \}\n\{]\}
+                    }
                     puts $Ouf [wrapText [format "set %-${MaxLen}s\{%s\}\n"\
-                        $Var<$arr(TclLvl|$Var)> $arr(TclVal|$Var)] $Tab]
+                        $Var<$arr(TclLvl|$Var)> $Val] $Tab]
 
                     # Decrease MaxLen with 4 spaces and revert it afterwards
                     incr MaxLen -4

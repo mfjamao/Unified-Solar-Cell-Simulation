@@ -41,18 +41,17 @@ namespace eval mfjGrm {
 
         # Replace a potential reference with the specified element in arguments
         set Lst [list]
+        set valLen [expr 1+$valIdx]
         foreach Elm $Arguments {
             if {[regexp -nocase {^(v|g|m)(-?\d+)$} $Elm -> Char Idx]} {
-                if {$Idx > $valIdx} {
-                    error "reference to an unverified element '$Idx'!"
-                }
-                if {[string index $Idx 0] eq "-"} {
 
-                    # Negative index with reference to the current index
-                    incr Idx $valIdx
-                    if {$Idx < 0} {
-                        error "'$Elm' index out of range !"
-                    }
+                # Negative index for the current index: -1
+                # Convert a negative index to the positive one
+                if {$Idx < 0} {
+                    incr Idx $valLen
+                }
+                if {$Idx < 0 || $Idx > $valIdx} {
+                    error "'$Elm' index out of range!"
                 }
                 set Val [lindex $varVal $Idx]
 
@@ -92,26 +91,25 @@ namespace eval mfjGrm {
         if {$DfltVal ne ""} {
             set DfltStr $DfltVal
 
-            # Find and substitute all the relevant index values
+            # Find and substitute all the relevant indices
             while {[regexp {v(-?\d+)} $DfltStr -> Idx]} {
-                if {$Idx > $valIdx} {
-                    error "reference to an unverified element '$Idx'!"
-                }
-                if {[string index $Idx 0] eq "-"} {
 
-                    # Negative index with reference to the current index
-                    incr Idx $valIdx
-                    if {$Idx < 0} {
-                        error "'$DfltStr' index out of range!"
-                    }
+                # Negative index for the current index: -1
+                # Convert a negative index to the positive one
+                if {$Idx < 0} {
+                    incr Idx $valLen
+                }
+                if {$Idx < 0 || $Idx > $ValIdx} {
+                    error "'$DfltStr' index out of range!"
                 }
                 regsub {v-?\d+} $DfltStr [lindex $varVal $Idx] DfltStr
             }
 
+            # In case an reference index is within an expression
             if {[regexp {v-?\d+} $DfltVal]
                 && ![regexp {^v-?\d+$} $DfltVal]} {
 
-                # Evaluate the update default string
+                # Evaluate the updated default string
                 if {[catch {set DfltVal [expr $DfltStr]}]} {
                     error "unknown expression '$DfltVal'!"
                 }
@@ -120,7 +118,7 @@ namespace eval mfjGrm {
             }
         }
 
-        # Evaluate the element at "valIdx" against a format rule
+        # Evaluate the current element at "valIdx" against a format rule
         set Val [lindex $varVal $valIdx]
         if {[regexp {^`+([^`]+)$} $Test -> Test]} {
             set Vital true

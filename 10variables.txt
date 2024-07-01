@@ -36,17 +36,17 @@ Specification (after semicolon):
    7 Number of CPUs (i >= 1): 4
 
 <GRAMMAR>{a = Sentaurus | s Sentaurus}
-{a = U-2022.12 | `s E<-2010.12> F<-2011.09> G<-2012.06> H<-2013.03> I<-2013.12>
-    J<-2014.09> K<-2015.06> L<-2016.03> M<-2016.12> N<-2017.09> O<-2018.06>
-    P<-2019.03> Q<-2019.12> R<-2020.09> S<-2021.06> T<-2022.03> U<-2022.12>}
+{a = U-2022.12 | `s E-2010.12 F-2011.09 G-2012.06 H-2013.03 I-2013.12 J-2014.09
+    K-2015.06 L-2016.03 M-2016.12 N-2017.09 O-2018.06 P-2019.03 Q-2019.12
+    R-2020.09 S-2021.06 T-2022.03 U-2022.12}
 {a = !Cylindrical | s C<ylindrical> !Cylindrical}
 {a = Electrical | s O<ptical> P<rocess> Electrical}
 {a = Local | s P<BS> Local}
-{== v-1 Local & `a | a = 1 | `i & `>= 1}
-{== v-2 Local & `a | a = 20 | `i & `>= 1}
-{== v-3 Local & `a | a = 4 | `i & `>= 1}
+{== v-2 Local & `a | a = 1 | `i & `>= 1}
+{== v-3 Local & `a | a = 20 | `i & `>= 1}
+{== v-4 Local & `a | a = 4 | `i & `>= 1}
 
-<VAR>SimEnv     {Sentaurus T-2022.03 !Cylindrical Process Local}
+<VAR>SimEnv     {Sentaurus T-2022.03 !Cylindrical Electrical PBS 1 5 8}
 
 <SENTAURUS>Tool_label = sde Tool_name = sde
 
@@ -116,7 +116,8 @@ Specifications for regions employing the explicit method:
     | == v1 Pyramid & (a = 1 | `n & `> 0 & `<= 1) | a | `p}
 {(n v1 | != v1 Vertices) & `a | a | `p} ...
 
-<VAR>RegGen     {{Silicon 75}}
+<VAR>RegGen     {{iaSi 0.006 50} {Silicon 165 50} {iaSi 0.006 50} {paSi 0.02 45}
+    {naSi 5} {Gas 0.1 44.5} {Gas 1} {Gas 4.5}}
 
 <COMMENT>Region and interface fields variable
 Supported constant region fields: Al(Aluminum) As(Arsenic) B(Boron) C Carbon
@@ -140,16 +141,16 @@ Specification for interface fields:
 <GRAMMAR>{r | rr | pp}
 {`!a & r v0 & (!= g0 Semiconductor & `a | `s Al As B C F Ge In N P Sb x y PD)
     | `f}
-{r v0 & (== v-1 {[xy]} & (`!a & `n & `>= 0 & `<= 1)
-    | == v-1 (Al|As|B|C|F|Ge|In|N|P|Sb|PD) & (`!a & `n & `>= 0)
-    | == v-2 (x|y|PD) & (a | `s Al As B C F Ge In N P Sb x y PD)
-    | == v-2 (Al|As|B|C|F|Ge|In|N|P|Sb) & (a | `s Al As B C F Ge In N P Sb x y
-    PD A<ctive> !<Active>) | == v-3 (Al|As|B|C|F|Ge|In|N|P|Sb) & (a | `s Al As
-    B C F Ge In N P Sb x y PD)) | f v-1 & (a | n & `> 0 | `f)
-    | f v-2 & (a | n & `>= 0 & `<= 1 | `f) | f v-3 & (a | `f)}
+{r v0 & (== v-2 {[xy]} & (`!a & `n & `>= 0 & `<= 1)
+    | == v-2 (Al|As|B|C|F|Ge|In|N|P|Sb|PD) & (`!a & `n & `>= 0)
+    | == v-3 (x|y|PD) & (a | `s Al As B C F Ge In N P Sb x y PD)
+    | == v-3 (Al|As|B|C|F|Ge|In|N|P|Sb) & (a | `s Al As B C F Ge In N P Sb x y
+    PD A<ctive> !<Active>) | == v-4 (Al|As|B|C|F|Ge|In|N|P|Sb) & (a | `s Al As
+    B C F Ge In N P Sb x y PD)) | f v-2 & (a | n & `> 0 | `f)
+    | f v-3 & (a | n & `>= 0 & `<= 1 | `f) | f v-4 & (a | `f)}
 ...
 
-<VAR>FldAttr    {}
+<VAR>FldAttr    {{r2 P 1.56e+15} {r4 B 1.41e+19} {r5 P 1.45e+19}}
 
 <COMMENT>Interface attributes variable
 Specify three types of region interfaces - SRH, metal contact and tunnelling
@@ -197,7 +198,10 @@ Specification for a tunneling interface:
 {(n v1 | f v1 | == v2 {C\w+} ) & `a | == v1 {c\d} & (a = 1e7 | `n & `> 0) | a}
 {(n v1 | f v1 | == v2 {C\w+} ) & `a | == v1 {c\d} & (a | `n & `> 0) | a}
 
-<VAR>IntfAttr   {}
+<VAR>IntfAttr   {{r4/6 c0 Ohmic 0 0 0 1e7} {r5/8 c1 Ohmic 0 0 0 1e7} {r0/1 1e+12
+    100000} {r4/7 0 10000000} {r5/7 0 10000000} {r1/2 0 190} {r3/2 0 190}}
+    {{r4/6 c0 Ohmic 0 0 0 1e7} {r5/8 c1 Ohmic 0 0 0 1e7} {r0/1 0 0} {r4/7 0
+    10000000} {r5/7 0 10000000} {r1/2 0 190} {r3/2 0 190}}
 
 <COMMENT>Optical generation attributes variable
 Specify four types of optical solver E(External), O(OBAM), T(TMM), R(Raytrace).
@@ -262,7 +266,7 @@ Specification for incidence angles and a shading fraction for all solvers:
     | == v1 ARC & (`!a & `m) | (n v1 | == v1 Fresnel ) & (a | s R<andom>
     G<aussian> Phong) | == v1 TMM & (a = 1 | n & `>= 1 | `m)
     | == v1 OBAM & `a | == v1 External & `!a & `f | `!a & `i & `> 0}
-{== v0 Spectrum & (a = 1.2 | `n & `> v-1) | == v0 Monochromatic & `a
+{== v0 Spectrum & (a = 1.2 | `n & `> v-2) | == v0 Monochromatic & `a
     | == v0 Incidence & (a = 0 | `n & `>= 0 & `<= 90)
     | == v1 ARC & (`!a & `n & `> 0) | ( n v1 | == v1 Fresnel ) & (== v2 Phong
     & (a = 1 | `i & `> 0) | == v2 Gaussian & (a = 0.1 | `n & `> 0)
@@ -270,15 +274,17 @@ Specification for incidence angles and a shading fraction for all solvers:
     | == v1 TMM & (n v2 & (a = 0 | `n & `>= 0) | `a)
     | == v1 (External|OBAM) & `a
     | a = MonteCarlo | s D<eterministic> MonteCarlo}
-{== v0 Spectrum & (a = 0.01 | `n & `> 0 & `< v-1) | == v0 {[IM]\w+} & `a
+{== v0 Spectrum & (a = 0.01 | `n & `> 0 & `< v-2) | == v0 {[IM]\w+} & `a
     | == v1 ARC & (`!a & `f) | == v1 Raytrace & (a = 1e-4 | `n & `> 0 & `< 1)
     | `a}
 {== v1 ARC & (a | `m) | == v1 Raytrace & (a = 100000 | `i & `> 0) | `a}
-{== v1 ARC & (m v-1 & `!a & `n & `> 0 | n v-1 & `!a & `f | f v-1 & (a | `m))
+{== v1 ARC & (m v-2 & `!a & `n & `> 0 | n v-2 & `!a & `f | f v-2 & (a | `m))
     | `a}
 ...
 
-<VAR>GopAttr    {}
+<VAR>GopAttr    {{r0/1 External 02opt/HJT_165um_a-Si-i_6nm_Spectral.plx}
+    {Spectrum 02opt/AM1.5g_IEC60904-3_2008.txt 0.3 1.2 0.01} {Monochromatic 0.3
+    0.001}}
 
 <COMMENT>Default attributes variable
 Specification for mesh refinements:
@@ -309,8 +315,7 @@ Specification for other settings:
 {== v0 Mesh & (a = 0.001 | `n & `> 0) | `a}
 {== v0 Mesh & (a = 1.1 | `n & `> 1) | `a}
 
-<VAR>DfltAttr   {{Mesh 10 0.05 8 0.0003 16 1.1 0.001 1.1} {Numeric 64} {Other
-    25}}
+<VAR>DfltAttr   {{Mesh 10 0.05 8 0.001 8 1.5 0.001 1.1} {Numeric 64} {Other 25}}
 
 <SENTAURUS>Tool_label = sprocess Tool_name = sprocess
 
@@ -382,56 +387,39 @@ Specification for write 1D profile along x:
 {== v0 Calibrate & (a = U-2022.12 | `s E<-2010.12> F<-2011.09> G<-2012.06>
     H<-2013.03> I<-2013.12> J<-2014.09> K<-2015.06> L<-2016.03> M<-2016.12>
     N<-2017.09> O<-2018.06> P<-2019.03> Q<-2019.12> R<-2020.09> S<-2021.06>
-    T<-2022.03> U<-2022.12>)
-    | == v0 (Deposit|Etch) & (`!a & `m)
-    | == v0 Diffuse & (`!a & `f)
-    | == v0 Implant & (`!a & `s As B P)
-    | == v0 Init & (`!a & `m)
-    | == v0 Mask & (`!a & `pp)
-    | == v0 Select & (`!a & `s Int Vac)
-    | == v0 Transform & (`!a & s flip)
-    | == v0 Write & (`!a & `p)}
-{== v0 Write & `a | == v0 Calibrate & (a | `f)
-    | == v0 (Deposit|Etch) & (`!a & `n & `> 0)
-    | == v0 Diffuse & (a = atm | s torr Pa atm)
-    | == v0 Implant & (`!a & `n & `> 0)
-    | == v0 Init & (`!a & `pp)
-    | == v0 Mask & (a = positive | s n<egative> positive)
-    | == v0 Select & (`!a & `n & `> 0)
-    | == v0 Transform & (a | `x)}
-{== v0 (Calibrate|Transform|Write) & `a
-    | == v0 Deposit & (a = anisotropic | s i<sotropic> anisotropic)
-    | == v0 Etch & (a = anisotropic | s i<sotropic> anisotropic)
-    | == v0 Diffuse & (a = N2 | s Cl2 H2 H2O HCl N2O O2 N2)
-    | == v0 Implant & (`!a & `n & `> 0)
-    | == v0 Init & (a = 100 | s 111 110 100)
-    | == v0 Mask & (a | s c<lear> !clear)
-    | == v0 Select & (a = store | s d<elete> store)}
-{== v0 (Calibrate|Mask|Transform|Write) & `a
-    | == v0 (Deposit|Etch) & (a = -1 | `i)
-    | == v0 Diffuse & (a = 1 | `n & `> 0 & `<= 1)
-    | == v0 Implant & (a = -90 | `n & `>= -360 & `<= 360)
-    | == v0 Init & (a | `s Al As B C F Ge In N P Sb)
+    T<-2022.03> U<-2022.12>) | == v0 (Deposit|Etch) & (`!a & `m) | == v0 Diffuse
+    & (`!a & `f) | == v0 Implant & (`!a & `s As B P) | == v0 Init & (`!a & `m) |
+    == v0 Mask & (`!a & `pp) | == v0 Select & (`!a & `s Int Vac) | == v0
+    Transform & (`!a & s flip) | == v0 Write & (`!a & `p)}
+{== v0 Write & `a | == v0 Calibrate & (a | `f) | == v0 (Deposit|Etch) & (`!a &
+    `n & `> 0) | == v0 Diffuse & (a = atm | s torr Pa atm) | == v0 Implant &
+    (`!a & `n & `> 0) | == v0 Init & (`!a & `pp) | == v0 Mask & (a = positive |
+    s n<egative> positive) | == v0 Select & (`!a & `n & `> 0) | == v0 Transform
+    & (a | `x)}
+{== v0 (Calibrate|Transform|Write) & `a | == v0 Deposit & (a = anisotropic | s
+    i<sotropic> anisotropic) | == v0 Etch & (a = anisotropic | s i<sotropic>
+    anisotropic) | == v0 Diffuse & (a = N2 | s Cl2 H2 H2O HCl N2O O2 N2) | == v0
+    Implant & (`!a & `n & `> 0) | == v0 Init & (a = 100 | s 111 110 100) | == v0
+    Mask & (a | s c<lear> !clear) | == v0 Select & (a = store | s d<elete>
+    store)}
+{== v0 (Calibrate|Mask|Transform|Write) & `a | == v0 (Deposit|Etch) & (a = -1 |
+    `i) | == v0 Diffuse & (a = 1 | `n & `> 0 & `<= 1) | == v0 Implant & (a = -90
+    | `n & `>= -360 & `<= 360) | == v0 Init & (a | `s Al As B C F Ge In N P Sb)
     | == v0 Select & (a = Silicon | `m)}
-{== v0 (Calibrate|Etch|Mask|Select|Transform|Write) & `a
-    | == v0 Deposit & (a | `== {\w+} )
-    | == v0 Diffuse & (a | `s Cl2 H2 H2O HCl N2 N2O O2)
-    | == v0 Implant & (a = 7 | `n & `>= 0 & `< 90)
-    | == v0 Init & (e v-1 & `a | `!a & `n & `> 0)}
-{== v0 (Calibrate|Etch|Implant|Init|Mask|Select|Transform|Write) & `a
-    | == v0 Deposit & (e v-1 & `a | `!a & `n & `> 0)
-    | == v0 Diffuse & (e v-1 & `a | `!a & `n & `> 0 & `< 1)}
-{== v0 (Calibrate|Etch|Implant|Init|Mask|Select|Transform|Write) & `a
-    | == v0 Deposit & (n v-1 & (a | `== {\w+} )
-        | e v-1 & `a | `!a & `n & `> 0)
-    | == v0 Diffuse & (n v-1 & (a | `s Cl2 H2 H2O HCl N2 N2O O2)
-        | e v-1 & `a | `!a & `n & `> 0)}
-...
+{== v0 (Calibrate|Etch|Mask|Select|Transform|Write) & `a | == v0 Deposit & (a |
+    `== {\w+} ) | == v0 Diffuse & (a | `s Cl2 H2 H2O HCl N2 N2O O2) | == v0
+    Implant & (a = 7 | `n & `>= 0 & `< 90) | == v0 Init & (e v-2 & `a | `!a & `n
+    & `> 0)}
+{== v0 (Calibrate|Etch|Implant|Init|Mask|Select|Transform|Write) & `a | == v0
+    Deposit & (e v-2 & `a | `!a & `n & `> 0) | == v0 Diffuse & (e v-2 & `a | `!a
+    & `n & `> 0 & `< 1)}
+{== v0 (Calibrate|Etch|Implant|Init|Mask|Select|Transform|Write) & `a | == v0
+    Deposit & (n v-2 & (a | `== {\w+} ) | e v-2 & `a | `!a & `n & `> 0) | == v0
+    Diffuse & (n v-2 & (a | `s Cl2 H2 H2O HCl N2 N2O O2) | e v-2 & `a | `!a & `n
+    & `> 0)}
+{...}
 
-<VAR>ProcSeq    {{calibrate T-2022.03 04code/Hy_model_nitridev3_JS.fps} {init
-    Silicon p0/75 100 B 7.22e+15} {deposit Nitride 0.075 anisotropic -1 Hy_Si
-    4.6e+20 Hy_Ni 4e+20} {diffuse 03exp/Diff/SiNx-250C.plx atm N2 1} {write p0}
-    {diffuse 03exp/Diff/2023Hammann-Fastramp.plx atm N2 1} {write p0}}
+<VAR>ProcSeq    {}
 
 <SENTAURUS>Tool_label = sdevice Tool_name = sdevice
 
@@ -491,52 +479,57 @@ Specification for a trap file for SRH recombination:
 <GRAMMAR>{m | r} {`!a & `f}
 {a | r v0 & (== g0 Semiconductor & `s EA0 Eg0 NC300 NV300 DC mt mu BGN SRH Trap
     Aug Rad | == g0 Insulator & `s EA0 Eg0 DC mt | `s WF EF)}
-{e v2 & `a | == v-1 (EA0|Eg0|NC300|NV300|DC|mt|WF|EF) & (`!a & `n & `> 0)
-    | == v-1 mu & (`!a & n & `> 0 | `s A<rora> M<asetti>)
-    | == v-1 BGN & `!a & `s B<enettWilson> d<elAlamo> J<ainRoulston>
+{e v2 & `a | == v-2 (EA0|Eg0|NC300|NV300|DC|mt|WF|EF) & (`!a & `n & `> 0)
+    | == v-2 mu & (`!a & n & `> 0 | `s A<rora> M<asetti>)
+    | == v-2 BGN & `!a & `s B<enettWilson> d<elAlamo> J<ainRoulston>
         S<lotboom> T<ableBGN>
-    | == v-1 Aug & (a | n & `> 0 | ( == m0 Silicon & `s EA0 Eg0 NC300 NV300 DC
+    | == v-2 Aug & (a | n & `> 0 | ( == m0 Silicon & `s EA0 Eg0 NC300 NV300 DC
         mt mu BGN SRH Trap Rad ! A<ltermatt> R<ichter> N<iewelt> | `s EA0 Eg0
         NC300 NV300 DC mt mu BGN SRH Trap Rad !))
-    | == v-1 Rad & (a | n & `> 0
+    | == v-2 Rad & (a | n & `> 0
         | `s EA0 Eg0 NC300 NV300 DC mt mu BGN SRH Trap Aug !)
-    | == v-1 SRH & (`!a & n & `> 0 | `s !)
-    | == v-1 Trap & (`!a & `f)
-    | == v-2 EA0 & (== g0 Insulator & (a | `s Eg0 DC mt) | == g0 Semiconductor
+    | == v-2 SRH & (`!a & n & `> 0 | `s !)
+    | == v-2 Trap & (`!a & `f)
+    | == v-3 EA0 & (== g0 Insulator & (a | `s Eg0 DC mt) | == g0 Semiconductor
         & (a | `s Eg0 NC300 NV300 DC mt mu BGN SRH Trap Aug Rad))
-    | == v-2 Eg0 & (== g0 Insulator & (a | `s EA0 DC mt) | == g0 Semiconductor
+    | == v-3 Eg0 & (== g0 Insulator & (a | `s EA0 DC mt) | == g0 Semiconductor
         & (a | `s EA0 NC300 NV300 DC mt mu BGN SRH Trap Aug Rad))
-    | == v-2 DC & (== g0 Insulator & (a | `s EA0 Eg0 mt) | == g0 Semiconductor
+    | == v-3 DC & (== g0 Insulator & (a | `s EA0 Eg0 mt) | == g0 Semiconductor
         & (a | `s EA0 Eg0 NC300 NV300 mt mu BGN SRH Trap Aug Rad))
-    | == v-2 mt & (a | n & `> 0 | (== g0 Insulator & `s EA0 Eg0 DC
+    | == v-3 mt & (a | n & `> 0 | (== g0 Insulator & `s EA0 Eg0 DC
         | == g0 Semiconductor & `s EA0 Eg0 NC300 NV300 DC mu BGN SRH Trap Aug
         Rad))
-    | == v-2 (WF|EF) & (a | `s WF EF)
-    | == v-2 NC300 & (a | `s EA0 Eg0 NV300 DC mt mu BGN SRH Trap Aug Rad)
-    | == v-2 NV300 & (a | `s EA0 Eg0 NC300 DC mt mu BGN SRH Trap Aug Rad)
-    | == v-2 mu & (a | n & `> 0
+    | == v-3 (WF|EF) & (a | `s WF EF)
+    | == v-3 NC300 & (a | `s EA0 Eg0 NV300 DC mt mu BGN SRH Trap Aug Rad)
+    | == v-3 NV300 & (a | `s EA0 Eg0 NC300 DC mt mu BGN SRH Trap Aug Rad)
+    | == v-3 mu & (a | n & `> 0
         | `s EA0 Eg0 NC300 NV300 DC mt BGN SRH Trap Aug Rad)
-    | == v-2 BGN & (a | `s EA0 Eg0 NC300 NV300 DC mu mt SRH Trap Aug Rad)
-    | == v-2 Aug & (n v-1 & (a | n & `> 0 | `s EA0 Eg0 NC300 NV300 DC mt mu BGN
-        SRH Trap Rad) | == v-1 ! & (a | `s EA0 Eg0 NC300 NV300 DC mt mu BGN SRH
+    | == v-3 BGN & (a | `s EA0 Eg0 NC300 NV300 DC mu mt SRH Trap Aug Rad)
+    | == v-3 Aug & (n v-2 & (a | n & `> 0 | `s EA0 Eg0 NC300 NV300 DC mt mu BGN
+        SRH Trap Rad) | == v-2 ! & (a | `s EA0 Eg0 NC300 NV300 DC mt mu BGN SRH
         Trap Rad) | a | n & `>= 0 & `<= 1 | `s EA0 Eg0 NC300 NV300 DC mt mu BGN
         SRH Trap Rad)
-    | == v-2 Rad & (a | `s EA0 Eg0 NC300 NV300 DC mt mu BGN SRH Trap Aug)
-    | == v-2 SRH & (a | n & `> 0 | `s EA0 Eg0 NC300 NV300 DC mt mu Trap
+    | == v-3 Rad & (a | `s EA0 Eg0 NC300 NV300 DC mt mu BGN SRH Trap Aug)
+    | == v-3 SRH & (a | n & `> 0 | `s EA0 Eg0 NC300 NV300 DC mt mu Trap
         BGN Aug Rad)
-    | == v-2 Trap & (a | n & `> 0 | `s EA0 Eg0 NC300 NV300 DC mt mu SRH
+    | == v-3 Trap & (a | n & `> 0 | `s EA0 Eg0 NC300 NV300 DC mt mu SRH
         BGN Aug Rad)
-    | == v-3 mt & (== g0 Insulator & (a | `s EA0 Eg0 DC) | == g0 Semiconductor
+    | == v-4 mt & (== g0 Insulator & (a | `s EA0 Eg0 DC) | == g0 Semiconductor
         & (a | `s EA0 Eg0 NC300 NV300 DC mu BGN SRH Trap Aug Rad))
-    | == v-3 mu & (a | `s EA0 Eg0 NC300 NV300 DC mt BGN SRH Trap Aug Rad)
-    | == v-3 Aug & (a | `s EA0 Eg0 NC300 NV300 DC mt mu BGN SRH Trap Rad)
-    | == v-3 SRH & (a | `s EA0 Eg0 NC300 NV300 DC mt mu Trap BGN Aug Rad)
-    | (== v-3 Trap | == v-4 Trap) & (a | n & `> 0
+    | == v-4 mu & (a | `s EA0 Eg0 NC300 NV300 DC mt BGN SRH Trap Aug Rad)
+    | == v-4 Aug & (a | `s EA0 Eg0 NC300 NV300 DC mt mu BGN SRH Trap Rad)
+    | == v-4 SRH & (a | `s EA0 Eg0 NC300 NV300 DC mt mu Trap BGN Aug Rad)
+    | (== v-4 Trap | == v-5 Trap) & (a | n & `> 0
         | `s EA0 Eg0 NC300 NV300 DC mt mu SRH BGN Aug Rad)
-    | == v-5 Trap & (a | `s EA0 Eg0 NC300 NV300 DC mt mu BGN SRH Aug Rad)}
+    | == v-6 Trap & (a | `s EA0 Eg0 NC300 NV300 DC mt mu BGN SRH Aug Rad)}
 ...
 
-<VAR>ModPar     {}
+<VAR>ModPar     {{r2 01mdb/Si_298.15K_2022Green.par SRH 0.0088 Aug Niewelt 0.55}
+    {r1 01mdb/a-Si-i_2015Ling.par Trap 03exp/Traps/Bulk_a-Si-i_2015Ling.txt SRH
+    !} {r3 01mdb/a-Si-i_2015Ling.par Trap 03exp/Traps/Bulk_a-Si-i_2015Ling.txt
+    SRH !} {r4 01mdb/a-Si-p_2015Ling.par Trap
+    03exp/Traps/Bulk_a-Si-p_2015Ling.txt SRH !} {r5 01mdb/a-Si-n_2015Ling.par
+    Trap 03exp/Traps/Bulk_a-Si-n_2015Ling.txt SRH !}}
 
 <COMMENT>Variable vary settings
 Specify the following variables for varying - c# contact property (IntfAttr),
@@ -581,7 +574,8 @@ Specification for varying other variables (sdevice --parameter-names):
 {== v1 {[CFV]\w+} & `a | a | `n & `< v1}
 ...
 
-<VAR>VarVary    {{SpecScaling 100 140}}
+<VAR>VarVary    {{SpecScaling 0.3 0} {MonoScaling 1 1} {Wavelength 1.2 90}
+    {MonoScaling 0 0} {SpecScaling 1 0} {c0 0.8 160}}
 
 <COMMENT>Extract field during variable varying and from snapshots
 Specify a point pX_Y_Z [um] for extracting 1D structural fields from saved
@@ -631,10 +625,10 @@ Specification for field integration from snapshots:
     ni_eff q UT eBT hBT eQt hQt E mue muh | a | `s Dn n p UA UB US UP UD Gop PD
     Eg EA EC EV EFe EFh BGN ni NA ND x V Eg_eff ni_eff q UT eBT hBT eQt hQt E
     mue muh)
-    | == v1 {(Ave|Int|Max|Lea)\w+} & (== v-1 CP & (a | `s Dn n p UA UB
+    | == v1 {(Ave|Int|Max|Lea)\w+} & (== v-2 CP & (a | `s Dn n p UA UB
     US UP UD Gop PD Eg EA EC EV EFe EFh BGN ni NA ND x V Eg_eff ni_eff q UT eBT
     hBT eQt hQt E mue muh Ave<rage> Int<egrate> Max<imum> Lea<st>)
-    | == v-1 {(Ave|Int|Max|Lea)\w+} & `!a & `s Dn n p UA UB US UP UD
+    | == v-2 {(Ave|Int|Max|Lea)\w+} & `!a & `s Dn n p UA UB US UP UD
     Gop PD Eg EA EC EV EFe EFh BGN ni NA ND x V Eg_eff ni_eff q UT eBT hBT eQt
     hQt E mue muh | a | `s CP Dn n p UA UB US UP UD Gop PD Eg EA EC EV EFe EFh
     BGN ni NA ND x V Eg_eff ni_eff q UT eBT hBT eQt hQt E mue muh Ave<rage>
@@ -645,10 +639,10 @@ Specification for field integration from snapshots:
     ni_eff q UT eBT hBT eQt hQt E mue muh) | a | `s Dn n p UA UB US UP UD Gop
     PD Eg EA EC EV EFe EFh BGN ni NA ND x V Eg_eff ni_eff q UT eBT hBT eQt hQt
     E mue muh)
-    | == v1 {(Ave|Int|Max|Lea)\w+} & (== v-1 CP & (a | `s Dn n p UA UB US UP
+    | == v1 {(Ave|Int|Max|Lea)\w+} & (== v-2 CP & (a | `s Dn n p UA UB US UP
     UD Gop PD Eg EA EC EV EFe EFh BGN ni NA ND x V Eg_eff ni_eff q UT eBT
     hBT eQt hQt E mue muh Ave<rage> Int<egrate> Max<imum> Lea<st>)
-    | == v-1 {(Ave|Int|Max|Lea)\w+} & `!a & `s Dn n p UA UB US UP UD
+    | == v-2 {(Ave|Int|Max|Lea)\w+} & `!a & `s Dn n p UA UB US UP UD
     Gop PD Eg EA EC EV EFe EFh BGN ni NA ND x V Eg_eff ni_eff q UT eBT hBT eQt
     hQt E mue muh | a | `s CP Dn n p UA UB US UP UD Gop PD Eg EA EC EV EFe EFh
     BGN ni NA ND x V Eg_eff ni_eff q UT eBT hBT eQt hQt E mue muh Ave<rage>
@@ -657,7 +651,7 @@ Specification for field integration from snapshots:
     mue muh}
 ...
 
-<VAR>GetFld     {{p10/170 Average Dn}}
+<VAR>GetFld     {{p5_0/160_50 Average Dn} {p0_20 1 2 Band} {p0_48 1 2 Band}}
 
 <SENTAURUS>Tool_label = svisual Tool_name = svisual
 
@@ -672,10 +666,10 @@ Specification:
 
 <GRAMMAR>v
 {a | `s CV JV QE SunsVoc SunsJsc QSSPC RAT}
-{== v-1 QSSPC & (a = 1e15 | `n & `> 0) | `a}
-{== v-2 QSSPC & (a = 38 | `n & `> 0) | `a}
+{== v-2 QSSPC & (a = 1e15 | `n & `> 0) | `a}
+{== v-3 QSSPC & (a = 38 | `n & `> 0) | `a}
 
-<VAR>PPAttr     {{v0 QSSPC 1e+15 38}}
+<VAR>PPAttr     {{v2 QE} {v5 JV}}
 
 <TAIL>No variables afterwards
 Put down any notes

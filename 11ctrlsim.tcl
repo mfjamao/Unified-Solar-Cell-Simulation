@@ -19,10 +19,11 @@
 #       node has only one child node
 #   FullSchenk: Select whether to calculate BGN using full Schenk model or not
 #   TrapDLN: Default # of levels in Sentaurus is 13
+#   ST|Hosts: Only the first letter of a host name matters
 #   Use braces to suppress string substitution so '\' is literally '\'
 ################################################################################
 array set SimArr {
-    Email "" Time "" Append false Inverse false
+    Email "mfjamao@yahoo.com" Time "" Append false Inverse false
     0Raw2Fmt true 1Fmt2Sim true 2PreProc true 3Batch true
     FVarRaw 10variables.txt FVarFmt variables.txt
     FIntrpr mfjIntrpr.tcl FProc mfjProc.tcl FGrm mfjGrm.tcl FST mfjST.tcl
@@ -57,11 +58,12 @@ array set SimArr {
     STDfltID {Tool_label = (\S+) Tool_name = (\S+)}
 };# End of 'SimArr'
 
-# Future license: license2e.restech.unsw.edu.au (129.94.146.121) 
+# Future license: license2e.restech.unsw.edu.au (129.94.146.121)
 # The script is designed to work properly in the project directory
 # Make the project directory as the working directory
 set FScript [info script]
 cd [file dirname $FScript]
+set FScript [file tail $FScript]
 set WD [pwd]
 
 # Ensure it is executable under unix platform
@@ -134,8 +136,8 @@ foreach Elm [list $SimArr(FSave) $SimArr(FLoad)] {
 }
 
 # Define log files (mfjProc::arr(FOut) and mfjProc::arr(FLog))
-set mfjProc::arr(FOut) [file rootname [file tail $FScript]].out
-set mfjProc::arr(FLog) [file rootname [file tail $FScript]].mfj
+set mfjProc::arr(FOut) [file rootname $FScript].out
+set mfjProc::arr(FLog) [file rootname $FScript].mfj
 
 # Process command-line arguments if any. Update variables MaxVerb in
 # mfjProc::arr and FVarRaw in mfjIntrpr::arr and variables Raw2Fmt, TXT2Sim,
@@ -189,11 +191,11 @@ while {[llength $argv]} {
         }
         default {
             if {$tcl_platform(platform) eq "unix"} {
-                vputs -w "Usage: ./[file tail $FScript] \[-a\] \[-f file\]\
-                    \[-v #\] \[-r #\] \[-t #\]\n"
+                vputs -w "Usage: ./$FScript \[-a\] \[-f file\] \[-v #\]\
+                    \[-r #\] \[-t #\]\n"
             } else {
-                vputs -w "Usage: [file tail $FScript] \[-a\] \[-f file\]\
-                    \[-v #\] \[-r #\] \[-t #\]\n"
+                vputs -w "Usage: $FScript \[-a\] \[-f file\] \[-v #\]\
+                    \[-r #\] \[-t #\]\n"
             }
             exit 1
         }
@@ -256,6 +258,7 @@ vputs -c '[lindex $StatLst 3]'\n
 # to 'running' when the project is running. Yet, it typically requires some
 # queue time before a scheduler completes arrangement of desired resources.
 set Queue false
+set BatOut ""
 set FSTBatch $SimArr(CodeDir)/$SimArr(FSTBatch)
 set FSTBatchOut [file rootname $FSTBatch].out
 if {[file isfile $FSTBatchOut]} {
@@ -264,8 +267,6 @@ if {[file isfile $FSTBatchOut]} {
         set BatOut $Line
     }
     close $Inf
-} else {
-    set BatOut ""
 }
 if {[lindex $InfoLst 0] eq "Sentaurus" && [lindex $StatLst 3] eq "ready"} {
     if {[lindex $InfoLst 1] eq "PBS" && [regexp {^\d+\.[^\d]+} $BatOut]} {

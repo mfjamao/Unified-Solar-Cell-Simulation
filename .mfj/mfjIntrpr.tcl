@@ -562,7 +562,10 @@ proc mfjIntrpr::readHost {} {
     } else {
         foreach Name $::SimArr(ST|Hosts) Path $::SimArr(ST|Paths)\
             Licn $::SimArr(ST|Licns) {
-            if {[string index $Name 0] eq [string index $arr(Host|ID) 0]} {
+
+            # Only compare the first letter of a host name
+            if {[string match -nocase [string index $Name 0]\
+                [string index $arr(Host|ID) 0]]} {
                 if {[string index $Path end] eq "/"} {
                     set Path [string range $Path 0 end-1]
                 }
@@ -578,18 +581,15 @@ proc mfjIntrpr::readHost {} {
         vputs -v3 -i1 "Sentaurus license: $arr(Host|STLicn)"
     }
     foreach Name $::SimArr(ST|Hosts) Path $::SimArr(ST|Paths) {
-        if {[string index $Name 0] eq [string index $arr(Host|ID) 0]} {
-            set SLib $Path/sharedlib
-            if {[iFileExists SLib]} {
-                set arr(Host|STSLib) $SLib
-                break
+        if {[string match -nocase [string index $Name 0]\
+            [string index $arr(Host|ID) 0]]} {
+            set arr(Host|STSLib) $Path/sharedlib
+            if {[catch {iFileExists arr(Host|STSLib)}]} {
+                file mkdir $arr(Host|STSLib)
             }
+            vputs -v3 -i1 "Sentaurus shared libraries: $arr(Host|STSLib)"
+            break
         }
-    }
-    if {$arr(Host|STSLib) eq ""} {
-        vputs -v3 -i1 "Sentaurus shared libraries not available!"
-    } else {
-        vputs -v3 -i1 "Sentaurus shared libraries: $arr(Host|STSLib)"
     }
 
     # Check Sentaurus TCAD path
@@ -605,7 +605,7 @@ proc mfjIntrpr::readHost {} {
         }
     }
 
-    # Find available Sentaurus TCAD versions
+    # Find available Sentaurus TCAD versions including service parkage
     if {$FoundPath} {
         foreach Elm [glob -nocomplain -directory $arr(Host|STPath) *] {
             set Elm [string toupper [file tail $Elm]]
@@ -623,22 +623,22 @@ proc mfjIntrpr::readHost {} {
     vputs
 }
 
-# mfjIntrpr::activateRR
-    # Check arr(RawVal|$Var) and arr(RawGLst|$Var) to activate the replace and
-    # then reuse features if necessary.
-proc mfjIntrpr::activateRR {} {
+# mfjIntrpr::activateSR
+    # Check arr(RawVal|$Var) and arr(RawGLst|$Var) to activate the substitute
+    # and then reuse features if necessary.
+proc mfjIntrpr::activateSR {} {
     variable arr
 
-    vputs "Activate replacing features in multiple-level variables if any..."
+    vputs "Activate substitute features in multiple-value variables if any..."
     set NewLst [list]
     set Sum 0
     foreach Var $arr(Raw|VarLst) {
 
         # Only check variables with multiple levels
         if {$arr(RawLvl|$Var) == 1} continue
-        set NewVal [replace $Var $arr(RawVal|$Var)]
+        set NewVal [substitute $Var $arr(RawVal|$Var)]
         if {[lindex $NewVal 0]} {
-            vputs -v2 -i1 "$Var: [lindex $NewVal 0] replacing features\
+            vputs -v2 -i1 "$Var: [lindex $NewVal 0] substitute features\
                 detected!"
             vputs -v2 -c "Before: \{$arr(RawVal|$Var)\}"
             vputs -v2 -c "After: \{[lindex $NewVal 1]\}\n"
@@ -647,9 +647,9 @@ proc mfjIntrpr::activateRR {} {
         set arr(RawVal|$Var) [lindex $NewVal 1]
     }
     if {$Sum} {
-        vputs -i1 "Totally $Sum replacing features activated!"
+        vputs -i1 "Totally $Sum substitute features activated!"
     } else {
-        vputs -i1 "No replacing feature found!"
+        vputs -i1 "No substitute feature found!"
     }
     vputs
 
@@ -787,10 +787,10 @@ proc mfjIntrpr::updateGrm {} {
     }
     if {$Diff} {
         set UpdateGrm true
-        set Lst ""
-        foreach Elm $arr(Host|AllSTVer) {
-            lappend Lst [string map {- <-} $Elm]>
-        }
+        set Lst $arr(Host|AllSTVer)
+        #foreach Elm $arr(Host|AllSTVer) {
+            #lappend Lst [regsub {\-} $Elm {<-}]>
+        #}
         lset SimGrm 1 [concat [lrange [lindex $SimGrm 1] 0 4] $Lst]
     }
 
@@ -2258,7 +2258,7 @@ proc mfjIntrpr::updateFmt {} {
                 if {$arr(FmtLvl|$Var) == 1} {
                     set Val [list $arr(FmtVal|$Var)]
                 } else {
-                    set Val $arr(FmtVal|$Var)
+                    set Val \{[join $arr(FmtVal|$Var) \}\n\{]\}
                 }
                 puts $Ouf [wrapText [format %-${MaxLen}s%s\n $Var $Val]\
                     $mfjProc::arr(Tab)]
@@ -2273,11 +2273,11 @@ proc mfjIntrpr::updateFmt {} {
 # mfjIntrpr::raw2Fmt
     # Do all the heavy lifting here by performing many small tasks. Mainly:
     # 1. Read variables and their values
-    # 2. Apply replace/reuse features to expand values
+    # 2. Apply substitute/reuse features to expand values
     # 3. Apply grammar rules to further validate values
     # 4. Compare variables in the formatted file to those in the raw file
 proc mfjIntrpr::raw2Fmt {} {
-    foreach Elm {readHost readRaw readBrf rawvsBrf updateBrf activateRR sortVar
+    foreach Elm {readHost readRaw readBrf rawvsBrf updateBrf activateSR sortVar
         updateGrm validateVar readFmt fmtvsRaw updateFmt updateRaw} {
         if {[catch $Elm ErrMsg]} {
             vputs -c "\nError in proc '$Elm':\n$ErrMsg\n"
