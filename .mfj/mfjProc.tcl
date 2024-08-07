@@ -421,7 +421,7 @@ proc mfjProc::readIdx {IdxStr {IdxLen ""}} {
     }
 
     # Verify, convert or expand if necessary
-    set Ply 1
+    set Prod 1
     set Idx1 ""
     set Idx2 ""
     set Lst [list]
@@ -470,7 +470,7 @@ proc mfjProc::readIdx {IdxStr {IdxLen ""}} {
                     }
                     if {$Char eq "/" || $Idx == $Len} {
                         lappend IdxLst $Lst
-                        set Ply [expr $Ply*[llength $Lst]]
+                        set Prod [expr $Prod*[llength $Lst]]
                         set Lst [list]
                     }
                 }
@@ -495,7 +495,7 @@ proc mfjProc::readIdx {IdxStr {IdxLen ""}} {
                     set Lst [concat $Lst $Tmp]
                     if {$Char eq "/" || $Idx == $Len} {
                         lappend IdxLst $Lst
-                        set Ply [expr $Ply*[llength $Lst]]
+                        set Prod [expr $Prod*[llength $Lst]]
                         set Lst [list]
                     }
                 }
@@ -512,7 +512,7 @@ proc mfjProc::readIdx {IdxStr {IdxLen ""}} {
     set TmpLst [list]
     foreach SubLst $IdxLst {
         set IdxLen [llength $SubLst]
-        set InnLen [expr $Ply/$IdxLen/$OutLen]
+        set InnLen [expr $Prod/$IdxLen/$OutLen]
         set Lst [list]
         for {set i 0} {$i < $OutLen} {incr i} {
             foreach Idx $SubLst {
@@ -528,7 +528,7 @@ proc mfjProc::readIdx {IdxStr {IdxLen ""}} {
     # Rearrange the full list
     set IdxLst [list]
     set IdxLen [llength $TmpLst]
-    for {set i 0} {$i < $Ply} {incr i} {
+    for {set i 0} {$i < $Prod} {incr i} {
         set Lst [list]
         for {set j 0} {$j < $IdxLen} {incr j} {
             lappend Lst [lindex $TmpLst $j $i]
@@ -539,124 +539,233 @@ proc mfjProc::readIdx {IdxStr {IdxLen ""}} {
 }
 
 # mfjProc::substitute
-    # Searching for the substitute features (i,j:k/i,j:k&l,m:n/l,m:n=) in case
-    # multiple values are provided to a variable. If a pattern is found,
-    # substitute the reference with the subsequent elements and retain the rest.
-    # Easy2Read form: {i,j:k/i,j:k&l,m:n/l,m:n= Val1 Val2 ...}
-    # Compact form: i,j:k/i,j:k&l,m:n/l,m:n=Val1|Val2|...
-    # '&' and '|' are used to seperate references and values, respectively
+    # Searching for any substitute feature (i/j/k,l:n&i/k/o,x:z=) in case
+    # a variable has multiple values. If the pattern is found, copy the content
+    # of value i and substitute those referenced elements with the assigned
+    # element values, respectively. For each referenced element, it may also be
+    # supplied with multiple element values. Under such circumstance, the number
+    # of values should be increased. Yet, it may cause chaotic references
+    # subsequently. So those values are folded temporarily until the end of
+    # substitute and reuse cycles.
+    # Substitute has two forms, where references must share the same level 0
+    # index and end with '=' and element values are separated by '|':
+    #   Easy2Read form: {i/j/k,l:n&i/k/o,x:z= ElmVal1 ElmVal2 ...}
+    #   Compact form: i/j/k,l:n&i/k/o,x:z=ElmVal1|ElmVal1|...
+    # Multiple element values can be assigned to one element by three methods:
+    #   1. Specify steps after the assigned element value separated by '@':
+    #   i/j/k=ElmVal@#(l), where '#' refers to the number of steps and 'l' is
+    #   optional. By default, element values are generated between the inital
+    #   and assigned values with the same intervals. If an optional letter is
+    #   appended, these values become evenly-spaced logarithmically.
+    #   2. Enumerate element values separated by '~': i/j/k=ElmVal1~ElmVal2...
+    #   3. Mix steps and enumeration: i/j/k=ElmVal1@#(l)~ElmVal2...
 # Arguments
     # VarName     Variable name
     # VarVal      Variable value
-# Result: Return the number of occurances and the updated list
+# Result: Return the # of folded values and the list after substitution
 proc mfjProc::substitute {VarName VarVal} {
     set VarMsg "variable '$VarName'"
-    set Cnt 0
 
-    # Substitute pattern is only checked for the 2nd value onwards
+    # The substitute pattern is only checked for the 2nd value (level 1) onwards
     set LvlIdx 1
     set LvlLen 2
     set NewLst [list [lindex $VarVal 0]]
+    set FoldLst 0   ;# 0 -> false, no folding values
     foreach OldVal [lrange $VarVal 1 end] {
         set LvlMsg "level '$LvlIdx'"
         set Msg "$LvlMsg of $VarMsg"
+        
+        # For the Easy2Read form, remove the enclosing braces if any
+        if {[regexp {\{(-?\d+[:,/&])*-?\d+=} $OldVal]} {
+            regexp -indices {(-|\d)} $OldVal Loc
+            set Idx [lindex $Loc 0]
+            set OldVal [string range $Idx end-$Idx]
+        }
 
-        # Check the string for the substitute pattern and treat a list in the
-        # Easy2Read form as a string as well
-        # A negative index is allowed by changing '\d+' to '-?\d+'
+        # Check the string for the substitute pattern and treat the list in the
+        # Easy2Read form also as a string! Negative indexing is supported by
+        # changing regular expression pattern from '\d+' to '-?\d+'
         if {[regexp {^((-?\d+[:,/&])*-?\d+)=(.+)$} $OldVal\
-            -> IdxStr Tmp ValStr]} {
+            -> ElmRefStr Tmp ElmValStr]} {
 
-            # Get the index list, negative indices are supported
+            # Interpret the index string and check validity of each reference.
+            # Make sure the level 0 index is equal (same original value) and
+            # within range and the rest indices are within range.
+            # If any index is negative, convert it to positive
             set IdxLst [list]
-            foreach Elm [split $IdxStr &] {
-                set IdxLst [concat $IdxLst [readIdx $Elm]]
-            }
+            set Idx0 ""
+            foreach RefStr [split $ElmRefStr &] {
+                foreach Elm [readIdx $RefStr] {
 
-            # Check the consistency of the target reference level
-            set RefLvl -1
-            set Lst [list]
-            foreach Elm $IdxLst {
-
-                # Get the level index of the target value
-                # For a negative index, -1 means the current value
-                # Convert a negative index to the positive
-                set Tmp [lindex $Elm 0]
-                if {$Tmp < 0} {
-                    set Lvl [incr Tmp $LvlLen]
-                } else {
-                    set Lvl $Tmp
-                }
-
-                # For the rest indices, convert each negative index if present
-                # Replace '-1' with 'end' and '-#' with 'end[incr -#]'
-                set Tmp [list]
-                foreach Idx [lrange $Elm 1 end] {
-                    if {$Idx < 0} {
-                        if {$Idx == -1} {
-                            lappend Tmp end
-                        } else {
-                            lappend Tmp end[incr Idx]
+                    # Check the first index
+                    if {$Idx0 eq ""} {
+                        set Idx0 [lindex $Elm 0]
+                        if {$Idx0 < 0} {
+                            incr Idx0 $LvlLen
                         }
+                        if {$Idx0 < 0 || $Idx0 >= $LvlIdx} {
+                            error "level 0 index '$Idx0' of reference\
+                                '$ElmRefStr' out of range for $Msg!"
+                        }
+                        set NewVal [lindex $NewLst $Idx0]
                     } else {
-                        lappend Tmp $Idx
+                        set Idx [lindex $Elm 0]
+                        if {$Idx < 0} {
+                            incr Idx $LvlLen
+                        }
+                        if {$Idx != $Idx0} {
+                            error "invalid reference '$ElmRefStr' for $Msg,\
+                                referring to multiple values!"
+                        }
                     }
-                }
-                lappend Lst $Tmp
-
-                # Check and update the target reference level
-                if {$RefLvl == -1} {
-                    if {$Lvl < 0 || $Lvl >= $LvlIdx} {
-                        error "reference level '[lindex $Elm 0]' in\
-                            '[join $Elm /]' out of range for $Msg!"
+                    
+                    # Check the rest indices
+                    set Lst [list]
+                    set Val $NewVal
+                    set Len [llength $Val]
+                    set Cnt 1
+                    foreach Idx [lrange $Elm 1 end] {
+                        if {$Idx < 0} {
+                            incr Idx $Len
+                        }
+                        if {$Idx < 0 || $Idx >= $Len} {
+                            error "level $Cnt index '$Idx' of reference\
+                                '$ElmRefStr' out of range for $Msg!"
+                        }
+                        lappend Lst $Idx
+                        set Val [lindex $Val $Idx]
+                        set Len [llength $Val]
+                        incr Cnt
                     }
-                    set RefLvl $Lvl
-                } else {
-                    if {$RefLvl != $Lvl} {
-                        error "multiple references '$RefLvl' and\
-                            '[lindex $Elm 0]' detected for $Msg!"
-                    }
+                    lappend IdxLst $Lst
                 }
             }
-            set IdxLst $Lst
             set IdxLen [llength $IdxLst]
 
-            # Convert a |-seperated value string to a value list
-            set ValLst [lrange [string map {| " "} $ValStr] 0 end]
-            set ValLen [llength $ValLst]
-
-            # Check whether 'ValLst' tallies with 'IdxLst'
-            if {$ValLen < $IdxLen} {
-                error "value '$ValLst' insufficient for $Msg!"
-            } elseif {$ValLen > $IdxLen} {
-                vputs -v2 "value '[lrange $ValLst $IdxLen end]' excess\
+            # Convert the '|'-seperated elemeent value string to a value list
+            # and check whether 'ElmValLst' tallies with 'IdxLst'
+            set ElmValLst [lrange [string map {| " "} $ElmValStr] 0 end]
+            set ElmValLen [llength $ElmValLst]
+            if {$ElmValLen < $IdxLen} {
+                error "value '$ElmValLst' insufficient for $Msg!"
+            } elseif {$ElmValLen > $IdxLen} {
+                vputs -v2 "value '[lrange $ElmValLst $IdxLen end]' excess\
                     for $Msg!"
-                set ValLst [lrange $ValLst 0 [incr IdxLen -1]]
+                set ElmValLst [lrange $ElmValLst 0 [incr IdxLen -1]]
             }
-            set NewVal [lindex $NewLst $RefLvl]
-            foreach Idx $IdxLst Val $ValLst {
-                if {[catch {lset NewVal $Idx $Val}]} {
-                    error "index '$Idx' invalid for $Msg!"
+
+            # Search 'ElmValLst' for '@' and '~'. If found, one element has
+            # multiple element values. If more than one elements have multiple
+            # element values, the number of combinations is the product of 
+            # the number of element values:
+            # 1. Generate all values for each element
+            # 2. Determine the number of Combinations
+            # 3. Generate all the combinations of element values
+            set Prod 1
+            set ValSubLst [list]
+            set ValCntLst [list]
+            foreach Idx $IdxLst ElmVal $ElmValLst {
+                set Lst [list]
+                set Cnt 0
+                set Begin ""
+                foreach Val [split $ElmVal ~] {
+                    if {[regexp {^([^@]+)@(\d+)([^\d]+)?$} $Val\
+                        -> End Steps Str]} {
+                        if {$Begin eq ""} {
+                            set Begin [lindex $NewVal $Idx]
+                        }
+                        if {![string is double -strict $Begin]} {
+                            error "'$Begin' of index '$Idx' not a number\
+                                for $Msg!"
+                        }
+                        if {![string is double -strict $End]} {
+                            error "'$End' in '$Val' not a number for $Msg!"
+                        }
+                        if {![string is integer -strict $Steps] || $Steps < 1} {
+                            error "'$Steps' not a postive integer for $Msg!"
+                        }
+
+                        # Even distribution logarithmically
+                        if {$Str ne ""} {
+                            if {$Begin <= 0} {
+                                error "'$Begin' of index '$Idx' not positive\
+                                    for $Msg!"
+                            }
+                            if {$End <= 0} {
+                                error "'$End' in '$Val' not positive for $Msg!"
+                            }
+                            for {set i 1} {$i <= $Steps} {incr i} {
+                                lappend Lst [expr {exp(log($Begin)\
+                                    +1.*(log($End)-log($Begin))*$i/$Steps)}]
+                            }
+                        } else {
+                            for {set i 1} {$i <= $Steps} {incr i} {
+                                lappend Lst [expr {$Begin\
+                                    +1.*($End-$Begin)*$i/$Steps}]
+                            }
+                        }
+                        set Begin $End
+                        incr Cnt $Steps
+                    } else {
+                        lappend Lst $Val
+                        set Begin $Val
+                        incr Cnt
+                    }
                 }
+                lappend ValSubLst $Lst
+                lappend ValCntLst $Cnt
+                set Prod [expr $Prod*$Cnt]
             }
-            lappend NewLst $NewVal
-            incr Cnt
+
+            # No expanding to the full list yet so the indexing afterwards is ok
+            # These combinations are generated similar to the depth-first search
+            if {$Prod > 1} {
+                set Lst [list]
+                set DenLst [list]
+                set Den $Prod
+                foreach Cnt $ValCntLst {
+                    lappend DenLst [expr $Den/$Cnt]
+                }
+                for {set i 0} {$i < $Prod} {incr i} {
+                    for {set j 0} {$j < $IdxLen} {incr j} {
+                        set Den [lindex $DenLst $j]
+                        set Idx [lindex $IdxLst $j]
+                        set Val [lindex $ValSubLst $j [expr int($i/$Den)]]
+                        if {[catch {lset NewVal $Idx $Val}]} {
+                            error "index '$Idx' invalid for $Msg!"
+                        }
+                    }
+                    lappend Lst $NewVal
+                }
+                lappend NewLst $Lst
+            } else {
+                foreach Idx $IdxLst Val $ElmValLst {
+                    if {[catch {lset NewVal $Idx $Val}]} {
+                        error "index '$Idx' invalid for $Msg!"
+                    }
+                }
+                lappend NewLst $NewVal
+            }
+            
+            # One level already has a value without folding
+            lappend FoldLst [incr Prod -1]
         } else {
 
             # This level has no substitute pattern
             lappend NewLst $OldVal
+            lappend FoldLst 0
         }
         incr LvlIdx
         incr LvlLen
     }
-    return [list $Cnt $NewLst]
+    return [list $FoldLst $NewLst]
 }
 
 # mfjProc::reuse
-    # Recursively searching for the reuse features (@i,j:k/i,j:k&l,m:n/l,m:n).
+    # Recursively searching for the reuse features (<i,j:k/i,j:k&l,m:n/l,m:n>).
     # '&' is used to seperate references.
     # Reference within the current value: Level index is omitted
-    # Reference to the previous value: Level index must be present
+    # Reference to one previous value: Level index must be present
 # Arguments
     # VarName     Variable name
     # VarVal      Variable value
@@ -704,8 +813,8 @@ proc mfjProc::reuse {VarName VarVal SubLst {Lvl ""} {OldIdx ""} {InLvl ""}} {
         }
 
         # Replace each reuse feature and evaluate the final expression
-        # Negative index is allowed with the pattern '-?\d+'
-        while {[regexp {@((-?\d+[:,/&])*-?\d+)} $Elm -> IdxStr]} {
+        # Negative indexing is supported with the pattern '-?\d+'
+        while {[regexp {<((-?\d+[:,/&])*-?\d+)>} $Elm -> ElmRefStr]} {
             if {[llength $Elm] > 1 || [regexp {^\{.+\}$} $Elm]} {
 
                 # Visit all the elements by regression
@@ -714,7 +823,7 @@ proc mfjProc::reuse {VarName VarVal SubLst {Lvl ""} {OldIdx ""} {InLvl ""}} {
                     $Elm $Lvl $NewIdx]
             } else {
                 set NewElm [list]
-                set StrLst [split $IdxStr &]
+                set StrLst [split $ElmRefStr &]
                 foreach Str $StrLst {
                     set IdxLst [readIdx $Str]
                     foreach Lst $IdxLst {
@@ -755,15 +864,15 @@ proc mfjProc::reuse {VarName VarVal SubLst {Lvl ""} {OldIdx ""} {InLvl ""}} {
                         }
 
                         # Detect and raise a circular reference error
-                        set MatLst [regexp -inline -all {@(-?\d+[:,/&])*-?\d+}\
+                        set MatLst [regexp -inline -all {<(-?\d+[:,/&])*-?\d+>}\
                             $Val]
                         foreach RefStr $MatLst {
-                            if {[string index $RefStr 0] ne "@"} continue
+                            if {[string index $RefStr 0] ne "<"} continue
+                            set RefStr [string range $RefStr 1 end-1]
                             foreach RefLst [split $RefStr &] {
-                                foreach RefIdx [readIdx [string range $RefLst\
-                                    1 end]] {
+                                foreach RefIdx [readIdx $RefLst] {
                                     if {$RefIdx eq $Lst} {
-                                        error "circular reference: '@$IdxStr'\
+                                        error "circular reference: '<$ElmRefStr>'\
                                             -> '$Val'"
                                     }
                                 }
@@ -778,18 +887,18 @@ proc mfjProc::reuse {VarName VarVal SubLst {Lvl ""} {OldIdx ""} {InLvl ""}} {
                 }
 
                 # Eval is required if reuse is not coming alone
-                if {[regexp {^@(-?\d+[:,/&])*-?\d+$} $Elm]} {
+                if {[regexp {^<(-?\d+[:,/&])*-?\d+>$} $Elm]} {
                     set Eval false
                 } else {
                     set Eval true
                 }
 
                 # Substitute the first reuse in the element
-                regsub {@(-?\d+[:,/&])*-?\d+} $Elm $NewElm Elm
+                regsub {<(-?\d+[:,/&])*-?\d+>} $Elm $NewElm Elm
 
                 # Evaluate the experession if no reuse feature
-                # Operators + - * / and Tcl math functions are supported
-                if {$Eval && ![regexp {@(-?\d+[:,/&])*-?\d+} $Elm]
+                # Operators + - * / % and Tcl math functions are supported
+                if {$Eval && ![regexp {<(-?\d+[:,/&])*-?\d+>} $Elm]
                     && [catch {set Elm [format %g [expr $Elm]]}]} {
                     error "unable to eval '$Elm' in $Msg!"
                 }
@@ -1321,7 +1430,7 @@ proc mfjProc::lPolation {XList YList X {LinX ""} {LinY ""}} {
         if {$LinY} {
             return [expr {$Y1+1.*($Y2-$Y1)*($X-$X1)/($X2-$X1)}]
         } else {
-            return [expr {exp(log($Y1)+(log($Y2)-log($Y1))\
+            return [expr {exp(log($Y1)+1.*(log($Y2)-log($Y1))\
                 *($X-$X1)/($X2-$X1))}]
         }
     } else {
@@ -1329,7 +1438,7 @@ proc mfjProc::lPolation {XList YList X {LinX ""} {LinY ""}} {
             return [expr {$Y1+1.*($Y2-$Y1)*(log($X)-log($X1))\
                 /(log($X2)-log($X1))}]
         } else {
-            return [expr {exp(log($Y1)+(log($Y2)-log($Y1))\
+            return [expr {exp(log($Y1)+1.*(log($Y2)-log($Y1))\
                 *(log($X)-log($X1))/(log($X2)-log($X1)))}]
         }
     }
@@ -2544,7 +2653,7 @@ proc mfjProc::buildTree {VarName VarVal STIdxLst {ColMode ""} {NodeTree ""}} {
     set STIdx 0
     set STLen [llength $STIdxLst]
     set VarIdx 0
-    set Ply 1
+    set Prod 1
     set LastLen 1
     set Seq 0
     set KeyNode [list]
@@ -2555,7 +2664,7 @@ proc mfjProc::buildTree {VarName VarVal STIdxLst {ColMode ""} {NodeTree ""}} {
         # In case no variables between tools
         while {$STIdx < $STLen && [lindex $STIdxLst $STIdx] == $VarIdx} {
             set Tmp [list]
-            for {set i 0} {$i < $Ply} {incr i} {
+            for {set i 0} {$i < $Prod} {incr i} {
                 lappend Tmp [incr Seq]
             }
             if {$STIdx > 0} {
@@ -2567,12 +2676,12 @@ proc mfjProc::buildTree {VarName VarVal STIdxLst {ColMode ""} {NodeTree ""}} {
         set ValLen [llength $Val]
         if {$ValLen > 1} {
             if {$ValLen != $LastLen || !$ColMode} {
-                set Ply [expr {$Ply*$ValLen}]
+                set Prod [expr {$Prod*$ValLen}]
             }
             set LastLen $ValLen
         }
         set Tmp [list]
-        for {set i 0} {$i < $Ply} {incr i} {
+        for {set i 0} {$i < $Prod} {incr i} {
             lappend Tmp [incr Seq]
         }
         lappend SWBNode [list $Tmp $Var $Val]
@@ -2582,7 +2691,7 @@ proc mfjProc::buildTree {VarName VarVal STIdxLst {ColMode ""} {NodeTree ""}} {
     # In case no variables or the rest tools have no variables
     while {$STIdx < $STLen && [lindex $STIdxLst $STIdx] == $VarIdx} {
         set Tmp [list]
-        for {set i 0} {$i < $Ply} {incr i} {
+        for {set i 0} {$i < $Prod} {incr i} {
             lappend Tmp [incr Seq]
         }
         if {$STIdx > 0} {
@@ -2601,9 +2710,9 @@ proc mfjProc::buildTree {VarName VarVal STIdxLst {ColMode ""} {NodeTree ""}} {
     vputs -v2 "Converting the node list to a SWB tree..."
     set End [llength $SWBNode]
     incr End -1
-    for {set i 0} {$i < $Ply} {incr i} {
+    for {set i 0} {$i < $Prod} {incr i} {
         for {set j 0} {$j <= $End} {incr j} {
-            set k1 [expr {$Ply/[llength [lindex $SWBNode $j 0]]}]
+            set k1 [expr {$Prod/[llength [lindex $SWBNode $j 0]]}]
             if {$i % $k1 == 0} {
                 set n1 $j
                 set n2 [lindex $SWBNode $j 0 [expr {$i/$k1}]]
@@ -2612,7 +2721,7 @@ proc mfjProc::buildTree {VarName VarVal STIdxLst {ColMode ""} {NodeTree ""}} {
                 }
                 if {$j > 0} {
                     incr j -1
-                    set k2 [expr {$Ply/[llength [lindex $SWBNode $j 0]]}]
+                    set k2 [expr {$Prod/[llength [lindex $SWBNode $j 0]]}]
                     set n3 [lindex $SWBNode $j 0 [expr int($i/$k2)]]
                     incr j
                 }

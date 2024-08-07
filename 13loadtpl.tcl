@@ -171,8 +171,11 @@ if {$Flg} {
     exit 1
 }
 
+# List the archive files and the first is the relative directory with '/'
+set FLst [exec tar -tzf $argv]
+set TmpDir [file dirname $argv]/[string range [lindex $FLst 0] 0 end-1]
+
 # Unpack the archive file
-set TmpDir [file rootname $argv]
 mputs $Ouf "Extract it to a temp directory '$TmpDir'"
 exec tar -xzf $argv -C [file dirname $argv]
 

@@ -1,7 +1,7 @@
 SimEnv      {Sentaurus T-2022.03 !Cylindrical Electrical PBS 1 5 8}
 
-RegGen      {{iaSi 0.006 50} {Silicon 165 @0/2} @0 {paSi 0.02 45}
-    {naSi @0/2-@3/2} {Gas 0.1 44.5} {Gas (@3/2-@5/2)*2} {Gas @0/2-@5/2-@6/1}}
+RegGen      {{iaSi 0.006 50} {Silicon 165 <0/2>} <0> {paSi 0.02 45}
+    {naSi <0/2>-<3/2>} {Gas 0.1 44.5} {Gas (<3/2>-<5/2>)*2} {Gas <0/2>-<5/2>-<6/1>}}
 
 FldAttr     {{r2 P 1.56e+15} {r4 B 1.41e+19} {r5 P 1.45e+19}}
 

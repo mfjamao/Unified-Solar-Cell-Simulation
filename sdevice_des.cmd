@@ -1785,13 +1785,20 @@ foreach grp $VarVary {
                 # Realise the logarithmic scale (Equidistant logarithmically)
                 # for intensity scaling: MPP for Suns-Voc is around 4-5% sun
                 if {$val == 0} {
-                    set txt 0
+                    
+                    # Remove 0 for QSSPC
+                    if {[regexp {c\d } [array get arr]]} {
+                        set txt 0\;
+                    } else {
+                        set txt ""
+                    }
                     set tmp -1
                     while {$tmp < [lindex $grp 2]} {
-                        append txt "\; [expr exp(log(1e-5)+[incr tmp]\
+                        append txt "[expr exp(log(1e-5)+[incr tmp]\
                             *(log([lindex $grp 1])-log(1e-5))/[lindex $grp 2])\
-                            /[lindex $grp 1]]"
+                            /[lindex $grp 1]]\; "
                     }
+                    set txt [string range $txt 0 end-2]
                 } elseif {[lindex $grp 1] == 0} {
                     set txt ""
                     set tmp -1
@@ -1799,7 +1806,13 @@ foreach grp $VarVary {
                         append txt "[expr exp(log($val)+[incr tmp]\
                             *(log(1e-5)-log($val))/[lindex $grp 2])/$val]\; "
                     }
-                    append txt 1
+                    
+                    # Remove 0 for QSSPC
+                    if {[regexp {c\d } [array get arr]]} {
+                        append txt 1
+                    } else {
+                        set txt [string range $txt 0 end-2]
+                    }
                 } else {
                     set txt 0
                     set tmp 0

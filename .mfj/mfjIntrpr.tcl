@@ -630,21 +630,27 @@ proc mfjIntrpr::activateSR {} {
     variable arr
 
     vputs "Activate substitute features in multiple-value variables if any..."
-    set NewLst [list]
     set Sum 0
     foreach Var $arr(Raw|VarLst) {
 
         # Only check variables with multiple levels
         if {$arr(RawLvl|$Var) == 1} continue
-        set NewVal [substitute $Var $arr(RawVal|$Var)]
-        if {[lindex $NewVal 0]} {
-            vputs -v2 -i1 "$Var: [lindex $NewVal 0] substitute features\
-                detected!"
-            vputs -v2 -c "Before: \{$arr(RawVal|$Var)\}"
-            vputs -v2 -c "After: \{[lindex $NewVal 1]\}\n"
-            incr Sum [lindex $NewVal 0]
+        set FoldLst 0
+        for {set i 1} {$i < $arr(RawLvl|$Var)} {incr i} {
+            lappend FoldLst 0
         }
-        set arr(RawVal|$Var) [lindex $NewVal 1]
+        set Cnt [regexp -all {(\s|\{)(-?\d+[:,/&])*-?\d+=} $arr(RawVal|$Var)]
+        if {$Cnt} {
+            incr Sum $Cnt
+            vputs -v2 -i1 "$Var: $Cnt substitute features detected!"
+            vputs -v2 -c "Before: \{\{[join $arr(RawVal|$Var) \}\n\{]\}\}"
+            set NewVal [substitute $Var $arr(RawVal|$Var)]            
+            set arr(RawFold|$Var) [lindex $NewVal 0]
+            set arr(RawVal|$Var) [lindex $NewVal 1]
+            vputs -v2 -c "After: \{\{[join $arr(RawVal|$Var) \}\n\{]\}\}\n"
+        } else {
+            set arr(RawFold|$Var) $FoldLst
+        }
     }
     if {$Sum} {
         vputs -i1 "Totally $Sum substitute features activated!"
@@ -652,13 +658,87 @@ proc mfjIntrpr::activateSR {} {
         vputs -i1 "No substitute feature found!"
     }
     vputs
+    
+    vputs "Activate reuse feature in multiple-value variables if any..."
+    set Sum 0
+    foreach Var $arr(Raw|VarLst) {
+    
+        # Only check variables with multiple levels
+        if {$arr(RawLvl|$Var) == 1} continue
+        set NewVal [list [lindex $arr(RawVal|$Var) 0]]
+        set Cnt 0
+        set Lvl 1
+        foreach LvlVal [lrange $arr(RawVal|$Var) 1 end] {
+
+            # Activate reuse only featurse in level 1+:
+            # Set reference to the previous levels
+            if {[regexp {^<(-?\d+[:,/&])*-?\d+>$} $LvlVal]} {
+                lappend NewVal [reuse $Var $arr(RawVal|$Var)\
+                    $LvlVal $Lvl $Lvl !InLvl]
+                incr Cnt
+            } else {
+                lappend NewVal $LvlVal
+            }
+            incr Lvl
+        }
+        if {$Cnt} {
+            incr Sum $Cnt
+            vputs -v2 -i1 "$Var: $Cnt reuse features detected!"
+            vputs -v2 -c "Before: \{\{[join $arr(RawVal|$Var) \}\n\{]\}\}"
+            set arr(RawVal|$Var) $NewVal
+            vputs -v2 -c "After: \{\{[join $arr(RawVal|$Var) \}\n\{]\}\}\n"
+        }
+    }
+    if {$Sum} {
+        vputs -i1 "Totally $Sum reuse features activated!"
+    } else {
+        vputs -i1 "No reuse feature found!"
+    }
+    vputs
+    
+    vputs "Expand folded values in multiple-value variables if any..."
+    set Sum 0
+    foreach Var $arr(Raw|VarLst) {
+    
+        # Only check variables with multiple levels
+        if {$arr(RawLvl|$Var) == 1} continue
+        set Cnt [expr [join $arr(RawFold|$Var) +]]
+        if {$Cnt > 0} {
+            incr Cnt $arr(RawLvl|$Var)
+            vputs -v2 -i1 "$Var: $arr(RawLvl|$Var) values expand to $Cnt!"
+            vputs -v2 -c "Before: \{\{[join $arr(RawVal|$Var) \}\n\{]\}\}"
+            set NewVal [list [lindex $arr(RawVal|$Var) 0]]
+            set LvlIdx 1
+            foreach Lst [lrange $arr(RawVal|$Var) 1 end] {
+                
+                # Extend to the full list now
+                if {[lindex $arr(RawFold|$Var) $LvlIdx] > 0} {
+                    foreach Val $Lst {
+                        lappend NewVal $Val
+                    }
+                } else {
+                    lappend NewVal $Lst
+                }
+                incr LvlIdx
+            }
+            set arr(RawVal|$Var) $NewVal
+            set arr(RawLvl|$Var) $Cnt
+            vputs -v2 -c "After: \{\{[join $arr(RawVal|$Var) \}\n\{]\}\}\n"
+            incr Sum
+        }
+    }
+    if {$Sum} {
+        vputs -i1 "Totally $Sum variables have folded values expanded!"
+    } else {
+        vputs -i1 "No folded values found!"
+    }
+    vputs    
 
     vputs "Activate reuse features in all variables if any..."
     set Sum 0
     foreach Var $arr(Raw|VarLst) {
         set NewLst [list]
-        set Update false
-        set Cnt [regexp -all {@(-?\d+[:,/&])*-?\d+} $arr(RawGLst|$Var)]
+        set Cnt [regexp -all {<(-?\d+[:,/&])*-?\d+>} $arr(RawGLst|$Var)]
         if {$Cnt} {
             incr Sum $Cnt
             vputs -v2 -i1 "$Var grammar: $Cnt reuse features detected!"
@@ -667,22 +747,15 @@ proc mfjIntrpr::activateSR {} {
                 $arr(RawGLst|$Var)]
             vputs -v2 -c "After: \{$arr(RawGLst|$Var)\}\n"
         }
-        set Cnt [regexp -all {@(-?\d+[:,/&])*-?\d+} $arr(RawVal|$Var)]
+        set Cnt [regexp -all {<(-?\d+[:,/&])*-?\d+>} $arr(RawVal|$Var)]
         if {$Cnt} {
             incr Sum $Cnt
             vputs -v2 -i1 "$Var: $Cnt reuse features detected!"
-            vputs -v2 -c "Before: \{$arr(RawVal|$Var)\}"
             if {$arr(RawLvl|$Var) > 1} {
+                vputs -v2 -c "Before: \{\{[join $arr(RawVal|$Var) \}\n\{]\}\}"
                 set NewVal [list]
                 set Lvl 0
                 foreach LvlVal $arr(RawVal|$Var) {
-
-                    # Activate reuse only feature in level 1+:
-                    # Set reference to the previous levels
-                    if {[regexp {^@(-?\d+[:,/&])*-?\d+$} $LvlVal]} {
-                        set LvlVal [reuse $Var $arr(RawVal|$Var)\
-                            $LvlVal $Lvl $Lvl !InLvl]
-                    }
 
                     # Activate reuse feature within each level:
                     # Set reference within the current level
@@ -690,13 +763,15 @@ proc mfjIntrpr::activateSR {} {
                     incr Lvl
                 }
                 set arr(RawVal|$Var) $NewVal
+                vputs -v2 -c "After: \{\{[join $arr(RawVal|$Var) \}\n\{]\}\}\n"
             } else {
+                vputs -v2 -c "Before: \{$arr(RawVal|$Var)\}"
                 set arr(RawVal|$Var) [reuse $Var $arr(RawVal|$Var)\
                     $arr(RawVal|$Var)]
+                vputs -v2 -c "After: \{$arr(RawVal|$Var)\}\n"
             }
-            vputs -v2 -c "After: \{$arr(RawVal|$Var)\}\n"
         }
-    }
+    }    
     if {$Sum} {
         vputs -i1 "Totally $Sum reuse features activated!"
     } else {

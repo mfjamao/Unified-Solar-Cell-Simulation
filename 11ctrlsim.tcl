@@ -58,7 +58,6 @@ array set SimArr {
     STDfltID {Tool_label = (\S+) Tool_name = (\S+)}
 };# End of 'SimArr'
 
-# Future license: license2e.restech.unsw.edu.au (129.94.146.121)
 # The script is designed to work properly in the project directory
 # Make the project directory as the working directory
 set FScript [info script]
