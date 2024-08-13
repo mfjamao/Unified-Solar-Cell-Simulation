@@ -256,7 +256,9 @@ if {$tcl_platform(platform) eq "unix" && ![file executable $FStr]} {
 # Optional load: Only copy the missing or newer regular files
 set Len [string length $TmpDir]
 incr Len
-set DirLst $TmpDir
+
+# Manually assign .mfj to the directory list
+set DirLst [list $TmpDir $TmpDir/.mfj]
 while {[llength $DirLst]} {
     foreach Elm [glob -nocomplain -tails -directory [lindex $DirLst 0]\
         -type f *] {
