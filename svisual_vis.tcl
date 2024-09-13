@@ -1410,12 +1410,12 @@ foreach pp $PPAttr {
                     set txt Ave[lindex $RegGen [lindex $lst 0] 0 1]/[lindex\
                         $RegGen [lindex $lst 1] 0 1]
                 } else {
-                    set lst [split $str /]
+                    set lst [string map {// " "} $str]
                     if {$Dim == 1} {
                         set txt AveWindow(([lindex $lst 0],0),([lindex\
                             $lst 1],$YMax))
                     } else {
-                        set txt AveWindow(([string map {_ , / ),(} $str]))
+                        set txt AveWindow(([string map {_ , // ),(} $str]))
                     }
                 }
             }
@@ -1788,12 +1788,12 @@ foreach pp $PPAttr {
                         set txt Ave[lindex $RegGen [lindex $lst 0] 0 1]/[lindex\
                             $RegGen [lindex $lst 1] 0 1]
                     } else {
-                        set lst [split $str /]
+                        set lst [string map {// " "} $str]
                         if {$Dim == 1} {
                             set txt AveWindow(([lindex $lst 0],0),([lindex\
                                 $lst 1],$YMax))
                         } else {
-                            set txt AveWindow(([string map {_ , / ),(} $str]))
+                            set txt AveWindow(([string map {_ , // ),(} $str]))
                         }
                     }
                 }
@@ -2360,10 +2360,10 @@ foreach pp $PPAttr {
                     if {![regexp {Recombination$} $val]} continue
                     vputs -i3 $val
                     if {$Dim == 1} {
-                        set str [string map {p (( / ,0),(}\
+                        set str [string map {p (( // ,0),(}\
                             [lindex $grp 0]],$YMax))
                     } else {
-                        set str [string map {p (( _ , / ),(}\
+                        set str [string map {p (( _ , // ),(}\
                             [lindex $grp 0]]))
                     }
                     create_variable -name tau|[lindex $grp 0]|$elm|s\

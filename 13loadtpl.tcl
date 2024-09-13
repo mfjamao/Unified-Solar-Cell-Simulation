@@ -5,8 +5,8 @@
 # project directory where the script resides. If the target files are the same
 # or newer, they are not replaced. Nevertheless, 10variables-brief.txt is always
 # overwritten. Additionally, Special treatment is applied to 11ctrlsim.tcl so
-# that values of ST|Hosts, ST|Paths, ST|Licns, and Email|Sufx in 'SimArr' are
-# still preserved in the target file.
+# that values of ST|Hosts, ST|Paths, ST|Licns, Email|Sufx, Email, and OneChild
+# in 'SimArr' are still preserved in the target file.
 #
 # Maintained by Dr. Fa-Jun MA (mfjamao@yahoo.com)
 ################################################################################
@@ -157,13 +157,19 @@ if {$Flg} {
     mputs $Ouf "Located the template file: '$argv'"
 
     # If the template is under WD, move it to 'TplDir' if not
-    if {[lindex [file split $argv] 0] ne $TplDir
-        && [file pathtype $argv] eq "relative"} {
-        mputs $Ouf "${Tab}Move '$argv' to '$TplDir'!"
-        set FTpl $TplDir/[file tail $argv]
-        file copy -force $argv $FTpl
-        file delete $argv
-        set argv $FTpl
+    if {[lindex [file split $argv] 0] ne $TplDir} {
+        if {[file pathtype $argv] eq "relative"} {
+            mputs $Ouf "${Tab}Move '$argv' to '$TplDir'!"
+            set FTpl $TplDir/[file tail $argv]
+            file copy -force $argv $FTpl
+            file delete $argv
+            set argv $FTpl
+        } else {
+            mputs $Ouf "${Tab}Copy '$argv' to '$TplDir'!"
+            set FTpl $TplDir/[file tail $argv]
+            file copy -force $argv $FTpl
+            set argv $FTpl
+        }
     }
 } else {
     mputs $Ouf "\n'$argv' not found!\n"
@@ -171,6 +177,7 @@ if {$Flg} {
     exit 1
 }
 
+# Extract the correct directory from the archive instead of the file name
 # List the archive files and the first is the relative directory with '/'
 set FLst [exec tar -tzf $argv]
 set TmpDir [file dirname $argv]/[string range [lindex $FLst 0] 0 end-1]
@@ -201,7 +208,6 @@ if {[catch {file copy -force $FSrc $FStr} ErrMsg]} {
 }
 
 # Special treatment for loading 11ctrlsim.tcl
-# Preserve values of ST|Hosts, ST|Paths, ST|Licns, and Email|Sufx in 'SimArr'
 set FStr 11ctrlsim.tcl
 set FSrc $TmpDir/$FStr
 mputs -n $Ouf [format "%s%04d $FSrc -> $FStr" $Tab [incr Cnt]]
@@ -212,29 +218,33 @@ if {[file isfile $FStr]} {
         mputs $Ouf ": Target newer, skipped!"
     } else {
         file copy -force $FStr $FStr.backup
-        foreach Elm [list $FSrc $FStr] Tmp {Str Txt} {
+        foreach Elm [list $FSrc $FStr] Tmp {Src Tgt} {
             set Inf [open $Elm r]
             set $Tmp [read $Inf]
             close $Inf
         }
-        foreach Elm {ST|Hosts ST|Paths ST|Licns Email|Sufx} {
+
+        # Preserve the following settings in the target 11ctrlsim.tcl
+        #   ST|Hosts ST|Paths ST|Licns Email|Sufx Email OneChild
+        foreach Elm {ST\\|Hosts ST\\|Paths ST\\|Licns Email\\|Sufx} {
 
             # Both REs work, yet the 2nd RE is more generetic than the 1st
-            if {[regexp $Elm\\s+\\\{(\[\\w./@\\n\ -\]+)\\\} $Str -> Val]} {
-                set TgtArr($Elm) $Val
-            }
-            if {[regexp $Elm\\s+\\\{(\[^\\\}\]+)\\\} $Txt -> Val]} {
+            if {[regexp ($Elm\\s+\\\{\[\\w./@\\n\ -\]+\\\}) $Src -> Val]} {
                 set SrcArr($Elm) $Val
             }
-
-            # Preserve the settings in the target 11ctrlsim.tcl
+            if {[regexp ($Elm\\s+\\\{\[^\\\}\]+\\\}) $Tgt -> Val]} {
+                set TgtArr($Elm) $Val
+            }
             if {$TgtArr($Elm) ne $SrcArr($Elm)} {
-                regsub $Elm\\s+\\\{\[^\\\}\]+\\\} $Txt\
-                    "$Elm \{$TgtArr($Elm)\}" Txt
+                regsub $Elm\\s+\\\{\[^\\\}\]+\\\} $Src $TgtArr($Elm) Src
             }
         }
+        regexp {(Email\s+\S+\s+Time)} $Tgt -> Val
+        regsub {Email\s+\S+\s+Time} $Src $Val Src
+        regexp {(OneChild\s+\S+\s+DfltYMax)} $Tgt -> Val
+        regsub {OneChild\s+\S+\s+DfltYMax} $Src $Val Src
         set Tmp [open $FStr w]
-        puts -nonewline $Tmp $Txt
+        puts -nonewline $Tmp $Src
         close $Tmp
         mputs $Ouf ": Copied!"
     }

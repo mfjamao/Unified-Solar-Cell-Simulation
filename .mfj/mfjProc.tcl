@@ -29,7 +29,8 @@ namespace eval mfjProc {
         UA AugerRecombination|cm^-3*s^-1 UB RadiativeRecombination|cm^-3*s^-1
         US srhRecombination|cm^-3*s^-1 UP PMIRecombination|cm^-3*s^-1
         UT TotalRecombination|cm^-3*s^-1 Gop OpticalGeneration|cm^-3*s^-1
-        Eg BandGap|eV BGN BandgapNarrowing|eV ni IntrinsicDensity|cm^-3
+        Eg BandGap|eV BGN
+        BandgapNarrowing|eV ni IntrinsicDensity|cm^-3
         EA ElectronAffinity|eV EC ConductionBandEnergy|eV
         EV ValenceBandEnergy|eV EFe eQuasiFermiEnergy|eV
         EFh hQuasiFermiEnergy|eV Band BandDiagram|eV
@@ -398,8 +399,8 @@ proc mfjProc::wrapText {Text {Lead ""} {Trail ""} {HangIdt ""} } {
 }
 
 # mfjProc::readIdx
-    # Read and interpret the index combination containing special symbols:
-    # '/' denotes index combination
+    # Read and interpret the index permutation containing special symbols:
+    # '/' denotes index permutation
     # ':' denotes all indices from index 1 to index 2
     # ',' separates index 1 and index 2
     # Example: 0/1,3:5 -> (0 1) (0 3) (0 4) (0 5)
@@ -407,7 +408,7 @@ proc mfjProc::wrapText {Text {Lead ""} {Trail ""} {HangIdt ""} } {
 # Arguments
     # IdxStr        A string of indices
     # IdxLen        The length of indices if any
-# Result: Return the interpreted list of indices/combination
+# Result: Return the interpreted list of indices/permutation
 proc mfjProc::readIdx {IdxStr {IdxLen ""}} {
 
     # Validate arguments
@@ -507,7 +508,7 @@ proc mfjProc::readIdx {IdxStr {IdxLen ""}} {
         incr Idx
     }
 
-    # Expand to a full list of indices combination (1 to n dimensions)
+    # Expand to a full list of indices permutation (1 to n dimensions)
     set OutLen 1
     set TmpLst [list]
     foreach SubLst $IdxLst {
@@ -521,7 +522,7 @@ proc mfjProc::readIdx {IdxStr {IdxLen ""}} {
                 }
             }
         }
-        set OutLen [expr {$IdxLen*$OutLen}]
+        set OutLen [expr $IdxLen*$OutLen]
         lappend TmpLst $Lst
     }
 
@@ -538,17 +539,19 @@ proc mfjProc::readIdx {IdxStr {IdxLen ""}} {
     return $IdxLst
 }
 
-# mfjProc::substitute
-    # Searching for any substitute feature (i/j/k,l:n&i/k/o,x:z=) in case
-    # a variable has multiple values. If the pattern is found, copy the content
-    # of value i and substitute those referenced elements with the assigned
-    # element values, respectively. For each referenced element, it may also be
-    # supplied with multiple element values. Under such circumstance, the number
-    # of values should be increased. Yet, it may cause chaotic references
-    # subsequently. So those values are folded temporarily until the end of
-    # substitute and reuse cycles.
-    # Substitute has two forms, where references must share the same level 0
-    # index and end with '=' and element values are separated by '|':
+# mfjProc::replaceElm
+    # A variable may have more than one value to enable batch simulation. The
+    # difference between values is typically small, varying one or two elements.
+    # For values beyond the 1st one, they can be assigned quickly with a
+    # shorthand form like i/j/k,l:n&i/k/o,x:z=val1|val2|.... If the pattern is
+    # present, copy the content of value i and replace those referenced elements
+    # with the assigned element values, respectively. For each referenced
+    # element, it may also be supplied with multiple element values. Under such
+    # circumstance, the number of values should be increased. Yet, it may cause
+    # chaotic references subsequently. So those values are folded temporarily
+    # until the end of replacing and reusing elements.
+    # Element replacement has two forms, where references must share the same
+    # level 0 index and end with '=' and element values are separated by '|':
     #   Easy2Read form: {i/j/k,l:n&i/k/o,x:z= ElmVal1 ElmVal2 ...}
     #   Compact form: i/j/k,l:n&i/k/o,x:z=ElmVal1|ElmVal1|...
     # Multiple element values can be assigned to one element by three methods:
@@ -559,14 +562,16 @@ proc mfjProc::readIdx {IdxStr {IdxLen ""}} {
     #   appended, these values become evenly-spaced logarithmically.
     #   2. Enumerate element values separated by '~': i/j/k=ElmVal1~ElmVal2...
     #   3. Mix steps and enumeration: i/j/k=ElmVal1@#(l)~ElmVal2...
+    #   4. The permutation of multiple elements is affected by
+    #   ::SimArr(OneChild)
 # Arguments
     # VarName     Variable name
     # VarVal      Variable value
 # Result: Return the # of folded values and the list after substitution
-proc mfjProc::substitute {VarName VarVal} {
+proc mfjProc::replaceElm {VarName VarVal} {
     set VarMsg "variable '$VarName'"
 
-    # The substitute pattern is only checked for the 2nd value (level 1) onwards
+    # Check the 2nd value (level 1) onwards for element-replacement pattern
     set LvlIdx 1
     set LvlLen 2
     set NewLst [list [lindex $VarVal 0]]
@@ -574,7 +579,7 @@ proc mfjProc::substitute {VarName VarVal} {
     foreach OldVal [lrange $VarVal 1 end] {
         set LvlMsg "level '$LvlIdx'"
         set Msg "$LvlMsg of $VarMsg"
-        
+
         # For the Easy2Read form, remove the enclosing braces if any
         if {[regexp {\{(-?\d+[:,/&])*-?\d+=} $OldVal]} {
             regexp -indices {(-|\d)} $OldVal Loc
@@ -582,8 +587,8 @@ proc mfjProc::substitute {VarName VarVal} {
             set OldVal [string range $Idx end-$Idx]
         }
 
-        # Check the string for the substitute pattern and treat the list in the
-        # Easy2Read form also as a string! Negative indexing is supported by
+        # Check the string for element-replacement pattern and treat the list in
+        # the Easy2Read form also as a string! Negative indexing is supported by
         # changing regular expression pattern from '\d+' to '-?\d+'
         if {[regexp {^((-?\d+[:,/&])*-?\d+)=(.+)$} $OldVal\
             -> ElmRefStr Tmp ElmValStr]} {
@@ -618,7 +623,7 @@ proc mfjProc::substitute {VarName VarVal} {
                                 referring to multiple values!"
                         }
                     }
-                    
+
                     # Check the rest indices
                     set Lst [list]
                     set Val $NewVal
@@ -656,11 +661,13 @@ proc mfjProc::substitute {VarName VarVal} {
 
             # Search 'ElmValLst' for '@' and '~'. If found, one element has
             # multiple element values. If more than one elements have multiple
-            # element values, the number of combinations is the product of 
-            # the number of element values:
-            # 1. Generate all values for each element
-            # 2. Determine the number of Combinations
-            # 3. Generate all the combinations of element values
+            # element values, the number of permutations is the number of values
+            # for any element in case all elements have the same number of
+            # values and ::SimArr(OneChild) is the column mode; Otherwise, it is
+            # the product of the number of element values:
+            #   1. Generate all values for each element
+            #   2. Determine the number of permutations
+            #   3. Generate all the permutations of element values
             set Prod 1
             set ValSubLst [list]
             set ValCntLst [list]
@@ -712,25 +719,41 @@ proc mfjProc::substitute {VarName VarVal} {
                         incr Cnt
                     }
                 }
+
+                # The number of permutations is updated only when the number
+                # of values is higher than one and different from the previous
+                # or ::SimArr(OneChild) is !OneChild
+                if {$Cnt > 1 && ($Cnt != [lindex $ValCntLst end]
+                    || [string index $::SimArr(OneChild) 0] eq "!")} {
+                    set Prod [expr $Prod*$Cnt]
+                }
                 lappend ValSubLst $Lst
                 lappend ValCntLst $Cnt
-                set Prod [expr $Prod*$Cnt]
             }
 
             # No expanding to the full list yet so the indexing afterwards is ok
-            # These combinations are generated similar to the depth-first search
+            # These permutations are generated similar to the depth-first search
             if {$Prod > 1} {
                 set Lst [list]
-                set DenLst [list]
-                set Den $Prod
+
+                # Dividend ÷ Divisor = Quotient, Dividend % Divisor = Remainder
+                # Determine the denominator/divisor list
+                set DivrLst [list]
+                set Quo $Prod
                 foreach Cnt $ValCntLst {
-                    lappend DenLst [expr $Den/$Cnt]
+
+                    # Update the quotient only if it is > 1
+                    if {$Quo > 1} {
+                        set Quo [expr $Quo/$Cnt]
+                    }
+                    lappend DivrLst $Quo
                 }
                 for {set i 0} {$i < $Prod} {incr i} {
                     for {set j 0} {$j < $IdxLen} {incr j} {
-                        set Den [lindex $DenLst $j]
+                        set Cnt [lindex $ValCntLst $j]
+                        set Divr [lindex $DivrLst $j]
                         set Idx [lindex $IdxLst $j]
-                        set Val [lindex $ValSubLst $j [expr int($i/$Den)]]
+                        set Val [lindex $ValSubLst $j [expr int($i/$Divr)%$Cnt]]
                         if {[catch {lset NewVal $Idx $Val}]} {
                             error "index '$Idx' invalid for $Msg!"
                         }
@@ -746,12 +769,12 @@ proc mfjProc::substitute {VarName VarVal} {
                 }
                 lappend NewLst $NewVal
             }
-            
+
             # One level already has a value without folding
             lappend FoldLst [incr Prod -1]
         } else {
 
-            # This level has no substitute pattern
+            # This level has no element-replacement pattern
             lappend NewLst $OldVal
             lappend FoldLst 0
         }
@@ -761,11 +784,15 @@ proc mfjProc::substitute {VarName VarVal} {
     return [list $FoldLst $NewLst]
 }
 
-# mfjProc::reuse
-    # Recursively searching for the reuse features (<i,j:k/i,j:k&l,m:n/l,m:n>).
+# mfjProc::reuseElm
+    # To save input, the values entered previously can be reused. Element-reuse
+    # feature can be applied anywhere, between values or within a value. This
+    # function recursively searches for the element-reuse features
+    # (<i,j:k/i,j:k&l,m:n/l,m:n>) and substitutes them with referenced elements.
     # '&' is used to seperate references.
-    # Reference within the current value: Level index is omitted
-    # Reference to one previous value: Level index must be present
+    # Note:
+    #   Reference within the current value: Level index is omitted
+    #   Reference to one previous value: Level index must be present
 # Arguments
     # VarName     Variable name
     # VarVal      Variable value
@@ -774,7 +801,7 @@ proc mfjProc::substitute {VarName VarVal} {
     # OldIdx      Optional, trace the index of the SubLst (default: "")
     # InLvl       Optional, restrict reference within a level (default: true)
 # Result: Return the updated list.
-proc mfjProc::reuse {VarName VarVal SubLst {Lvl ""} {OldIdx ""} {InLvl ""}} {
+proc mfjProc::reuseElm {VarName VarVal SubLst {Lvl ""} {OldIdx ""} {InLvl ""}} {
 
     # Validate arguments
     # All levels should not be negative integers
@@ -812,7 +839,7 @@ proc mfjProc::reuse {VarName VarVal SubLst {Lvl ""} {OldIdx ""} {InLvl ""}} {
             set Msg "'$Elm' of $VarMsg (index $NewIdx)"
         }
 
-        # Replace each reuse feature and evaluate the final expression
+        # Replace each element-reuse feature and evaluate the final expression
         # Negative indexing is supported with the pattern '-?\d+'
         while {[regexp {<((-?\d+[:,/&])*-?\d+)>} $Elm -> ElmRefStr]} {
             if {[llength $Elm] > 1 || [regexp {^\{.+\}$} $Elm]} {
@@ -886,20 +913,20 @@ proc mfjProc::reuse {VarName VarVal SubLst {Lvl ""} {OldIdx ""} {InLvl ""}} {
                     }
                 }
 
-                # Eval is required if reuse is not coming alone
+                # Eval is required if element-reuse is not coming alone
                 if {[regexp {^<(-?\d+[:,/&])*-?\d+>$} $Elm]} {
                     set Eval false
                 } else {
                     set Eval true
                 }
 
-                # Substitute the first reuse in the element
+                # Substitute the first pattern in the element
                 regsub {<(-?\d+[:,/&])*-?\d+>} $Elm $NewElm Elm
 
-                # Evaluate the experession if no reuse feature
+                # Evaluate the experession if no reuse pattern left
                 # Operators + - * / % and Tcl math functions are supported
                 if {$Eval && ![regexp {<(-?\d+[:,/&])*-?\d+>} $Elm]
-                    && [catch {set Elm [format %g [expr $Elm]]}]} {
+                    && [catch {set Elm [format %g [expr 1.*$Elm]]}]} {
                     error "unable to eval '$Elm' in $Msg!"
                 }
 
@@ -1031,11 +1058,17 @@ proc mfjProc::iFileExists {VarName args} {
 #     Find the region index where an interface profile belongs
 # Arguments:
 #     RegDim        Region settings
-#     Intf          px1_y1_z1/x2_y2_z2
+#     Intf          An interface string, e.g. px1_y1_z1//x2_y2_z2
 # Result: Return the region index or raise an error
 proc mfjProc::getRegIdx {RegDim Intf} {
+
+    # Validate argument
+    if {regexp {^p[^/]+//[^/]+$} $Intf} {
+        set Lst [string map {p \{ _ " " // "\} \{"} $Intf]\}
+    } else {
+        error "invalid argument '$Intf' for getRegIdx!"
+    }
     set Dim [llength [lindex $RegDim 0 1]]
-    set Lst [split [split [string range $Intf 1 end] _] /]
     if {$Dim == 1} {
         if {[lindex $Lst 1] == 1} {
             set Pos [expr [lindex $Lst 0]+0.0001]
@@ -1479,7 +1512,7 @@ proc mfjProc::str2List {VarInfo StrList {Level 0}} {
             # {{{1 2 3 ...}}}
             # The function name is adaptive using '[lindex [info level 0] 0]'
             lappend FmtLst [[lindex [info level 0] 0] $VarInfo\
-                $SubLst [expr {$Level+1}]]
+                $SubLst [expr $Level+1]]
         } else {
 
             # A string or a number
@@ -1581,12 +1614,12 @@ proc mfjProc::iSwitch {Dflt Str Ptn args} {
 
 # mfjProc::groupValues
     # Some variables contain values for multiple materials, regions,
-    # interfaces, points, etc. It is necessary to split the values into
+    # interfaces, positions, etc. It is necessary to split the values into
     # multiple sublists based on the predefined group ID
 # Arguments:
     # VarName     Variable name
     # VarVal      Variable value
-    # GrpID       Combinations of 'm', 'p', 'pp', 'r', 'rr'
+    # GrpID       Permutations of 'm', 'p', 'pp', 'r', 'rr'
                   # 'b', 'd', 'o', 'q', 'v'
     # LvlIdx      The current level index
     # LvlLen      The total levels
@@ -1653,9 +1686,9 @@ proc mfjProc::groupValues {VarName VarVal GrpID LvlIdx LvlLen} {
     }
     if {[regexp {ppp} $GStr]} {
         if {[string length $Txt]} {
-            append Txt " or point or box"
+            append Txt " or position or box"
         } else {
-            set Txt "a point or box"
+            set Txt "a position or box"
         }
     } elseif {[regexp {pp} $GStr]} {
         if {[string length $Txt]} {
@@ -1665,9 +1698,9 @@ proc mfjProc::groupValues {VarName VarVal GrpID LvlIdx LvlLen} {
         }
     } elseif {[regexp {p} $GStr]} {
         if {[string length $Txt]} {
-            append Txt " or point"
+            append Txt " or position"
         } else {
-            set Txt "a point"
+            set Txt "a position"
         }
     }
     if {[regexp {rrr} $GStr]} {
@@ -1703,32 +1736,14 @@ proc mfjProc::groupValues {VarName VarVal GrpID LvlIdx LvlLen} {
         }
         # set RegMat [lindex $::SimArr(RegMat) $::SimArr(RegLvl)]
         # set RegIdx [lindex $::SimArr(RegIdx) $::SimArr(RegLvl)]
-        set DimLen $::SimArr(DimLen)
         set RegLen [llength $RegInfo]
 
         # Extract the boundaries of the simulation domain (including
         # dummy gaseous layers)
-        set XMin [lindex $RegInfo 0 1 0]
-        set XMax [lindex $RegInfo end 2 0]
-        set YMin 0
-        set YMax 0
-        set ZMin 0
-        set ZMax 0
-        if {[llength [lindex $RegInfo end 1]] > 1} {
-            set YMax [lindex $RegInfo end 2 1]
-        }
-        if {[llength [lindex $RegInfo end 1]] == 2} {
-            if {[lindex $RegInfo end-1 1 0] < 0} {
-                set YMin [lindex $RegInfo end-1 1 1]
-            } else {
-                set YMin 0
-            }
-        }
-        if {[llength [lindex $RegInfo end 1]] == 3} {
-            set YMin [lindex $RegInfo end 1 1]
-            set ZMin [lindex $RegInfo end-1 1 2]
-            set ZMax [lindex $RegInfo end 2 2]
-        }
+        set XLst [lindex $::SimArr(RegX) $::SimArr(RegLvl)]
+        set YLst [lindex $::SimArr(RegY) $::SimArr(RegLvl)]
+        set ZLst [lindex $::SimArr(RegZ) $::SimArr(RegLvl)]
+        set DimLst [list $XLst $YLst $ZLst]
     }
 
     # Set regular exppression strings for a material or regions
@@ -1739,10 +1754,6 @@ proc mfjProc::groupValues {VarName VarVal GrpID LvlIdx LvlLen} {
 
     # RE for integers and real numbers (including scientific notation)
     set RE_n {[+-]?(\.\d+|\d+(\.\d*)?)([eE][+-]?\d+)?}
-
-    # Regular expression for a position
-    set RE_p (${RE_n}_){0,2}$RE_n
-    set pp1D $RE_n/\[+-\]
 
     set VarMsg "variable '$VarName'"
     set NewLst [list]
@@ -1785,8 +1796,8 @@ proc mfjProc::groupValues {VarName VarVal GrpID LvlIdx LvlLen} {
                         } else {
 
                             # Check against multiple-level 'IntfAttr'
-                            if {[llength $::SimArr(ConLen)] == $LvlLen
-                                && $::SimArr(ColMode)} {
+                            if {[string index $::SimArr(OneChild) 0] ne "!"
+                                && [llength $::SimArr(ConLen)] == $LvlLen} {
                                 if {[regexp -nocase $Val\
                                     [lindex $::SimArr(ConLst) $LvlIdx]]} {
                                     set Bool true
@@ -1919,7 +1930,9 @@ proc mfjProc::groupValues {VarName VarVal GrpID LvlIdx LvlLen} {
             } elseif {$GID eq "m"} {
 
                 # Group ID 'm' is used in variable 'RegDim' only for groupValues
-                if {[regexp -nocase ^($RE_n|p$RE_p|p$RE_p/$RE_p)$ $Val]} {
+                if {[regexp -nocase ^$RE_n$ $Val]
+                    || [regexp {^[pP]([^_]*\d+[^_]*_){1,2}[^_]*\d+[^_]*$} $Val]
+                    || [regexp {//} $Val]} {
                     set Bool false
                 } else {
                     if {[catch {iSwitch !Dflt $Val E<llipse> V<ertex>\
@@ -1941,7 +1954,7 @@ proc mfjProc::groupValues {VarName VarVal GrpID LvlIdx LvlLen} {
                                 set Bool true
                             }
                         } else {
-                            if {$Idx eq -1} {
+                            if {$Idx == -1} {
                                 set Bool false
                             } else {
                                 set Val [lindex $MatLst $Idx]
@@ -1952,11 +1965,14 @@ proc mfjProc::groupValues {VarName VarVal GrpID LvlIdx LvlLen} {
                         set Bool false
                     }
                 }
-            } elseif {$GID eq "p"} {
-                set Bool [regexp ^\[pP\]($RE_p&)*$RE_p$ $Val]
-            } elseif {$GID eq "pp"} {
-                set Bool [expr [regexp ^\[pP\]($RE_p/$RE_p&)*$RE_p/$RE_p$ $Val]\
-                    || [regexp ^\[pP\]($RE_n/\[+-\]&)*$RE_n/\[+-\]$ $Val]]
+            } elseif {$GID eq "pp" || $GID eq "p"} {
+                set NewVal [verifyPos $Val $GStr $DimLst $VarMsg]
+                if {[llength $NewVal]} {
+                    set Bool true
+                    set Val $NewVal
+                } else {
+                    set Bool false
+                }
             } elseif {$GID eq "r"} {
                 set Bool [regexp -nocase ^r$RE_r$ $Val]
             } elseif {$GID eq "rr"} {
@@ -1978,7 +1994,7 @@ proc mfjProc::groupValues {VarName VarVal GrpID LvlIdx LvlLen} {
 
                         # Check against multiple-level 'VarVary'
                         if {[llength $VarLen] == $LvlLen
-                            && $::SimArr(ColMode)} {
+                            && [string index $::SimArr(OneChild) 0] ne "!"} {
                             if {[lindex $VarLen $LvlIdx] == 0} {
                                 error "no varying variable in level '$LvlIdx\
                                     of 'VarVary'!"
@@ -2014,135 +2030,6 @@ proc mfjProc::groupValues {VarName VarVal GrpID LvlIdx LvlLen} {
             # Skip the rest further processing if not a group ID
             if {!$Bool} {
                 continue
-            }
-
-            if {[regexp ^\[pP\]($RE_p&)*$RE_p$ $Val]} {
-                set NewVal [list]
-                foreach Str [split [string range $Val 1 end] &] {
-                    set PLst [split $Str _]
-
-                    # Verify coordinates and their numbers should match 'DimLen'
-                    if {[llength $PLst] != $DimLen} {
-                        error "element 'p$Str' of $VarMsg should have the\
-                            same number of coordinates as variable 'RegGen'!"
-                    }
-                    set Lst [list]
-                    foreach Elm $PLst Min [list $XMin $YMin $ZMin]\
-                        Max [list $XMax $YMax $ZMax] {
-                        if {$Elm ne ""} {
-
-                            # Make sure each point is within simulation domain
-                            if {$Elm < $Min || $Elm > $Max} {
-                                error "element 'p$Str' of $VarMsg beyond\
-                                    simulation domain($Min $Max)!"
-                            }
-
-                            # Format each number to the proper form such as
-                            # removing trailing zeroes and decimal point
-                            lappend Lst [format %.12g $Elm]
-                        }
-                    }
-                    lappend NewVal p[join $Lst _]
-                }
-
-                # Keep the last found duplicate
-                set Val [lsort -unique $NewVal]
-            }
-            if {[regexp ^\[pP\]($RE_p/$RE_p&)*$RE_p/$RE_p$ $Val]\
-                || [regexp ^\[pP\]($RE_n/\[+-\]&)*$RE_n/\[+-\]$ $Val]} {
-                set NewVal [list]
-                foreach Str [split [string range $Val 1 end] &] {
-                    if {$DimLen > 1} {
-                        set PPLst [list]
-                        foreach PLst [split [split $Str _] /] {
-                            if {[llength $PLst] != $DimLen} {
-                                error "element 'p$Str' of $VarMsg should have\
-                                    the same number of coordinates as\
-                                    variable 'RegGen'!"
-                            }
-                            set Tmp [list]
-                            foreach Elm $PLst {
-
-                                # Format each number to the proper form like
-                                # removing trailing zeroes and decimal point
-                                lappend Tmp [format %.12g $Elm]
-                            }
-                            lappend PPLst [join $Tmp _]
-                        }
-                        lappend NewVal p[join $PPLst /]
-
-                        # sort axis values in 'pp' ascendingly
-                        # make sure the interface or box is within simulation
-                        # domain and defined correctly
-                        set Idx 0
-                        set Cnt 0
-                        lset PPLst 0 [split [lindex $PPLst 0] _]
-                        lset PPLst 1 [split [lindex $PPLst 1] _]
-                        foreach Elm1 [lindex $PPLst 0] Elm2 [lindex $PPLst 1]\
-                            Min [list $XMin $YMin $ZMin]\
-                            Max [list $XMax $YMax $ZMax] {
-                            if {$Elm1 ne ""} {
-                                incr Cnt [expr $Elm1 == $Elm2]
-
-                                # Sort and format each number properly
-                                set Tmp [lsort -real [list $Elm1 $Elm2]]
-                                lset PPLst 0 $Idx [lindex $Tmp 0]
-                                lset PPLst 1 $Idx [lindex $Tmp 1]
-                                if {[lindex $Tmp 0] < $Min
-                                    || [lindex $Tmp 1] > $Max} {
-                                    error "($Tmp) in element 'p$Str' of $VarMsg\
-                                        beyond domain($Min $Max)!"
-                                }
-                            }
-                            incr Idx
-                        }
-
-                        # 'pp' should be two points
-                        if {$Cnt == $DimLen} {
-                            error "element 'p$Str' of $VarMsg should be two\
-                                points!"
-                        }
-
-                        # 'pp' for 'pprr' is perpendicular to one axis
-                        # Otherwise, it should be a region instead
-                        if {[regexp {^o?pprr} $GStr]} {
-                            if {$Cnt != 1} {
-                                error "element 'p$Str' of $VarMsg should\
-                                    be an interface!"
-                            }
-                        } else {
-                            if {$Cnt != 0} {
-                                error "element 'p$Str' of $VarMsg should\
-                                    be a region!"
-                            }
-
-                            # Update 'pp' for region with the sorted coordinates
-                            lset NewVal end p[join [join $PPLst /] _]
-                        }
-                    } else {
-                        set PLst [split $Str /]
-                        if {[regexp {^o?pprr} $GStr]} {
-                            if {[lindex $PLst 1] eq "-"
-                                || [lindex $PLst 1] eq "+"} {
-                                lappend NewVal p[format %.12g\
-                                    [lindex $PLst 0]]/[lindex $PLst 1]
-                            } else {
-                                error "element 'p$Str' of $VarMsg should\
-                                    be an interface!"
-                            }
-                        } else {
-                            if {[lindex $PLst 0] == [lindex $PLst 1]} {
-                                error "element 'p$Str' of $VarMsg should\
-                                    be a region!"
-                            }
-                            lappend NewVal p[format %.12g [lindex $PLst\
-                                0]]/[format %.12g [lindex $PLst 1]]
-                        }
-                    }
-                }
-
-                # Keep the last found duplicate
-                set Val [lsort -unique $NewVal]
             }
 
             # Verify region and interface. Split them if necessary
@@ -2208,6 +2095,211 @@ proc mfjProc::groupValues {VarName VarVal GrpID LvlIdx LvlLen} {
     return $NewLst
 }
 
+# mfjProc::verifyPos
+    # Verify a position string: p###_###_###, px#_y#_z#, px#+5_y#_###,
+    # p###_###_###//x#_y#_z#, p###_###_###&x#_y#_z#&x#+5_y#_###
+    # Evaluate coordinates and make sure they are within the simulation
+    # domain. Sort the coordinates if 'GStr' is 'pp'.
+# Arguments:
+    # PosStr        A string of positions for evaluation
+    # GStr          Total grammar string: 'p', 'pp', 'pprr', 'ppprrr', and ...
+    # DimLst        Coordinates at X, Y Z axes
+    # Context       A context message
+# Result: Return the verified/evaluated position string list
+proc mfjProc::verifyPos {PosStr GStr DimLst Context} {
+
+    # Create an array for intepreting x#, y#, and z#
+    set DimLen 0
+    set Arr(xLst) [lindex $DimLst 0]
+    set Arr(xLen) [llength $Arr(xLst)]
+    incr DimLen [expr $Arr(xLen) > 0]
+    set Arr(yLst) [lindex $DimLst 1]
+    set Arr(yLen) [llength $Arr(yLst)]
+    incr DimLen [expr $Arr(yLen) > 0]
+    set Arr(zLst) [lindex $DimLst 2]
+    set Arr(zLen) [llength $Arr(zLst)]
+    incr DimLen [expr $Arr(zLen) > 0]
+    set NewStrLst [list]
+
+    # Tcl functions are lower cases so change the string to lower cases
+    set PosStr [string tolower $PosStr]
+
+    # A position string should start with 'p', otherwise not a position string
+    if {[string index $PosStr 0] ne "p"} {
+        return $NewStrLst
+    }
+
+    set StrLst [split [string range $PosStr 1 end] &]
+    set Bool false
+    set PosLen 0
+    set PPLst [list]
+    foreach Str $StrLst {
+        if {[regexp {^([^_]+_){0,2}[^_]+//([^_]+_){0,2}[^_]+$} $Str]} {
+
+            # Position list length is 2
+            if {$PosLen == 1} {
+                error "no mixed use of positions and regions in '$PosStr'\
+                    of $Context!"
+            }
+            set PosLen 2
+            if {!$Bool} {
+                set Bool true
+            }
+            set Lst \{[string map {_ " " // "\} \{"} $Str]\}
+            if {[llength [lindex $Lst 0]] != [llength [lindex $Lst 1]]} {
+                error "two positions should have the same number of coordinates\
+                    in element '$Lst' of $Context!"
+            }
+            lappend PPLst $Lst
+        } elseif {[regexp {^([^_]*\d+[^_]*_){0,2}[^_]*\d+[^_]*$} $Str]} {
+
+            # Position list length is 1
+            if {$PosLen == 2} {
+                error "no mixed use of positions and regions in '$PosStr'\
+                    of $Context!"
+            }
+            set PosLen 1
+            lappend PPLst [list [split $Str _]]
+        } else {
+            if {$Bool} {
+                error "invalid position string for '$Str' of $Context!"
+            } else {
+                return $NewStrLst
+            }
+        }
+    }
+
+    # Verify each coordinate within each position
+    foreach PosLst $PPLst {
+        set Cnt 0
+        set NewPosLst [list]
+        foreach Pos $PosLst {
+            if {$DimLen > 0 && [llength $Pos] != $DimLen} {
+
+                # For 'p' test, skip a string having only one dimension.
+                # If the previous string is not a position, it is likely to an
+                # unrelevant string
+                if {$PosLen == 1 && [llength $Pos] == 1 && !$Bool} {
+                    return $NewStrLst
+                } else {
+                    error "element '$Pos' of $Context should\
+                        have the same number of coordinates as\
+                        variable 'RegGen'!"
+                }
+            }
+
+            # 1D interface with '+' or '-'
+            if {$DimLen == 1 && $Cnt == 1 && [regexp {^o?pprr} $GStr]} {
+                if {$Pos eq "+" || $Pos eq "-"} {
+                    lappend NewPosLst $Pos
+                    incr Cnt
+                    continue
+                } else {
+                    error "element '$PosLst' of $Context should\
+                        be an interface!"
+                }
+            }
+
+            # Verify each coordinate
+            set NewPos [list]
+            foreach Elm $Pos Axis {x y z} {
+                if {$Elm eq ""} continue
+
+                # If not number, evaluate the expression
+                if {![string is double $Elm]} {
+
+                    # Replace x#, y#, z# if present
+                    while {[regexp {([xyz])(-?\d+)} $Elm -> Char Idx]} {
+                        set Lst $Arr(${Char}Lst)
+                        set Len $Arr(${Char}Len)
+                        if {$Idx < 0} {
+                            incr Idx $Len
+                        }
+                        if {$Idx < 0 || $Idx >= $Len} {
+                            error "index '${Char}$Idx' out of range '$Len'\
+                                for $Context!"
+                        }
+                        regsub {[xyz]-?\d+} $Elm [lindex $Lst $Idx] Elm
+                    }
+
+                    # Evaluate the expression
+                    if {[catch {set Elm [expr 1.*$Elm]}]} {
+                        error "unable to eval '$Elm' for $Context!"
+                    }
+                }
+
+                if {![string is double $Elm]} {
+                    error "coordinate '$Elm' not a number for $Context!"
+                }
+
+                # Each coordinate must be within the simulation domain
+                if {$Arr(xLen) > 0} {
+                    set Min [lindex $Arr(${Axis}Lst) 0]
+                    set Max [lindex $Arr(${Axis}Lst) end]
+                    if {$Elm < $Min || $Elm > $Max} {
+                        error "$Axis coordinate '$Elm' of $Context beyond\
+                            simulation domain($Min $Max)!"
+                    }
+                }
+
+                # Format each number to the proper form such as removing
+                # trailing zeroes and decimal point
+                lappend NewPos [format %.12g $Elm]
+                set Bool true
+            }
+            lappend NewPosLst $NewPos
+            incr Cnt
+        }
+        if {$PosLen == 1} {
+            lappend NewStrLst p[join [lindex $NewPosLst 0] _]
+            continue
+        }
+        lappend NewStrLst\
+            p[join [lindex $NewPosLst 0] _]//[join [lindex $NewPosLst 1] _]
+
+        # Sort axis values in 'pp' ascendingly
+        if {$PosLen == 2 && [llength [lindex $NewPosLst 0]] > 1} {
+            set Idx 0
+            set Cnt 0
+            foreach Elm1 [lindex $NewPosLst 0] Elm2 [lindex $NewPosLst 1] {
+                incr Cnt [expr $Elm1 == $Elm2]
+
+                # Sort coordinates properly
+                set Lst [lsort -real [list $Elm1 $Elm2]]
+                lset NewPosLst 0 $Idx [lindex $Lst 0]
+                lset NewPosLst 1 $Idx [lindex $Lst 1]
+                incr Idx
+            }
+
+            # 'pp' should be two positions
+            if {$Cnt == $DimLen} {
+                error "element '$NewPosLst' of $Context should\
+                    be two positions!"
+            }
+
+            # 'pp' for 'pprr' is perpendicular to one axis
+            # Otherwise, it should be a region instead
+            if {[regexp {^o?pprr} $GStr]} {
+                if {$Cnt != 1} {
+                    error "element '$NewPosLst' of $Context should\
+                        be an interface!"
+                }
+            } else {
+                if {$Cnt != 0} {
+                    error "element '$NewPosLst' of $Context should be a region!"
+                }
+
+                # 'pp' for a region should be updated with sorted coordinates
+                lset NewStrLst end p[join [lindex $NewPosLst 0]\
+                    _]//[join [lindex $NewPosLst 1] _]
+            }
+        }
+    }
+
+    # Keep the last found duplicate
+    return [lsort -unique $NewStrLst]
+}
+
 # mfjProc::intfVn
 #     Determine the normal 3D vector of an interface based on two opposite
 #     positions. The interface is perpendicular to one axis and a dot in 1D,
@@ -2221,33 +2313,42 @@ proc mfjProc::groupValues {VarName VarVal GrpID LvlIdx LvlLen} {
 #       Point fingers from the 1st to the 2nd position. Always align the thumb
 #       with the X axis, the index with Y, and the middle with Z.
 # Arguments:
-#     Pos1          Position 1
-#     Pos2          Opposite position 2
+#     Pos1          Position 1 string/list or the interface string/list
+#     Pos2          Opposite position 2 string/list
 # Result: Return the normal 3D vector.
 proc mfjProc::intfVn {Pos1 {Pos2 ""}} {
     set Vn [list]
 
-    # Validate arguments. Valide arguments:
-    # 0_0/1_0 = {0_0 1_0} = {{0 0} {1 0}} = 0_0 1_0 = {0 0} {1 0}
+    # Validate arguments (an interface or two positions). Valide arguments:
+    #   0_0//1_0 or {{0 0} {1 0}} or {0 0} {1 0}
     if {$Pos2 eq ""} {
-        if {[regexp {/} $Pos1]} {
-            set Pos1 [split $Pos1 /]
+        if {[regexp {^[^/]+//[^/]+$} $Pos1]} {
+            set Pos1 \{[string map {_ " " // "\} \{"} $Pos1]\}
+        } elseif {[llength $Pos1] == 1} {
+            error "invalid argument '$Pos1' for intfVn!"
         }
-        set Pos2 [lindex $Pos1 end]
+        set Pos2 [lindex $Pos1 1]
         set Pos1 [lindex $Pos1 0]
     }
-    set Pos1 [string map {_ " "} $Pos1]
-    set Pos2 [string map {_ " "} $Pos2]
+    set Intf [join $Pos1 _]//[join $Pos2 _]
+    if {[llength $Pos1] != [llength $Pos2]} {
+        error "'$Intf' should have the same number of coordinates!"
+    }
 
     # Determine Vn
-    if {[llength $Pos1] == 1 && [llength $Pos2] == 1
-        && [string is double $Pos1]} {
-        if {$Pos2 eq "-"} {
-            set Vn [list -1 0 0]
-        } elseif {$Pos2 eq "+"} {
-            set Vn [list 1 0 0]
+    if {[llength $Pos1] == 1} {
+        if {[string is double -strict $Pos1]} {
+            if {$Pos2 eq "-"} {
+                set Vn [list -1 0 0]
+            } elseif {$Pos2 eq "+"} {
+                set Vn [list 1 0 0]
+            } else {
+                error "unknown interface '$Pos1 $Pos2' for 1D!"
+            }
+        } else {
+            error "unknown interface '$Pos1 $Pos2' for 1D!"
         }
-    } elseif {[llength $Pos1] == 2 && [llength $Pos2] == 2} {
+    } elseif {[llength $Pos1] == 2} {
         foreach Elm1 $Pos1 Elm2 $Pos2 {
             if {![string is double -strict $Elm1]} {
                 error "'$Pos1' not a valid position!"
@@ -2274,7 +2375,7 @@ proc mfjProc::intfVn {Pos1 {Pos2 ""}} {
                 set Vn [list 0 -1 0]
             }
         }
-    } elseif {[llength $Pos1] == 3 && [llength $Pos2] == 3} {
+    } elseif {[llength $Pos1] == 3} {
         foreach Elm1 $Pos1 Elm2 $Pos2 {
             if {![string is double -strict $Elm1]} {
                 error "'$Pos1' not a valid position!"
@@ -2286,7 +2387,7 @@ proc mfjProc::intfVn {Pos1 {Pos2 ""}} {
 
         foreach Idx1 {0 1 2} Idx2 {1 0 0} Idx3 {2 2 1} {
             if {[lindex $Pos1 $Idx1] == [lindex $Pos2 $Idx1]} {
-                set Val [expr ([lindex $Pos1 $Idx2]-[lindex $Pos2 $Idx2])\
+                set Val [expr 1.*([lindex $Pos1 $Idx2]-[lindex $Pos2 $Idx2])\
                     *([lindex $Pos1 $Idx3]-[lindex $Pos2 $Idx3])]
                 if {$Val > 0} {
                     if {$Idx1 == 0} {
@@ -2312,14 +2413,14 @@ proc mfjProc::intfVn {Pos1 {Pos2 ""}} {
     if {[llength $Vn]} {
         return $Vn
     } else {
-        error "'$Pos1/$Pos2' not a valid interface!"
+        error "'$Intf' not a valid interface!"
     }
 }
 
 # mfjProc::overlap
 #     Check overlap between an interface field and a region
 # Arguments
-#     Intf          An interface normal to one axis
+#     Intf          An interface string/list normal to one axis
 #     Dep           Field depth along the normal axis
 #     Reg           An existing region
 # Result: Return the depth of overlap. -1 -> no overlap.
@@ -2330,14 +2431,18 @@ proc mfjProc::overlap {Intf Dep Reg} {
         error "depth '$Dep' invalid!"
     }
 
-    # 0_0/1_0 = {0_0 1_0} = {{0 0} {1 0}}
-    if {[regexp {/} $Intf]} {
-        set Intf [split $Intf /]
+    # Valide arguments: 0_0//1_0 or {{0 0} {1 0}}
+    if {[regexp {^[^/]+//[^/]+$} $Intf]} {
+        set Pos1 \{[string map {_ " " // "\} \{"} $Intf]\}
+        set Pos2 [lindex $Pos1 1]
+        set Pos1 [lindex $Pos1 0]
+    } elseif {[llength $Intf] > 1} {
+        set Pos1 [lindex $Intf 0]
+        set Pos2 [lindex $Intf 1]
+        set Intf [join $Pos1 _]//[join $Pos2 _]
+    } else {
+        error "invalid argument '$Intf' for overlap!"
     }
-    set Pos1 [lindex $Intf 0]
-    set Pos2 [lindex $Intf end]
-    set Pos1 [string map {_ " "} $Pos1]
-    set Pos2 [string map {_ " "} $Pos2]
 
     # Get two opposite positions from the interface field
     set Vn [intfVn $Pos1 $Pos2]
@@ -2349,7 +2454,7 @@ proc mfjProc::overlap {Intf Dep Reg} {
         set Lst $Pos2
         set Pos2 [list]
         foreach Elm1 $Lst Elm2 [lrange $Vn 0 $End] {
-            lappend Pos2 [expr $Elm1+$Elm2*$Dep]
+            lappend Pos2 [expr $Elm1+1.*$Elm2*$Dep]
         }
     }
 
@@ -2385,7 +2490,7 @@ proc mfjProc::overlap {Intf Dep Reg} {
         # and the minimum from two maxima (C2 and C4)
         set MaxMin [expr $C1 > $C3 ? $C1 : $C3]
         set MinMax [expr $C2 < $C4 ? $C2 : $C4]
-        lappend Dep [expr $V*($MinMax-$MaxMin)]
+        lappend Dep [expr 1.*$V*($MinMax-$MaxMin)]
     }
 
     # If two boxes collide, they collide at all axes. Return overlap depth
@@ -2402,7 +2507,7 @@ proc mfjProc::overlap {Intf Dep Reg} {
 #     RegInfo       Detailed info of regions
 #     Idx1            Index of region 1
 #     Idx2            Index of region 2
-# Result: Return the interface between two block regions
+# Result: Return the interface list between two block regions
 proc mfjProc::rr2pp {RegInfo Idx1 Idx2} {
 
     # Validate arguments
@@ -2625,21 +2730,21 @@ proc mfjProc::readMatDB {FMat args} {
 }
 
 # mfjProc::buildTree
-    # Build a SWB node tree according to the column or full combination mode
+    # Build a SWB node tree according to the OneChild or full permutation mode
     # Key nodes are a list of the last nodes of all tools
 # Arguments:
     # VarName             Variable names
     # VarVal              Variable values
     # STIdxLst            Sentaurus tool Index list
-    # ColMode             Optional, column (default) or full combination
+    # OneChild            Optional, OneChild (default) or full permutation
     # NodeTree            Optional, returns node tree (default) or key nodes
 # Result: Return the node tree
-proc mfjProc::buildTree {VarName VarVal STIdxLst {ColMode ""} {NodeTree ""}} {
+proc mfjProc::buildTree {VarName VarVal STIdxLst {OneChild ""} {NodeTree ""}} {
 
     # Validate arguments
-    foreach Elm [list ColMode NodeTree] {
+    foreach Elm [list OneChild NodeTree] {
 
-        # Make an alias of 'ColMode' and 'NodeTree'
+        # Make an alias of 'OneChild' and 'NodeTree'
         upvar 0 $Elm Alias
         if {[string index $Alias 0] eq "!"} {
             set Alias false
@@ -2654,7 +2759,7 @@ proc mfjProc::buildTree {VarName VarVal STIdxLst {ColMode ""} {NodeTree ""}} {
     set STLen [llength $STIdxLst]
     set VarIdx 0
     set Prod 1
-    set LastLen 1
+    set LastLen 0
     set Seq 0
     set KeyNode [list]
     set SWBNode [list]
@@ -2675,8 +2780,8 @@ proc mfjProc::buildTree {VarName VarVal STIdxLst {ColMode ""} {NodeTree ""}} {
         }
         set ValLen [llength $Val]
         if {$ValLen > 1} {
-            if {$ValLen != $LastLen || !$ColMode} {
-                set Prod [expr {$Prod*$ValLen}]
+            if {$ValLen != $LastLen || !$OneChild} {
+                set Prod [expr $Prod*$ValLen]
             }
             set LastLen $ValLen
         }
@@ -2712,22 +2817,22 @@ proc mfjProc::buildTree {VarName VarVal STIdxLst {ColMode ""} {NodeTree ""}} {
     incr End -1
     for {set i 0} {$i < $Prod} {incr i} {
         for {set j 0} {$j <= $End} {incr j} {
-            set k1 [expr {$Prod/[llength [lindex $SWBNode $j 0]]}]
+            set k1 [expr $Prod/[llength [lindex $SWBNode $j 0]]]
             if {$i % $k1 == 0} {
                 set n1 $j
-                set n2 [lindex $SWBNode $j 0 [expr {$i/$k1}]]
+                set n2 [lindex $SWBNode $j 0 [expr $i/$k1]]
                 if {$i == 0 && $j == 0} {
                     set n3 0
                 }
                 if {$j > 0} {
                     incr j -1
-                    set k2 [expr {$Prod/[llength [lindex $SWBNode $j 0]]}]
+                    set k2 [expr $Prod/[llength [lindex $SWBNode $j 0]]]
                     set n3 [lindex $SWBNode $j 0 [expr int($i/$k2)]]
                     incr j
                 }
                 set Len [llength [lindex $SWBNode $j end]]
                 if {$Len} {
-                    set Val [lindex $SWBNode $j end [expr {$i/$k1%$Len}]]
+                    set Val [lindex $SWBNode $j end [expr $i/$k1%$Len]]
                 } else {
                     set Val ""
                 }
@@ -2764,7 +2869,7 @@ proc mfjProc::tcl2Scheme {VarName VarVal {Level 0}} {
 
             # The function name is adaptive using '[lindex [info level 0] 0]'
             lappend SLst [[lindex [info level 0] 0] $VarName\
-                $SubLst [expr {$Level+1}]]
+                $SubLst [expr $Level+1]]
         } else {
             if {$SubLen == 0} {
 

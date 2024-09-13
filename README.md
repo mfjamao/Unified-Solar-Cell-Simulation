@@ -24,8 +24,9 @@ Currently only Sentaurus TCAD is supported. In your home directory on your
         git clone https://github.com/mfjamao/Unified-Solar-Cell-Simulation.git
     Afterwards, enter the subdirectory "Unified-Solar-Cell-Simulation", make
     sure '11ctrlsim.tcl' is executable. Open '11ctrlsim.tcl' with any text
-    editor and update the values for keys 'ST|Hosts', 'ST|Paths', and 'ST|Licns'
-    in the array 'SimArr' according to your own set up of Sentaurus TCAD.
+    editor and update the values for keys 'ST|Hosts', 'ST|Paths', 'ST|Licns',
+    Email|Sufx, and Email in the array 'SimArr' according to your own set up
+    of Sentaurus TCAD.
 
 # Citation for UniSolar
 If UniSolar promotes your research, kindly cite the following references in your
@@ -78,6 +79,13 @@ Material, spectra and experimental files are also required if appeared in
     02opt/ and 03exp/, respectively.
 
 # Version history
+2.3     12/09/2024
+    Enhancement: 1. Introduced a shorthand format to allow easy permutation of
+        multiple element values.  2. Added X, Y, and Z references following the
+        implicit method used in 'RegGen'. 3. Enabled math calculations including
+        Tcl math functions for each coordinate in position specifications.  4.
+        Updated the delimiter between two positions from '/' to '//' to avoid
+        confusion with the division symbol.
 2.2     04/01/2024
     Enhancement: Process simulations are integrated into UniSolar. Processes
         like diffusion, implantation are supported.

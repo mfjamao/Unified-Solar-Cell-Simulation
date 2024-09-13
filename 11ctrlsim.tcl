@@ -1,29 +1,33 @@
 #!/usr/bin/tclsh
 
 ################################################################################
-# This script is designed to start/stop simulation. When the script is running,
-# it checks whether a previous instance is still running. If it is, wait till
-# it ends. If the job is running (locally or by a job scheduler), stop it. If
-# no job is running, carry out the following four steps:
+# This script is designed to start/stop simulation. Once the script is executed,
+# it checks whether a previous instance is still running. If so, wait till it
+# ends. If a batch is running (locally or by a job scheduler), kill the job.
+# If no batch job is running, carry out the following four steps:
 #   1. Convert the raw variable file (case insensitive) to a formatted file
-#   2. Convert the formatted file to simulator specific files
-#   3. Start preprocessing with the simulator
-#   4. Run the job locally or submit it to a job scheduler
+#   2. Convert the formatted file to simulator-compatible files
+#   3. Start preprocessing to generate command files for the simulator
+#   4. Run the batch job locally or submit it to a job scheduler
 #
 # Maintained by Dr. Fa-Jun MA (mfjamao@yahoo.com). Only Sentaurus is supported
 # now. Other simulators will be supported in future.
 #
 # Other notes:
-#   Node4All: Node arrangement for all variables even if not multiple levels
-#   ColMode: If adjacent variables have the same multiple levels, one parent
-#       node has only one child node
-#   FullSchenk: Select whether to calculate BGN using full Schenk model or not
+#   HideVar: Hide variables from Sentaurus Workbench unless they have multiple
+#       levels.
+#   OneChild: If adjacent variables have the same multiple levels, one parent
+#       node has only one child node. Disable it to enable full permutation.
+#   FullSchenk: Select whether to calculate BGN using full Schenk model or not,
+#       which is still experimenting
 #   TrapDLN: Default # of levels in Sentaurus is 13
-#   ST|Hosts: Only the first letter of a host name matters
-#   Use braces to suppress string substitution so '\' is literally '\'
+#   Add or modify an element in ST|Hosts, ST|Paths, ST|Licns, and Email|Sufx to
+#       suit your settings. Set Email to override Email|Sufx. For ST|Hosts, Only
+#       the first letter of a host name matters
+#   In Tcl, use braces to suppress string substitution so '\' is literally '\'
 ################################################################################
 array set SimArr {
-    Email "mfjamao@yahoo.com" Time "" Append false Inverse false
+    Email "" Time "" Append false Inverse false
     0Raw2Fmt true 1Fmt2Sim true 2PreProc true 3Batch true
     FVarRaw 10variables.txt FVarFmt variables.txt
     FIntrpr mfjIntrpr.tcl FProc mfjProc.tcl FGrm mfjGrm.tcl FST mfjST.tcl
@@ -32,12 +36,12 @@ array set SimArr {
     FInfo siminfo FLock lock FSTStat .status FDOESum DOESummary.csv
     CodeDir .mfj MDBDir 01mdb OptDir 02opt ExpDir 03exp PMIDir 04code
     EtcDir 05etc OutDir 06out TplDir 07tpl
-    DfltYMax 2.0 LatFac 0.8 GasThx 0.1 Node4All !Node4All ColMode ColMode
-    FullSchenk !FullSchenk TrapDLN 100  EdgeEx 10 IntfEx 0.001
+    HideVar HideVar OneChild OneChild DfltYMax 2.0 LatFac 0.8 GasThx 0.1
+    TrapDLN 100  EdgeEx 10 IntfEx 0.001 FullSchenk !FullSchenk
     NThread 4 BitSize {64 80 128 256} Digits {5 5 6 10}
     RhsMin {1e-10 1e-12 1e-15 1e-25} Iter {10 12 15 20}
-    ModTime "" RegInfo "" RegLvl 0 RegMat "" RegIdx "" DimLen "" MatDB ""
-    ConLst "" ConLen "" VarLen ""
+    ModTime "" RegInfo "" RegLvl 0 RegMat "" RegIdx "" RegX "" RegY ""
+    RegZ "" MatDB "" ConLst "" ConLen "" VarLen ""
     VarName {SimEnv RegGen FldAttr IntfAttr GopAttr DfltAttr ProcSeq ModPar
         VarVary GetFld PPAttr}
     BIDLst {{c\d} {(\w+/)?\w+/\w+(/[\deE.+-]+)?} {S\w*} {M\w*} {W\w*}}
@@ -48,7 +52,7 @@ array set SimArr {
     Prefix "# ---"
     Email|Sufx {unsw.edu.au unsw.edu.au}
     ST|Hosts {katana tyrion}
-    ST|Paths {/srv/scratch/z5344214/apps/sentaurus
+    ST|Paths {/srv/scratch/z3505796/apps/sentaurus
         /share/scratch/z3505796/apps/sentaurus}
     ST|Licns {27020@license2e.restech.unsw.edu.au
         27105@licence.eng.unsw.edu.au}
@@ -236,7 +240,8 @@ if {[file isfile $FInfo]} {
 } else {
     set InfoLst {Sentaurus Local}
 }
-vputs -n "Checking project '[file tail $WD]' status: '[lindex $InfoLst 0]', "
+vputs "Checking project '[file tail $WD]' status:"
+vputs -i1 -n "Simulator: '[lindex $InfoLst 0]'; Status: "
 set StatLst [list [clock seconds] [exec hostname] $tcl_platform(user) unknown\
     [pid]]
 if {[lindex $InfoLst 0] eq "Sentaurus"} {
@@ -348,37 +353,35 @@ if {$SimArr(0Raw2Fmt)} {
         '$SimArr(FVarFmt)'...\n"
     set mfjProc::arr(Indent2) 1
     mfjIntrpr::raw2Fmt
-    set mfjProc::arr(Indent2) 0
 
-    # Update SimArr(FInfo) if necessary
+    # Update FInfo if necessary
     set Lst [list [lindex $mfjIntrpr::arr(FmtVal|SimEnv) 0]\
-        [lindex $mfjIntrpr::arr(FmtVal|SimEnv) 4]]
+        [lindex $mfjIntrpr::arr(FmtVal|SimEnv) 4] [file mtime $SimArr(FVarRaw)]]
     if {$InfoLst ne $Lst} {
         set InfoLst $Lst
         set Ouf [open $FInfo w]
         puts $Ouf [join $InfoLst |]
         close $Ouf
     }
-    vputs -i1 "Processing time = [expr [clock seconds]-$::SimArr(Time)] s\n"
+    vputs "Processing time = [expr [clock seconds]-$::SimArr(Time)] s\n"
+    set mfjProc::arr(Indent2) 0
 }
 
 # Pass variable lists to the selected simulator
 if {$SimArr(1Fmt2Sim)} {
     set SimArr(Time) [clock seconds]
+    set mfjProc::arr(Indent2) 1
     if {!$SimArr(0Raw2Fmt)} {
-        vputs "Checking host settings and reading '$SimArr(FVarFmt)'...\n"
-        set mfjProc::arr(Indent2) 1
+        vputs -i-1 "Checking host settings and reading '$SimArr(FVarFmt)'...\n"
         mfjIntrpr::readHost
         mfjIntrpr::readFmt
-        set mfjProc::arr(Indent2) 0
     }
     if {[lindex $InfoLst 0] eq "Sentaurus"} {
-        vputs "Preparing relevant files for 'Sentaurus TCAD'...\n"
-        set mfjProc::arr(Indent2) 1
+        vputs -i-1 "Preparing relevant files for 'Sentaurus TCAD'...\n"
         mfjST::fmt2swb
     }
+    vputs "Processing time = [expr [clock seconds]-$SimArr(Time)] s\n"
     set mfjProc::arr(Indent2) 0
-    vputs -i1 "Processing time = [expr [clock seconds]-$SimArr(Time)] s\n"
 }
 
 # Perform preprocess

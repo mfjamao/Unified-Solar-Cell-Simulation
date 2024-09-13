@@ -129,7 +129,7 @@ if {[llength $ProcSeq]} {
                 puts $ouf $str\n
             }
             init {
-                set var [string map {p \{ _ " " / "\} \{"} [lindex $grp 2]]\}
+                set var [string map {p \{ _ " " // "\} \{"} [lindex $grp 2]]\}
                 set val [lindex $var 1 0]
                 puts $ouf "line x loc= 0.0 spac= 0.001 tag= top"
                 if {$val > 0.05} {
@@ -192,7 +192,7 @@ if {[llength $ProcSeq]} {
                     } else {
                         set str "mask name= [incr cnt] [lindex $grp 2]"
                     }
-                    set var [string map {p \{ _ " " / "\} \{"}\
+                    set var [string map {p \{ _ " " // "\} \{"}\
                         [lindex $grp 1]]\}
                     if {$Dim == 1} {
                         incr idx

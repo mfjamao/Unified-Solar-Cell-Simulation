@@ -37,6 +37,7 @@ namespace eval mfjGrm {
         set RE_p (${RE_n}_){0,2}$RE_n
 
         # Regular expression for 'xx' or 'yy' or 'zz'
+        # To be updated...
         set RE_c $RE_n/$RE_n
 
         # Replace a potential reference with the specified element in arguments
@@ -110,7 +111,7 @@ namespace eval mfjGrm {
                 && ![regexp {^v-?\d+$} $DfltVal]} {
 
                 # Evaluate the updated default string
-                if {[catch {set DfltVal [expr $DfltStr]}]} {
+                if {[catch {set DfltVal [format %g [expr 1.*$DfltStr]]}]} {
                     error "unknown expression '$DfltVal'!"
                 }
             } else {
@@ -187,6 +188,7 @@ namespace eval mfjGrm {
             }
 
             # Extract boundaries for tests: 'p', 'r', 'x', 'y', 'z'
+            set DimLst [list]
             if {$varName ne "RegGen" && [regexp {[prxyz]} $Test]} {
 
                 # Get values from global array 'SimArr'.
@@ -200,32 +202,14 @@ namespace eval mfjGrm {
                         }
                     }
                 }
-                set DimLen $::SimArr(DimLen)
                 set RegLen [llength $RegInfo]
 
                 # Extract the boundaries of the simulation domain (including
                 # dummy gaseous layers)
-                set XMin [lindex $RegInfo 0 1 0]
-                set XMax [lindex $RegInfo end 2 0]
-                set YMin 0
-                set YMax 0
-                set ZMin 0
-                set ZMax 0
-                if {[llength [lindex $RegInfo end 1]] > 1} {
-                    set YMax [lindex $RegInfo end 2 1]
-                }
-                if {[llength [lindex $RegInfo end 1]] == 2} {
-                    if {[lindex $RegInfo end-1 1 0] < 0} {
-                        set YMin [lindex $RegInfo end-1 1 1]
-                    } else {
-                        set YMin 0
-                    }
-                }
-                if {[llength [lindex $RegInfo end 1]] == 3} {
-                    set YMin [lindex $RegInfo end 1 1]
-                    set ZMin [lindex $RegInfo end-1 1 2]
-                    set ZMax [lindex $RegInfo end 2 2]
-                }
+                set XLst [lindex $::SimArr(RegX) $::SimArr(RegLvl)]
+                set YLst [lindex $::SimArr(RegY) $::SimArr(RegLvl)]
+                set ZLst [lindex $::SimArr(RegZ) $::SimArr(RegLvl)]
+                set DimLst [list $XLst $YLst $ZLst]
             }
 
             switch -- $Test {
@@ -563,43 +547,12 @@ namespace eval mfjGrm {
                                 set Bool [expr "$Inv false"]
                             }
                         } else {
-                            if {[regexp ^\[pP\]($RE_p)$ $Val -> PStr]} {
-                                set PLst [split $PStr _]
-                                if {$varName ne "RegGen"} {
-
-                                    # Verify coordinates and their numbers
-                                    # should match 'DimLen'
-                                    if {[llength $PLst] != $DimLen} {
-                                        error "element '$Val' of '$varVal'\
-                                            should have the same number of\
-                                            coordinates as variable 'RegGen'!"
-                                    }
-                                    foreach Elm $PLst\
-                                        Min [list $XMin $YMin $ZMin]\
-                                        Max [list $XMax $YMax $ZMax] {
-                                        if {$Elm ne ""} {
-
-                                            # Make sure each point is within
-                                            # simulation domain
-                                            if {$Elm < $Min || $Elm > $Max} {
-                                                error "element '$Val' of\
-                                                    '$varVal' beyond simulation\
-                                                    domain($Min $Max)!"
-                                            }
-                                        }
-                                    }
-                                }
-                                set Lst [list]
-                                foreach Elm $PLst {
-
-                                    # Format each number to the proper form like
-                                    # removing trailing zeroes and decimal point
-                                    lappend Lst [format %.12g $Elm]
-                                }
+                            set Lst [verifyPos $Val $Test $DimLst $varVal]
+                            if {[llength $Lst]} {
                                 set Bool [expr "$Inv true"]
 
                                 # Update the current element
-                                lset varVal $valIdx p[join $Lst _]
+                                lset varVal $valIdx $Lst
                             } else {
                                 set Bool [expr "$Inv false"]
                             }
@@ -627,75 +580,21 @@ namespace eval mfjGrm {
                             set Val [lindex $Arg 0]
 
                             # Rough check for a previous index
-                            if {[regexp ^\[pP\]($RE_p/$RE_p)$ $Val]} {
+                            if {[regexp ^\[pP\]($RE_p//$RE_p)$ $Val]} {
                                 set Bool [expr "$Inv true"]
                             } else {
                                 set Bool [expr "$Inv false"]
                             }
                         } else {
+                            set Lst [verifyPos $Val $Test $DimLst $varVal]
 
-                            # Verify and sort the points
-                            if {[regexp ^\[pP\]($RE_p/$RE_p)$ $Val -> PStr]} {
-                                set PPLst [split [split $PStr _] /]
-                                if {[llength [lindex $PPLst 0]]
-                                    != [llength [lindex $PPLst 1]]} {
-                                    error "two points should have the same\
-                                        number of coordinates in element\
-                                        '$Val' of $varVal!"
-                                }
-                                if {$varName ne "RegGen"} {
-                                    if {[llength [lindex $PPLst 0]]
-                                        != $DimLen} {
-                                        error "element '$Val' of '$varVal'\
-                                            should have the same number of\
-                                            coordinates as variable\
-                                            'RegGen'!"
-                                    }
+                            # Verify and sort the positions
+                            if {[llength $Lst]} {
 
-                                    # sort axis values in 'pp' ascendingly
-                                    # make sure the interface or box is within
-                                    # simulation domain and defined correctly
-                                    set Idx 0
-                                    foreach Elm1 [lindex $PPLst 0]\
-                                        Elm2 [lindex $PPLst 1]\
-                                        Min [list $XMin $YMin $ZMin]\
-                                        Max [list $XMax $YMax $ZMax] {
-                                        if {$Elm1 ne ""} {
-
-                                            # Sort each number
-                                            set Tmp [lsort -real\
-                                                [list $Elm1 $Elm2]]
-                                            lset PPLst 0 $Idx [lindex $Tmp 0]
-                                            lset PPLst 1 $Idx [lindex $Tmp 1]
-                                            if {[lindex $Tmp 0] < $Min
-                                                || [lindex $Tmp 1] > $Max} {
-                                                error "element '$Val' of\
-                                                    '$varVal' beyond\
-                                                    domain($Min $Max)!"
-                                            }
-                                        }
-                                        incr Idx
-                                    }
-                                }
-                                set Idx 0
-                                set Cnt 0
-                                foreach Elm1 [lindex $PPLst 0]\
-                                    Elm2 [lindex $PPLst 1] {
-
-                                    # Format each number properly
-                                    lset PPLst 0 $Idx [format %.12g $Elm1]
-                                    lset PPLst 1 $Idx [format %.12g $Elm2]
-                                    incr Cnt [expr $Elm1 == $Elm2]
-                                    incr Idx
-                                }
-                                if {$Cnt == [llength [lindex $PPLst 0]]} {
-                                    error "two points should be different in\
-                                        element '$Val' of $varVal!"
-                                }
                                 set Bool [expr "$Inv true"]
 
                                 # Update the current element
-                                lset varVal $valIdx p[join [join $PPLst /] _]
+                                lset varVal $valIdx $Lst
                             } else {
                                 set Bool [expr "$Inv false"]
                             }
@@ -817,6 +716,8 @@ namespace eval mfjGrm {
                         }
                     } else {
                         if {[regexp ^\[xX\]($RE_n)$ $Val -> CStr]} {
+                            set XMin [lindex $XLst 0]
+                            set XMax [lindex $XLst end]
 
                             # Make sure X is within simulation domain
                             if {$CStr < $XMin || $CStr > $XMax} {
@@ -855,7 +756,9 @@ namespace eval mfjGrm {
                         }
                     } else {
                         if {[regexp ^\[xX\]($RE_c)$ $Val -> CStr]} {
-                            set CLst [lsort -real [split $CStr /]]
+                            set XMin [lindex $XLst 0]
+                            set XMax [lindex $XLst end]
+                            set CLst [lsort -real [string map {// " "} $CStr]]
                             set Lst [list]
                             foreach Elm $CLst {
 
@@ -902,12 +805,14 @@ namespace eval mfjGrm {
                         }
                     } else {
                         if {[regexp ^\[yY\]($RE_n)$ $Val -> CStr]} {
-                            if {$DimLen == 1} {
+                            if {[llength $YLst] == 0} {
                                 error "element '$Val' of '$varVal': no Y\
                                     coordinate allowed for 1D!"
                             }
 
                             # Make sure Y is within simulation domain
+                            set YMin [lindex $YLst 0]
+                            set YMax [lindex $YLst end]
                             if {$CStr < $YMin || $CStr > $YMax} {
                                 error "element '$Val' of '$varVal' beyond\
                                     simulation domain($YMin $YMax)!"
@@ -944,11 +849,13 @@ namespace eval mfjGrm {
                         }
                     } else {
                         if {[regexp ^\[yY\]($RE_c)$ $Val -> CStr]} {
-                            if {$DimLen == 1} {
+                            if {[llength $YLst] == 1} {
                                 error "element '$Val' of '$varVal': no Y\
                                     coordinates allowed for 1D!"
                             }
-                            set CLst [lsort -real [split $CStr /]]
+                            set YMin [lindex $YLst 0]
+                            set YMax [lindex $YLst end]
+                            set CLst [lsort -real [string map {// " "} $CStr]]
                             set Lst [list]
                             foreach Elm $CLst {
 
@@ -995,12 +902,14 @@ namespace eval mfjGrm {
                         }
                     } else {
                         if {[regexp ^\[zZ\]($RE_n)$ $Val -> CStr]} {
-                            if {$DimLen != 3} {
+                            if {[llength $ZLst] == 0} {
                                 error "element '$Val' of '$varVal': no Z\
-                                    coordinate allowed for ${DimLen}D!"
+                                    coordinate allowed for non-3D!"
                             }
 
                             # Make sure Z is within simulation domain
+                            set ZMin [lindex $ZLst 0]
+                            set ZMax [lindex $ZLst end]
                             if {$CStr < $ZMin || $CStr > $ZMax} {
                                 error "element '$Val' of '$varVal' beyond\
                                     simulation domain($ZMin $ZMax)!"
@@ -1037,11 +946,13 @@ namespace eval mfjGrm {
                         }
                     } else {
                         if {[regexp ^\[zZ\]($RE_c)$ $Val -> CStr]} {
-                            if {$DimLen != 3} {
+                            if {[llength $ZLst] == 0} {
                                 error "element '$Val' of '$varVal': no Z\
-                                    coordinates allowed for ${DimLen}D!"
+                                    coordinates allowed for non-3D!"
                             }
-                            set CLst [lsort -real [split $CStr /]]
+                            set ZMin [lindex $ZLst 0]
+                            set ZMax [lindex $ZLst end]
+                            set CLst [lsort -real [string map {// " "} $CStr]]
                             set Lst [list]
                             foreach Elm $CLst {
 

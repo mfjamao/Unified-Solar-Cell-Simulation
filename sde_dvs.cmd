@@ -105,7 +105,7 @@ if {[lindex $SimEnv 3] eq "Optical"} {
 # Split 'FldAttr' to 'RegFld' and 'IntfFld' for easier handling
 # RegFld format: Region ID, (field ID, value, active?), ...
 # IntfFld format: rr, (profile file, scaling, lateral factor), ...
-#   (pp Vn), (profile file, scaling, lateral factor), ...
+#   (pp_str Vn), (profile file, scaling, lateral factor), ...
 set RegFld [list]
 set IntfFld [list]
 set FldAttr [lsort -index 0 [str2List "" $FldAttr]]
@@ -202,7 +202,7 @@ foreach grp $IntfFld {
             vputs "\n;# warning: $err!"
         }
     } else {
-        lset grp 0 [split [split [string range [lindex $grp 0 0] 1 end] _] /]
+        lset grp 0 [string map {p \{ _ " " // "\} \{"} [lindex $grp 0 0]]\}
     }
     set cnt 1
     foreach elm [lrange $grp 1 end] {
@@ -377,7 +377,7 @@ if {!$LoadTDR && [llength $GopAttr]
 
 # Make sure all optical windows for External, OBAM, TMM and Raytrace face
 # the same direction (light propagation direction LPD is either 1 or -1)
-# Convert ri/j to pp list 'GopPP'
+# Convert ri/j to a 'pp' list 'GopPP'
 set txt ""
 set LPD 0
 set GopPP [list]
@@ -394,7 +394,7 @@ foreach grp $GopAttr {
         if {[regexp {^r(\d+)/(\d+)$} [lindex $grp 0] -> idx val]} {
             set lst [rr2pp $RegGen $idx $val]
         } else {
-            set lst [split [split [string range [lindex $grp 0] 1 end] _] /]
+            set lst [string map {p \{ _ " " // "\} \{"} [lindex $grp 0]]\}
         }
         lappend GopPP [concat $lst [lrange $grp 1 end]]
 
@@ -514,10 +514,13 @@ vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
         (else (sde:error "unknown value!\n"))
     )
 )
+
 ;# Split a string according to a delimiting character to a list
+;# Multiple repeating delimiting characters are considered as one character
 (define (mfj:string-split Str SplitChr)
     (let Next ((StrLst (string->list Str)) (ChrLst '()) (Lst '()))
-        (if (or (null? StrLst) (char=? (car StrLst) SplitChr))
+        (if (or (null? StrLst) (and (char=? (car StrLst) SplitChr)
+            (not (char=? (cadr StrLst) SplitChr))))
             (begin
                 (define ElmStr (list->string (reverse ChrLst)))
                 (set! ChrLst '())
@@ -526,7 +529,11 @@ vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
                     (set! Lst (cons (string->number ElmStr) Lst))
                 )
             )
-            (set! ChrLst (cons (car StrLst) ChrLst))
+
+            ;# Ignore the delimiting character
+            (if (not (char=? (car StrLst) SplitChr))
+                (set! ChrLst (cons (car StrLst) ChrLst))
+            )
         )
         (if (null? StrLst)
             (reverse Lst)
@@ -1213,7 +1220,7 @@ vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
 )
 
 ;# If TMM is selected, sdevice triggers an unknown issue to increase memory
-;# consumption contineously until crash using offset refinement
+;# consumption continuously until crash using offset refinement
 (for-each
     (lambda (IFld)
         (let* ((IntfID (car IFld)) (IntfStr "") (IntfLst '()))
@@ -1694,9 +1701,18 @@ vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
 
 ;# Enable axis-aligned algorithm in addition to bisectional refinement algorithm
 ;# Reduce mesh-induced numeric noise e.g. changing contact width
-(if (= (length XCutLst) 0) (set! XCutLst XMax))
-(if (= (length YCutLst) 0) (set! YCutLst YMax))
-(if (= (length ZCutLst) 0) (set! ZCutLst ZMax))
+(if (= (length XCutLst) 0)
+    (set! XCutLst XMax)
+    (mfj:display XCutLst)
+)
+(if (= (length YCutLst) 0)
+    (set! YCutLst YMax)
+    (mfj:display YCutLst)
+)
+(if (= (length ZCutLst) 0)
+    (set! ZCutLst ZMax)
+    (mfj:display ZCutLst)
+)
 (if (= Dim 3)
     (sdesnmesh:axisaligned "xCuts" XCutLst "yCuts" YCutLst "zCuts" ZCutLst)
     (sdesnmesh:axisaligned "xCuts" XCutLst "yCuts" YCutLst)

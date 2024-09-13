@@ -419,7 +419,7 @@ proc mfjIntrpr::readBrf {} {
             }
         } else {
             vputs -i1 "Warning: no variables in '$FVarBrf'!"
-            set arr(UpdatBrf) true
+            set arr(UpdateBrf) true
         }
     }
     vputs
@@ -623,13 +623,14 @@ proc mfjIntrpr::readHost {} {
     vputs
 }
 
-# mfjIntrpr::activateSR
-    # Check arr(RawVal|$Var) and arr(RawGLst|$Var) to activate the substitute
-    # and then reuse features if necessary.
-proc mfjIntrpr::activateSR {} {
+# mfjIntrpr::activateRR
+    # Check arr(RawVal|$Var) and arr(RawGLst|$Var) to activate the element-
+    # replacement and element-reuse features in multiple values. Subsequently,
+    # activate element-reuse features within a value if found.
+proc mfjIntrpr::activateRR {} {
     variable arr
 
-    vputs "Activate substitute features in multiple-value variables if any..."
+    vputs "Activate element-replacement features from 2nd value onwards if any..."
     set Sum 0
     foreach Var $arr(Raw|VarLst) {
 
@@ -642,9 +643,9 @@ proc mfjIntrpr::activateSR {} {
         set Cnt [regexp -all {(\s|\{)(-?\d+[:,/&])*-?\d+=} $arr(RawVal|$Var)]
         if {$Cnt} {
             incr Sum $Cnt
-            vputs -v2 -i1 "$Var: $Cnt substitute features detected!"
+            vputs -v2 -i1 "$Var: $Cnt element-replacement features detected!"
             vputs -v2 -c "Before: \{\{[join $arr(RawVal|$Var) \}\n\{]\}\}"
-            set NewVal [substitute $Var $arr(RawVal|$Var)]            
+            set NewVal [replaceElm $Var $arr(RawVal|$Var)]
             set arr(RawFold|$Var) [lindex $NewVal 0]
             set arr(RawVal|$Var) [lindex $NewVal 1]
             vputs -v2 -c "After: \{\{[join $arr(RawVal|$Var) \}\n\{]\}\}\n"
@@ -653,16 +654,16 @@ proc mfjIntrpr::activateSR {} {
         }
     }
     if {$Sum} {
-        vputs -i1 "Totally $Sum substitute features activated!"
+        vputs -i1 "Totally $Sum element-replacement features activated!"
     } else {
-        vputs -i1 "No substitute feature found!"
+        vputs -i1 "No element-replacement feature found!"
     }
     vputs
-    
-    vputs "Activate reuse feature in multiple-value variables if any..."
+
+    vputs "Activate element-reuse features from 2nd value onwards if any..."
     set Sum 0
     foreach Var $arr(Raw|VarLst) {
-    
+
         # Only check variables with multiple levels
         if {$arr(RawLvl|$Var) == 1} continue
         set NewVal [list [lindex $arr(RawVal|$Var) 0]]
@@ -673,7 +674,7 @@ proc mfjIntrpr::activateSR {} {
             # Activate reuse only featurse in level 1+:
             # Set reference to the previous levels
             if {[regexp {^<(-?\d+[:,/&])*-?\d+>$} $LvlVal]} {
-                lappend NewVal [reuse $Var $arr(RawVal|$Var)\
+                lappend NewVal [reuseElm $Var $arr(RawVal|$Var)\
                     $LvlVal $Lvl $Lvl !InLvl]
                 incr Cnt
             } else {
@@ -683,23 +684,23 @@ proc mfjIntrpr::activateSR {} {
         }
         if {$Cnt} {
             incr Sum $Cnt
-            vputs -v2 -i1 "$Var: $Cnt reuse features detected!"
+            vputs -v2 -i1 "$Var: $Cnt element-reuse features detected!"
             vputs -v2 -c "Before: \{\{[join $arr(RawVal|$Var) \}\n\{]\}\}"
             set arr(RawVal|$Var) $NewVal
             vputs -v2 -c "After: \{\{[join $arr(RawVal|$Var) \}\n\{]\}\}\n"
         }
     }
     if {$Sum} {
-        vputs -i1 "Totally $Sum reuse features activated!"
+        vputs -i1 "Totally $Sum element-reuse features activated!"
     } else {
-        vputs -i1 "No reuse feature found!"
+        vputs -i1 "No element-reuse feature found!"
     }
     vputs
-    
+
     vputs "Expand folded values in multiple-value variables if any..."
     set Sum 0
     foreach Var $arr(Raw|VarLst) {
-    
+
         # Only check variables with multiple levels
         if {$arr(RawLvl|$Var) == 1} continue
         set Cnt [expr [join $arr(RawFold|$Var) +]]
@@ -710,7 +711,7 @@ proc mfjIntrpr::activateSR {} {
             set NewVal [list [lindex $arr(RawVal|$Var) 0]]
             set LvlIdx 1
             foreach Lst [lrange $arr(RawVal|$Var) 1 end] {
-                
+
                 # Extend to the full list now
                 if {[lindex $arr(RawFold|$Var) $LvlIdx] > 0} {
                     foreach Val $Lst {
@@ -732,50 +733,50 @@ proc mfjIntrpr::activateSR {} {
     } else {
         vputs -i1 "No folded values found!"
     }
-    vputs    
+    vputs
 
-    vputs "Activate reuse features in all variables if any..."
+    vputs "Activate element-reuse features within a value if any..."
     set Sum 0
     foreach Var $arr(Raw|VarLst) {
         set NewLst [list]
         set Cnt [regexp -all {<(-?\d+[:,/&])*-?\d+>} $arr(RawGLst|$Var)]
         if {$Cnt} {
             incr Sum $Cnt
-            vputs -v2 -i1 "$Var grammar: $Cnt reuse features detected!"
+            vputs -v2 -i1 "$Var grammar: $Cnt element-reuse features detected!"
             vputs -v2 -c "Before: \{$arr(RawGLst|$Var)\}"
-            set arr(RawGLst|$Var) [reuse $Var $arr(RawGLst|$Var)\
+            set arr(RawGLst|$Var) [reuseElm $Var $arr(RawGLst|$Var)\
                 $arr(RawGLst|$Var)]
             vputs -v2 -c "After: \{$arr(RawGLst|$Var)\}\n"
         }
         set Cnt [regexp -all {<(-?\d+[:,/&])*-?\d+>} $arr(RawVal|$Var)]
         if {$Cnt} {
             incr Sum $Cnt
-            vputs -v2 -i1 "$Var: $Cnt reuse features detected!"
+            vputs -v2 -i1 "$Var: $Cnt element-reuse features detected!"
             if {$arr(RawLvl|$Var) > 1} {
                 vputs -v2 -c "Before: \{\{[join $arr(RawVal|$Var) \}\n\{]\}\}"
                 set NewVal [list]
                 set Lvl 0
                 foreach LvlVal $arr(RawVal|$Var) {
 
-                    # Activate reuse feature within each level:
+                    # Activate element-reuse feature within each level:
                     # Set reference within the current level
-                    lappend NewVal [reuse $Var $LvlVal $LvlVal $Lvl]
+                    lappend NewVal [reuseElm $Var $LvlVal $LvlVal $Lvl]
                     incr Lvl
                 }
                 set arr(RawVal|$Var) $NewVal
                 vputs -v2 -c "After: \{\{[join $arr(RawVal|$Var) \}\n\{]\}\}\n"
             } else {
                 vputs -v2 -c "Before: \{$arr(RawVal|$Var)\}"
-                set arr(RawVal|$Var) [reuse $Var $arr(RawVal|$Var)\
+                set arr(RawVal|$Var) [reuseElm $Var $arr(RawVal|$Var)\
                     $arr(RawVal|$Var)]
                 vputs -v2 -c "After: \{$arr(RawVal|$Var)\}\n"
             }
         }
-    }    
+    }
     if {$Sum} {
-        vputs -i1 "Totally $Sum reuse features activated!"
+        vputs -i1 "Totally $Sum element-reuse features activated!"
     } else {
-        vputs -i1 "No reuse feature found!"
+        vputs -i1 "No element-reuse feature found!"
     }
     vputs
 }
@@ -1079,9 +1080,9 @@ proc mfjIntrpr::validateVar {} {
             set OldLvl [string map {\"\" \{\}} $OldLvl]
             for {set j 0} {$j < $RGLvlLen} {incr j} {
 
-                # For the column mode, skip other combinations for region
+                # For the OneChild mode, skip other permutations for region
                 # related variables
-                if {$::SimArr(ColMode) eq "ColMode"
+                if {[string index $::SimArr(OneChild) 0] ne "!"
                     && $LvlLen == $RGLvlLen && $i != $j} {
                     continue
                 }
@@ -1123,8 +1124,6 @@ proc mfjIntrpr::validateVar {} {
                     }
                     if {$GID} {
                         set ::SimArr(RegLvl) $j
-                        set ::SimArr(DimLen) [llength\
-                            [lindex $::SimArr(RegInfo) $j 0 1]]
                         if {[llength $OldLvl]} {
                             set NewLvl [groupValues $Var $OldLvl $Grm0\
                                 $LvlIdx $LvlLen]
@@ -1242,7 +1241,7 @@ proc mfjIntrpr::valRegGen {} {
     }
     vputs -i2 "Further validation:"
     set VarMsg "variable 'RegGen'"
-    foreach Elm [list RegInfo RegGen RegMat RegIdx] {
+    foreach Elm [list RegInfo RegGen RegMat RegIdx RegX RegY RegZ] {
         set $Elm [list]
     }
     set GasThx $::SimArr(GasThx)
@@ -1267,9 +1266,11 @@ proc mfjIntrpr::valRegGen {} {
             RegSeq NegSeq Imp} {
             set $Elm 0
         }
-        foreach Elm [list 1D 2D 3D] Tmp [list RILst RDLst MatLst IdxLst] {
+        foreach Elm [list 1D 2D 3D] {
             set $Elm false
-            set $Tmp [list]
+        }
+        foreach Elm [list RILst RDLst MatLst IdxLst XLst YLst ZLst] {
+            set $Elm [list]
         }
 
         # Update region name and region ID with this format: material, region,
@@ -1290,7 +1291,7 @@ proc mfjIntrpr::valRegGen {} {
 
                 # Regions are specified using the implicit method, which
                 # determines the simulation domain. Calculate two diagonal
-                # points for each specified region (1D, 2D and 3D).
+                # positions for each specified region (1D, 2D and 3D).
                 set Imp true
                 lset Mat 1 [incr RegSeq]_[lindex $Mat 0]
                 lset Mat end $RegSeq
@@ -1298,13 +1299,16 @@ proc mfjIntrpr::valRegGen {} {
                     if {$3D} {
                         set Z1 [format %.12g $ZMax]
                         set Z2 [format %.12g [expr {$ZMax+$DimLst}]]
+                        set ZLst [concat $ZLst $Z1 $Z2]
                     } elseif {$2D} {
                         set Y1 [format %.12g $YMax]
                         set Y2 [format %.12g [expr {$YMax+$DimLst}]]
+                        set YLst [concat $YLst $Y1 $Y2]
                     } else {
                         set 1D true
                         set X1 [format %.12g $XMax]
                         set X2 [format %.12g [expr {$XMax+$DimLst}]]
+                        set XLst [concat $XLst $X1 $X2]
                         vputs -i$Idt "Layer [incr Lyr]:"
                     }
                 } elseif {$Len == 2} {
@@ -1314,14 +1318,18 @@ proc mfjIntrpr::valRegGen {} {
                     if {$3D} {
                         set Y1 [format %.12g $YMax]
                         set Y2 [format %.12g [expr {$YMax+[lindex $DimLst 0]}]]
+                        set YLst [concat $YLst $Y1 $Y2]
                         set Z1 0
                         set Z2 [format %.12g [lindex $DimLst 1]]
+                        set ZLst [concat $ZLst $Z1 $Z2]
                     } else {
                         set 2D true
                         set X1 [format %.12g $XMax]
                         set X2 [format %.12g [expr {$XMax+[lindex $DimLst 0]}]]
+                        set XLst [concat $XLst $X1 $X2]
                         set Y1 0
                         set Y2 [format %.12g [lindex $DimLst 1]]
+                        set YLst [concat $YLst $Y1 $Y2]
                         vputs -i$Idt "Layer [incr Lyr]:"
                     }
                 } else {
@@ -1334,10 +1342,13 @@ proc mfjIntrpr::valRegGen {} {
                     set 3D true
                     set X1 [format %.12g $XMax]
                     set X2 [format %.12g [expr {$XMax+[lindex $DimLst 0]}]]
+                    set XLst [concat $XLst $X1 $X2]
                     set Y1 0
                     set Y2 [lindex $DimLst 1]
+                    set YLst [concat $YLst $Y1 $Y2]
                     set Z1 0
                     set Z2 [lindex $DimLst 2]
+                    set ZLst [concat $ZLst $Z1 $Z2]
                     vputs -i$Idt "Layer [incr Lyr]:"
                 }
                 vputs -i[expr $Idt+1] $OldReg
@@ -1411,63 +1422,55 @@ proc mfjIntrpr::valRegGen {} {
                     set RegID $RegSeq
                 }
 
-                # Make sure all points tally with the dimension
-                set PStr [string range [lindex $DimLst 2] 1 end]
+                # Make sure all positions tally with the dimension
                 set Lst [lindex $DimLst 0]
-                if {[string equal -nocase [lindex $DimLst 0] "Block"]} {
+                if {[string equal -nocase $Lst "Block"]} {
 
-                    # Sort, verify 'pp' and convert it to 'p'
-                    set Idx 0
-                    set Cnt 0
-                    set PPLst [split [split $PStr _] /]
-                    foreach Elm1 [lindex $PPLst 0] Elm2 [lindex $PPLst 1] {
-                        incr Cnt [expr $Elm1 == $Elm2]
+                    # Convert 'pp' to two coordinate lists
+                    set Lst [concat $Lst [string map {p \{ _ " " // "\} \{"}\
+                        [lindex $DimLst 2]]\}]
+                    if {[llength [lindex $Lst end]] != 3} {
+                        error "position '$Elm' not 3D!"
+                    }
+                } elseif {[string equal -nocase $Lst "Vertex"]} {
 
-                        # Sort and format each number properly
-                        set Tmp [lsort -real [list $Elm1 $Elm2]]
-                        lset PPLst 0 $Idx [lindex $Tmp 0]
-                        lset PPLst 1 $Idx [lindex $Tmp 1]
-                        incr Idx
-                    }
-                    if {$Cnt != 0} {
-                        error "element '[lindex $DimLst 2]' of '$OldReg'\
-                            should be a region!"
-                    }
-                    set Lst [concat $Lst $PPLst]
-                } elseif {[string equal -nocase [lindex $DimLst 0] "Vertex"]} {
+                    # Convert each 'p' to a coordinate list
                     foreach Elm [lrange $DimLst 2 end] {
-                        set PStr [string range $Elm 1 end]
-                        lappend Lst [split $PStr _]
-                        set Len [llength [lindex $Lst end]]
-                        if {$Len != 2} {
-                            error "point '$Elm' not 2D!"
+                        lappend Lst [string map {p "" _ " "} $Elm]
+                        if {[llength [lindex $Lst end]] != 2} {
+                            error "position '$Elm' not 2D!"
                         }
                     }
                 } else {
 
-                    # Convert 'pp' to 'p' and append the rest elements
-                    set Lst [concat $Lst [split [split $PStr _] /]\
-                        [lrange $DimLst 3 end]]
+                    # Convert two 'p' to two coordinate lists
+                    foreach Elm [lrange $DimLst 2 3] {
+                        lappend Lst [string map {p "" _ " "} $Elm]
+                        if {[llength [lindex $Lst end]] != 3} {
+                            error "position '$Elm' not 3D!"
+                        }
+                    }
+                    set Lst [concat $Lst [lrange $DimLst 4 end]]
                 }
                 set Len [llength [lindex $Lst 2]]
                 if {$Len == 2} {
                     if {$1D} {
-                        error "point '[lindex $DimLst 2]' not 1D!"
+                        error "position '[lindex $DimLst 2]' not 1D!"
                     }
                     if {$3D || [regexp {^[CP][a-z]+$} [lindex $DimLst 0]]} {
-                        error "point '[lindex $DimLst 2]' not 3D!"
+                        error "position '[lindex $DimLst 2]' not 3D!"
                     }
                     set 2D true
                 } elseif {$Len == 3} {
                     if {$1D} {
-                        error "point '[lindex $DimLst 2]' not 1D!"
+                        error "position '[lindex $DimLst 2]' not 1D!"
                     }
                     if {$2D} {
-                        error "point '[lindex $DimLst 2]' not 2D!"
+                        error "position '[lindex $DimLst 2]' not 2D!"
                     }
                     set 3D true
                 } else {
-                    error "point '[lindex $DimLst 2]' not 2D/3D!"
+                    error "position '[lindex $DimLst 2]' not 2D/3D!"
                 }
             }
 
@@ -1561,6 +1564,7 @@ proc mfjIntrpr::valRegGen {} {
         } else {
             lset IdxLst $Idx [concat [lindex $IdxLst $Idx] 0]
         }
+        lappend XLst -$GasThx
         if {$1D} {
             set GasReg [list $GasReg -$GasThx 0]
         } elseif {$2D} {
@@ -1590,6 +1594,7 @@ proc mfjIntrpr::valRegGen {} {
             lset GasReg 0 end $RegSeq
             set Idx [lsearch -exact $MatLst Gas]
             lset IdxLst $Idx [concat [lindex $IdxLst $Idx] $RegSeq]
+            lappend XLst [expr $XMax+$GasThx]
             if {$1D} {
                 lset GasReg 1 $XMax
                 lset GasReg 2 [expr $XMax+$GasThx]
@@ -1610,6 +1615,7 @@ proc mfjIntrpr::valRegGen {} {
                     lset GasReg 0 1 [format %0${NOD}d [incr RegSeq]]_Gas
                     lset GasReg 0 end $RegSeq
                     lset IdxLst $Idx [concat [lindex $IdxLst $Idx] $RegSeq]
+                    lappend YLst -$GasThx
                     if {$3D} {
                         lset GasReg 1 [list -$GasThx -$GasThx 0]
                         lset GasReg 2 [list [expr $XMax+$GasThx] 0 $ZMax]
@@ -1624,6 +1630,7 @@ proc mfjIntrpr::valRegGen {} {
                 lset GasReg 0 1 [format %0${NOD}d [incr RegSeq]]_Gas
                 lset GasReg 0 end $RegSeq
                 lset IdxLst $Idx [concat [lindex $IdxLst $Idx] $RegSeq]
+                lappend YLst [expr $YMax+$GasThx]
                 if {$3D} {
                     lset GasReg 1 [list -$GasThx $YMax 0]
                     lset GasReg 2 [list [expr $XMax+$GasThx]\
@@ -1636,6 +1643,7 @@ proc mfjIntrpr::valRegGen {} {
                 lappend RILvl $GasReg
             }
             if {$3D} {
+                set ZLst [concat $ZLst -$GasThx [expr $ZMax+$GasThx]]
 
                 # Append the farmost gas region for 3D
                 lset GasReg 0 1 [format %0${NOD}d [incr RegSeq]]_Gas
@@ -1658,7 +1666,13 @@ proc mfjIntrpr::valRegGen {} {
         lappend RegInfo $RILvl
         lappend RegMat $MatLst
         lappend RegIdx $IdxLst
+        lappend RegX [lsort -unique -real $XLst]
+        lappend RegY [lsort -unique -real $YLst]
+        lappend RegZ [lsort -unique -real $ZLst]
         vputs -i$Idt "Totally '[incr RegSeq]' regions (including dummies)!"
+        vputs -i$Idt "Region Xs: \{[lindex $RegX end]\}"
+        vputs -i$Idt "Region Ys: \{[lindex $RegY end]\}"
+        vputs -i$Idt "Region Zs: \{[lindex $RegZ end]\}"
         vputs -v3 -c "Region info: \{$RILvl\}"
         vputs -v3 -c "Region materials: \{$MatLst\}"
         vputs -v3 -c "Region indices: \{$IdxLst\}"
@@ -1667,6 +1681,9 @@ proc mfjIntrpr::valRegGen {} {
     set ::SimArr(RegInfo) $RegInfo
     set ::SimArr(RegMat) $RegMat
     set ::SimArr(RegIdx) $RegIdx
+    set ::SimArr(RegX) $RegX
+    set ::SimArr(RegY) $RegY
+    set ::SimArr(RegZ) $RegZ
     set arr(RawVal|RegGen) $RegGen
 }
 
@@ -1750,7 +1767,7 @@ proc mfjIntrpr::fmtvsRaw {} {
         set arr(RawLvl|$Var) 1
     }
     set DfltSet [list $::SimArr(DfltYMax) $::SimArr(LatFac) $::SimArr(GasThx)]
-    foreach Elm {Node4All ColMode FullSchenk} {
+    foreach Elm {HideVar OneChild FullSchenk} {
         if {[string equal -nocase $::SimArr($Elm) $Elm]} {
             lappend DfltSet $Elm
         } else {
@@ -1971,6 +1988,45 @@ proc mfjIntrpr::fmtvsRaw {} {
     }
 }
 
+# mfjIntrpr::updateModTime
+    # In case grammar check is skipped, update key files with modified time
+proc mfjIntrpr::updateModTime {} {
+    variable arr
+
+    vputs "Checking key files in '$::SimArr(FVarFmt)' for any modification..."
+    set Lst [list]
+    foreach Elm $arr(FmtVal|mfjModTime) {
+        if {[lindex $Elm 1] != [file mtime [lindex $Elm 0]]} {
+            lappend Lst [list [lindex $Elm 0] [file mtime [lindex $Elm 0]]]
+            if {!$arr(UpdateFmt)} {
+                set arr(UpdateFmt) true
+                vputs -i1 "The following files were modified:"
+            }
+            vputs -i2 "File '[lindex $Elm 0]' updated!"
+
+            # If PMI files are updated, remove the
+            # corresponding share objects
+            if {[string equal -nocase .c\
+                [file extension [lindex $Elm 0]]]} {
+                set Obj [glob -nocomplain [file\
+                    rootname [lindex $Elm 0]].so.*]
+                if {$Obj ne ""} {
+                    vputs -i2 "File '$Obj' deleted!"
+                    file delete $Obj
+                }
+            }
+        } else {
+            lappend Lst $Elm
+        }
+    }
+    if {$arr(UpdateFmt)} {
+        set arr(FmtVal|mfjModTime) $Lst
+    } else {
+        vputs -i1 "No file was modified!"
+    }
+    vputs
+}
+
 # mfjIntrpr::fmtvsTcl
     # Compare ::SimArr(FVarFmt) against ::SimArr(FVarEnv) and ::SimArr(FVarSim)
     # and set arr(UpdateFmt) to be true if there is any difference
@@ -2058,7 +2114,7 @@ proc mfjIntrpr::fmtvsTcl {} {
 
 # mfjIntrpr::rawvsFmt
     # Compare ::SimArr(FVarRaw) against ::SimArr(FVarFmt) and set arr(UpdateRaw)
-    # and arr(UpdatBrf) to be true if there is any difference
+    # and arr(UpdateBrf) to be true if there is any difference
 proc mfjIntrpr::rawvsFmt {} {
     variable arr
 
@@ -2228,14 +2284,13 @@ proc mfjIntrpr::updateRaw {} {
                     puts $Ouf $arr(RawCmntB4|$Var)\n
                 }
 
+                # Preserve each value so it is the same as in FVarBrf
                 # Increase nested level for a single level value
-                if {$arr(RawLvl|$Var) == 1} {
-                    set Val [list $arr(RawVal|$Var)]
+                if {$arr(BrfLvl|$Var) == 1} {
+                    set Val [list $arr(BrfVal|$Var)]
                 } else {
-                    set Val $arr(RawVal|$Var)
+                    set Val $arr(BrfVal|$Var)
                 }
-
-                # Preserve each value so it is the same as in the brief file
                 puts $Ouf [wrapText [format %-${MaxLen}s%s\n <VAR>$Var $Val]]
                 if {[info exists arr(RawCmntAf|$Var)]
                     && $arr(RawCmntAf|$Var) ne ""} {
@@ -2352,11 +2407,45 @@ proc mfjIntrpr::updateFmt {} {
     # 3. Apply grammar rules to further validate values
     # 4. Compare variables in the formatted file to those in the raw file
 proc mfjIntrpr::raw2Fmt {} {
-    foreach Elm {readHost readRaw readBrf rawvsBrf updateBrf activateSR sortVar
-        updateGrm validateVar readFmt fmtvsRaw updateFmt updateRaw} {
+    variable arr
+    foreach Elm {readHost readRaw readBrf rawvsBrf} {
         if {[catch $Elm ErrMsg]} {
             vputs -c "\nError in proc '$Elm':\n$ErrMsg\n"
             exit 1
+        }
+    }
+
+    # Skip grammar check if FVarBrf and FVarRaw are the same and FVarRaw
+    # is not modified
+    set FInfo $::SimArr(CodeDir)/$::SimArr(FInfo)
+    if {[file isfile $FInfo]} {
+        set Inf [open $FInfo r]
+        gets $Inf Line
+        close $Inf
+        set InfoLst [split $Line |]
+        if {[lindex $InfoLst 2] == [file mtime $::SimArr(FVarRaw)]} {
+            set RawMod false
+        } else {
+            set RawMod true
+        }
+    } else {
+        set RawMod true
+    }
+    if {$arr(UpdateBrf) || $arr(UpdateRaw) || $RawMod} {
+        foreach Elm {updateBrf activateRR sortVar updateGrm validateVar
+            readFmt fmtvsRaw updateFmt updateRaw} {
+            if {[catch $Elm ErrMsg]} {
+                vputs -c "\nError in proc '$Elm':\n$ErrMsg\n"
+                exit 1
+            }
+        }
+    } else {
+        vputs "Skip grammar check as variable files are not modified :)\n"
+        foreach Elm {readFmt updateModTime updateFmt} {
+            if {[catch $Elm ErrMsg]} {
+                vputs -c "\nError in proc '$Elm':\n$ErrMsg\n"
+                exit 1
+            }
         }
     }
 }

@@ -42,11 +42,11 @@ Specification (after semicolon):
 {a = !Cylindrical | s C<ylindrical> !Cylindrical}
 {a = Electrical | s O<ptical> P<rocess> Electrical}
 {a = Local | s P<BS> Local}
-{== v-2 Local & `a | a = 1 | `i & `>= 1}
-{== v-3 Local & `a | a = 20 | `i & `>= 1}
-{== v-4 Local & `a | a = 4 | `i & `>= 1}
+{!= v-2 Local & (a = 1 | `i & `>= 1) | a}
+{!= v-3 Local & (a = 20 | `i & `>= 1) | a}
+{!= v-4 Local & (a = 4 | `i & `>= 1) | a}
 
-<VAR>SimEnv     {Sentaurus T-2022.03 !Cylindrical Electrical PBS 1 5 8}
+<VAR>SimEnv     {Sentaurus T-2022.03 !Cylindrical Electrical pbs 1 5 8}
 
 <SENTAURUS>Tool_label = sde Tool_name = sde
 
@@ -61,15 +61,18 @@ Implicit method: Regions of a block shape (rectangle or cuboid) are described
     a region should omit its thickness if it shares its layer with the previous
     region. Moreover, it should skip its thickness and width if the previous
     region and itself are within the same section. These regions are indexed
-    from 1 to N and determine the size of the simulation domain from (0 0 0)
-    to (XMax YMax ZMax).
+    from 1 to N.
 
 The simulation domain is surrounded by dummy gas regions by default to easily
     reference the domain surfaces. The top gas layer is indexed as 0, the
     bottom layer N+1, the left layer N+2, the right N+3, the far N+4, the near
     N+5. In case of 2D cylindrical, the left is not added so the right is N+2
     instead. Additionally, only the top layer is added in case performing only
-    optical simulation with raytrace.
+    optical simulation with raytrace. From the top to bottom, coordinates of
+    layers are counted from 0. The top one can be referenced as x0 while the
+    bottom as x-1. The simulation domain at the X axis is between x1 and x-2 (or
+    x-1). Likewise, coordinates of sections are counted from left to right and
+    those of subsections are counted from far to near.
 
 Explicit method: Regions of special shapes (Block, Ellipse, VList, Pyramid,
     Cone, etc.) should be specified in advance. Regions labeled as "Keep" are
@@ -90,21 +93,22 @@ Specifications for regions employing the implicit method:
         Mat6 x3 y3 z3 ...}
 
 Specifications for regions employing the explicit method:
-    Block (2D/3D) specify its diagonal vertices: mat Block Keep px1_y1/x2_y2
+    Block (2D/3D) specify its diagonal vertices: mat Block Keep px1_y1//x2_y2
     Vertices (2D polygon) specify its vertices (>= 3): mat V K px1_y1 px2_y2 ...
     Ellipse (2D/3D) specify its centre to its major radius followed by an
-        optional MinR/MaxR: mat Ellipse Keep px1_y1/x2_y2 [MinR/MaxR]
+        optional MinR/MaxR: mat Ellipse Keep px1_y1 px2_y2 [MinR/MaxR]
     Cone (3D) specify its base centre to its top centre/vertex followed by the
         major base radius and optional top radius and MinR/MaxR:
-        mat Cone Keep px1_y1_z1/x2_y2_z2 BaseR [TopR MinR/MaxR]
+        mat Cone Keep px1_y1_z1 px2_y2_z2 BaseR [TopR MinR/MaxR]
     Pyramid (3D) specify its base centre to its top centre/vertex followed by
         the optional slant angle [°] and top radius, sides and MinR/MaxR:
-        mat Pyramid Keep px1_y1_z1/x2_y2_z2 [Angle TopR NSides MinR/MaxR]
+        mat Pyramid Keep px1_y1_z1 px2_y2_z2 [Angle TopR NSides MinR/MaxR]
 
 <GRAMMAR>m
 {`!a & n & `> 0 | s E<llipse> V<ertices> P<yramid> C<one> Block}
 {n v1 & (a | `n & `> 0) | `!a & s K<eep>  M<erge> Remove}
-{n v1 & (a | `n & `> 0) | `!a & (== v1 Vertices & `p | `pp)}
+{n v1 & (a | `n & `> 0) | `!a & (== v1 Block & `pp | `p)}
+{(n v1 | == v1 Block) & `a | `!a & `p}
 {(n v1 | == v1 Block) & `a | == v1 Ellipse & (a = 1 | `n & `> 0 & `<= 1)
     | == v1 Pyramid & (a = 54.74 | `n & `> 0 & `< 90)
     | `!a & (== v1 Cone & (`n & `> 0) | `p)}
@@ -116,8 +120,8 @@ Specifications for regions employing the explicit method:
     | == v1 Pyramid & (a = 1 | `n & `> 0 & `<= 1) | a | `p}
 {(n v1 | != v1 Vertices) & `a | a | `p} ...
 
-<VAR>RegGen     {{iaSi 0.006 50} {Silicon 165 50} {iaSi 0.006 50} {paSi 0.02 45}
-    {naSi 5} {Gas 0.1 44.5} {Gas 1} {Gas 4.5}}
+<VAR>RegGen     {{iaSi 0.006 50} {Silicon 165 <0/2>} <0> {paSi 0.02 45} {naSi
+    <0/2>-<3/2>} {Gas 0.1 44.5} {Gas (<3/2>-<5/2>)*2} {Gas <0/2>-<5/2>-<6/1>}}
 
 <COMMENT>Region and interface fields variable
 Supported constant region fields: Al(Aluminum) As(Arsenic) B(Boron) C Carbon
@@ -132,7 +136,7 @@ Specification for region fields:
     3 Optional dopant activation switch: A<ctive> | !<Active>
     4 Optional region field 2 ...
 Specification for interface fields:
-    0 Interface: ri/j | px11_y11/x12_y12
+    0 Interface: ri/j | px11_y11//x12_y12
     1 Interface field file 1: 03exp/B40.plx
     2 Optional field density ratio (n > 0): 1
     3 Optional lateral decay factor (0 <= n <= 1): 0.8
@@ -198,29 +202,27 @@ Specification for a tunneling interface:
 {(n v1 | f v1 | == v2 {C\w+} ) & `a | == v1 {c\d} & (a = 1e7 | `n & `> 0) | a}
 {(n v1 | f v1 | == v2 {C\w+} ) & `a | == v1 {c\d} & (a | `n & `> 0) | a}
 
-<VAR>IntfAttr   {{r4/6 c0 Ohmic 0 0 0 1e7} {r5/8 c1 Ohmic 0 0 0 1e7} {r0/1 1e+12
-    100000} {r4/7 0 10000000} {r5/7 0 10000000} {r1/2 0 190} {r3/2 0 190}}
-    {{r4/6 c0 Ohmic 0 0 0 1e7} {r5/8 c1 Ohmic 0 0 0 1e7} {r0/1 0 0} {r4/7 0
-    10000000} {r5/7 0 10000000} {r1/2 0 190} {r3/2 0 190}}
+<VAR>IntfAttr   {{r4/6 c0} {r5/8 c1} {r0/1 1e12 1e5} {r4,5/7 0 1e7} {r1,3/2 0
+    190}} 0/2/1,2=0|0
 
 <COMMENT>Optical generation attributes variable
 Specify four types of optical solver E(External), O(OBAM), T(TMM), R(Raytrace).
     For Raytrace, ARCs and BC(boundary condition)s need to be specified.
 
 Specification for an external optical spectral profile:
-    0 Optical window: ri/j | px11_y11/x12_y12
+    0 Optical window: ri/j | px11_y11//x12_y12
     1 Optical solver: E<xternal>
     2 Spectral photogeneration file: 02opt/Spectral_OG1D_Upright_170um.plx
 Specification for the optical beam absorption method:
-    0 Optical window: ri/j | px11_y11/x12_y12
+    0 Optical window: ri/j | px11_y11//x12_y12
     1 Optical solver: O<BAM>
 Specification for the transfer matrix method:
-    0 Optical window: ri/j | px11_y11/x12_y12
+    0 Optical window: ri/j | px11_y11//x12_y12
     1 Optical solver: T<MM>
     2 Refractive index n >= 1 or material file for TMM bottom medium: 2.3
     3 Extinction coefficient k >= 0 for TMM: 0
 Specification for the raytrace solver:
-    0 Optical window: ri/j | px11_y11/x12_y12
+    0 Optical window: ri/j | px11_y11//x12_y12
     1 Optical solver: R<aytrace>
     2 Number of rays (i > 0): 1000
     3 Deterministic or MonteCarlo: MonteCarlo | Deterministic
@@ -360,13 +362,13 @@ Specification for implant:
 Specification for initialization:
     0 ID: Ini<t>
     1 Materal: Silicon
-    2 Region size: p0_0_0/1_1_1
+    2 Region size: p0_0_0//1_1_1
     3 Optional orientation: 111 | 110 | 100
     4 Optional field: Al | As | B | C | F | Ge | In | N | P | Sb
     5 Optional field value (n > 0) [cm^-3]: 1e15
 Specification for photoresist mask:
     0 ID: Mas<k>
-    1 Mask interface: p0_0/0_1
+    1 Mask interface: p0_0//0_1
     2 Optional mask type: n<egative> | positive
     3 Optional mask operation: c<lear> | !clear
 Specification for setting fields:
@@ -525,8 +527,7 @@ Specification for a trap file for SRH recombination:
 ...
 
 <VAR>ModPar     {{r2 01mdb/Si_298.15K_2022Green.par SRH 0.0088 Aug Niewelt 0.55}
-    {r1 01mdb/a-Si-i_2015Ling.par Trap 03exp/Traps/Bulk_a-Si-i_2015Ling.txt SRH
-    !} {r3 01mdb/a-Si-i_2015Ling.par Trap 03exp/Traps/Bulk_a-Si-i_2015Ling.txt
+    {r1,3 01mdb/a-Si-i_2015Ling.par Trap 03exp/Traps/Bulk_a-Si-i_2015Ling.txt
     SRH !} {r4 01mdb/a-Si-p_2015Ling.par Trap
     03exp/Traps/Bulk_a-Si-p_2015Ling.txt SRH !} {r5 01mdb/a-Si-n_2015Ling.par
     Trap 03exp/Traps/Bulk_a-Si-n_2015Ling.txt SRH !}}
@@ -574,8 +575,8 @@ Specification for varying other variables (sdevice --parameter-names):
 {== v1 {[CFV]\w+} & `a | a | `n & `< v1}
 ...
 
-<VAR>VarVary    {{SpecScaling 0.3 0} {MonoScaling 1 1} {Wavelength 1.2 90}
-    {MonoScaling 0 0} {SpecScaling 1 0} {c0 0.8 160}}
+<VAR>VarVary    {{SpecScaling 0.3} {MonoScaling 1 1} {Wavelength 1.2 90}
+    {MonoScaling 0} {SpecScaling 1} {c0 0.8 160}}
 
 <COMMENT>Extract field during variable varying and from snapshots
 Specify a point pX_Y_Z [um] for extracting 1D structural fields from saved
@@ -596,7 +597,7 @@ Specification for point extraction during variable varying:
     0 Point: p0_0_0
   >=1 Supported field: n
 Specification for other extraction during variable varying:
-    0 Window, region, interface: p0_0_0/1_1_1
+    0 Window, region, interface: p0_0_0//1_1_1
     1 Operation: A<verage> | I<ntegrate> | M<aximum> | L<east>
     2 Supported field: n
   >=3 Optional coordinate printing (CP) for A|M|L or supported field
@@ -606,7 +607,7 @@ Specification for axis aligned cut from snapshots: (Band = "EA EC EV EFe EFh")
     2 # of the back dummy layers (i >= 0): 1
   >=3 Supported field: Band
 Specification for field integration from snapshots:
-    0 Region or a window: r1 | p0_0/1_1
+    0 Region or a window: r1 | p0_0//1_1
   >=1 Supported field: Gop
 
 <GRAMMAR>{p | pp | r | rr}
@@ -651,7 +652,8 @@ Specification for field integration from snapshots:
     mue muh}
 ...
 
-<VAR>GetFld     {{p5_0/160_50 Average Dn} {p0_20 1 2 Band} {p0_48 1 2 Band}}
+<VAR>GetFld     {{px2+5_0//x3-5_y-2 Average Dn} {p0_(y1+y3)/2&0_(y-2+y-4)/2 1 2
+    Band}}
 
 <SENTAURUS>Tool_label = svisual Tool_name = svisual
 

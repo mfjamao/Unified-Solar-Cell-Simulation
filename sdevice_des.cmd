@@ -535,9 +535,9 @@ CurrentPlot {
                         }
                         vputs -n -i-5 "
                             $tmp"
-                    } elseif {[regexp {^p[^/]+/[^/]+$} [lindex $str 0]]} {
-                        set tmp [split [split [string range [lindex $str 0]\
-                            1 end] _] /]
+                    } elseif {[regexp {^p[^/]+//[^/]+$} [lindex $str 0]]} {
+                        set tmp [string map {p \{ _ " " // "\} \{"}\
+                            [lindex $str 0]]\}
                         if {$Dim == 1} {
                             set tmp "[lindex $var 0] (Window\[([lindex $tmp\
                                 0] 0) ([lindex $tmp 1] $YMax)\]"
@@ -617,9 +617,9 @@ CurrentPlot {
                         }
                         vputs -n -i-5 "
                             $tmp"
-                    } elseif {[regexp {^p[^/]+/[^/]+$} [lindex $str 0]]} {
-                        set tmp [split [split [string range [lindex $str 0]\
-                            1 end] _] /]
+                    } elseif {[regexp {^p[^/]+//[^/]+$} [lindex $str 0]]} {
+                        set tmp [string map {p \{ _ " " // "\} \{"}\
+                            [lindex $str 0]]\}
                         if {$Dim == 1} {
                             set tmp "[lindex $var 0] (Window\[([lindex $tmp\
                                 0] 0) ([lindex $tmp 1] $YMax)\]"
@@ -697,9 +697,9 @@ CurrentPlot {
                         }
                         vputs -n -i-5 "
                             $tmp"
-                    } elseif {[regexp {^p[^/]+/[^/]+$} [lindex $str 0]]} {
-                        set tmp [split [split [string range [lindex $str 0]\
-                            1 end] _] /]
+                    } elseif {[regexp {^p[^/]+//[^/]+$} [lindex $str 0]]} {
+                        set tmp [string map {p \{ _ " " // "\} \{"}\
+                            [lindex $str 0]]\}
                         if {$Dim == 1} {
                             set tmp "[lindex $var 0] (Window\[([lindex $tmp\
                                 0] 0) ([lindex $tmp 1] $YMax)\]"
@@ -755,10 +755,10 @@ CurrentPlot {
                         }
                         vputs -n -i-5 "
                             $tmp"
-                    } elseif {[regexp {^r(\d+/\d+)$} [lindex $str 0]]} {
+                    } elseif {[regexp {^r\d+/\d+$} [lindex $str 0]]} {
                         set idx [string map {r "" / " "} [lindex $str 0]]
-                            set tmp [lindex $RegGen [lindex $idx 0] 0\
-                                1]/[lindex $RegGen [lindex $idx 1] 0 1]
+                        set tmp [lindex $RegGen [lindex $idx 0] 0\
+                            1]/[lindex $RegGen [lindex $idx 1] 0 1]
                         set tmp "[lindex $var 0] (RegionInterface= \"$tmp\""
                         if {[regexp $elm\\s+CP $var]} {
                             append tmp " Coordinates)"
@@ -768,8 +768,8 @@ CurrentPlot {
                         vputs -n -i-5 "
                             $tmp"
                     } else {
-                        set tmp [split [split [string range [lindex $str 0]\
-                            1 end] _] /]
+                        set tmp [string map {p \{ _ " " // "\} \{"}\
+                            [lindex $str 0]]\}
                         if {$Dim == 1} {
                             set tmp "[lindex $var 0] (Window\[([lindex $tmp\
                                 0] 0) ([lindex $tmp 1] $YMax)\]"
@@ -954,8 +954,7 @@ if {[regexp {\{(Mono|Spec)Scaling\s} $VarVary]} {
             if {[regexp {^r(\d+)/(\d+)$} [lindex $grp 0] -> val tmp]} {
                 set lst [rr2pp $RegGen $val $tmp]
             } else {
-                set lst [split [split [string range [lindex $grp 0]\
-                    1 end] _] /]
+                set lst [string map {p \{ _ " " // "\} \{"} [lindex $grp 0]]\}
             }
             vputs -n -i-1 "
                 Window (\"W$idx\") ("

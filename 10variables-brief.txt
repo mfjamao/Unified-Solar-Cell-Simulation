@@ -1,7 +1,7 @@
-SimEnv      {Sentaurus T-2022.03 !Cylindrical Electrical PBS 1 5 8}
+SimEnv      {Sentaurus T-2022.03 !Cylindrical Electrical pbs 1 5 8}
 
-RegGen      {{iaSi 0.006 50} {Silicon 165 <0/2>} <0> {paSi 0.02 45}
-    {naSi <0/2>-<3/2>} {Gas 0.1 44.5} {Gas (<3/2>-<5/2>)*2} {Gas <0/2>-<5/2>-<6/1>}}
+RegGen      {{iaSi 0.006 50} {Silicon 165 <0/2>} <0> {paSi 0.02 45} {naSi
+    <0/2>-<3/2>} {Gas 0.1 44.5} {Gas (<3/2>-<5/2>)*2} {Gas <0/2>-<5/2>-<6/1>}}
 
 FldAttr     {{r2 P 1.56e+15} {r4 B 1.41e+19} {r5 P 1.45e+19}}
 
@@ -17,15 +17,14 @@ ProcSeq     {}
 
 ModPar      {{r2 01mdb/Si_298.15K_2022Green.par SRH 0.0088 Aug Niewelt 0.55}
     {r1,3 01mdb/a-Si-i_2015Ling.par Trap 03exp/Traps/Bulk_a-Si-i_2015Ling.txt
-        SRH !}
-    {r4 01mdb/a-Si-p_2015Ling.par Trap 03exp/Traps/Bulk_a-Si-p_2015Ling.txt
-        SRH !}
-    {r5 01mdb/a-Si-n_2015Ling.par Trap 03exp/Traps/Bulk_a-Si-n_2015Ling.txt
-        SRH !}}
+    SRH !} {r4 01mdb/a-Si-p_2015Ling.par Trap
+    03exp/Traps/Bulk_a-Si-p_2015Ling.txt SRH !} {r5 01mdb/a-Si-n_2015Ling.par
+    Trap 03exp/Traps/Bulk_a-Si-n_2015Ling.txt SRH !}}
 
 VarVary     {{SpecScaling 0.3} {MonoScaling 1 1} {Wavelength 1.2 90}
     {MonoScaling 0} {SpecScaling 1} {c0 0.8 160}}
 
-GetFld      {{p5_0/160_50 Average Dn} {p0_20&0_48 1 2 Band}}
+GetFld      {{px2+5_0//x3-5_y-2 Average Dn} {p0_(y1+y3)/2&0_(y-2+y-4)/2 1 2 Band}}
 
 PPAttr      {{v2 QE} {v5 JV}}
+
