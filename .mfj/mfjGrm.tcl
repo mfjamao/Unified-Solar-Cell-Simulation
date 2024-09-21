@@ -496,7 +496,7 @@ namespace eval mfjGrm {
                         } else {
                             if {[regexp {^[vV](\d+)$} $Val -> VStr]} {
 
-                                # No multiple levels for 'RampAttr'
+                                # No multiple levels for 'VarVary'
                                 if {[llength $::SimArr(VarLen)] == 1} {
                                     if {[catch {set Idx [readIdx $VStr\
                                         $::SimArr(VarLen)]}]} {
@@ -521,10 +521,10 @@ namespace eval mfjGrm {
                         if {!$Bool && $Vital} {
                             if {$Inv eq ""} {
                                 error "element '$Val' of '$varVal' should\
-                                    be a ref to a variable in 'RampAttr'!"
+                                    be a ref to a variable in 'VarVary'!"
                             } else {
                                 error "element '$Val' of '$varVal' should\
-                                    NOT be a ref to a variable in 'RampAttr'!"
+                                    NOT be a ref to a variable in 'VarVary'!"
                             }
                         }
                     }

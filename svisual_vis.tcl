@@ -4,7 +4,7 @@
 #include "varSim.tcl"
 
 # Alert users to remove/combine duplicate vv#
-set PPAttr [lsort -index 0 [str2List "" $PPAttr]]
+set PPAttr [lsort -index 0 [str2List $PPAttr]]
 if {[llength [lsort -unique -index 0 $PPAttr]] < [llength $PPAttr]} {
     error "duplicate entries found in PPAttr '$PPAttr'!"
 }
@@ -17,7 +17,7 @@ if {[llength [lsort -unique -index 0 $PPAttr]] < [llength $PPAttr]} {
 
 foreach var {SimEnv RegGen VarVary DfltAttr VV2Fld SS2Fld PPAttr GopAttr
     IntfCon IntfTun IntfSRV RegIntfTrap ModPar ProcSeq
-    Dim LoadTDR XMax YMax ZMax} {
+    DimLen LoadTDR XMax YMax ZMax} {
     vputs -n -i-2 "
         set $var \{[regsub -all {\s+} [set $var] " "]\}"
 }
@@ -119,10 +119,10 @@ set apPlt AbsorbedPhotonDensity
 # assumes 1 um for z direction while intArea assumes 1 cm in a 2D simulation
 # jArea is related to current density, photon flux, ...
 # intArea: affected by IntegrationUnit in Math section
-if {$Dim == 3} {
+if {$DimLen == 3} {
     set jArea [expr 1e-8*$YMax*$ZMax]
     set intArea $jArea
-} elseif {$Dim == 2 && [lindex $SimEnv 2] eq "Cylindrical"} {
+} elseif {$DimLen == 2 && [lindex $SimEnv 2] eq "Cylindrical"} {
     set jArea [expr 1e-8*$PI*pow($YMax,2)]
     set intArea $jArea
 } else {
@@ -370,7 +370,7 @@ foreach pp $PPAttr {
             vputs -i2 "Calculate illuminated photons numerically"
             create_curve -name ${pp0}_N|Inc -dataset Data_$pp0\
                 -axisX $xVar -axisY "RaytracePhoton Input"
-            if {$Dim != 3 && [lindex $SimEnv 2] eq "!Cylindrical"} {
+            if {$DimLen != 3 && [lindex $SimEnv 2] eq "!Cylindrical"} {
                 set_curve_prop ${pp0}_N|Inc -yScale 1e4
             }
             create_curve -name ${pp0}_D|Inc -function\
@@ -391,7 +391,7 @@ foreach pp $PPAttr {
             create_curve -name ${pp0}_NR -dataset Data_$pp0\
                 -axisX $xVar -axisY "RaytraceContactFlux\
                 A(TOpt([lindex $RegGen 0 0 1]/OutDevice))"
-            if {$Dim != 3 && [lindex $SimEnv 2] eq "!Cylindrical"} {
+            if {$DimLen != 3 && [lindex $SimEnv 2] eq "!Cylindrical"} {
                 create_curve -name ${pp0}_0|R -function\
                     "1e4*<${pp0}_NR>/<${pp0}_A|Inc>"
             } else {
@@ -402,7 +402,7 @@ foreach pp $PPAttr {
             create_curve -name ${pp0}_NT -dataset Data_$pp0\
                 -axisX $xVar -axisY "RaytraceContactFlux\
                 A(BOpt([lindex $RegGen end 0 1]/OutDevice))"
-            if {$Dim != 3 && [lindex $SimEnv 2] eq "!Cylindrical"} {
+            if {$DimLen != 3 && [lindex $SimEnv 2] eq "!Cylindrical"} {
                 create_curve -name ${pp0}_1|T -function\
                     "1e4*<${pp0}_NT>/<${pp0}_A|Inc>"
             } else {
@@ -461,7 +461,7 @@ foreach pp $PPAttr {
                     vputs -i3 $var
                     create_curve -name ${pp0}_NA|[lindex $grp 0]\
                         -dataset Data_$pp0 -axisX $xVar -axisY $var
-                    if {$Dim != 3 && [lindex $SimEnv 2] eq "!Cylindrical"} {
+                    if {$DimLen != 3 && [lindex $SimEnv 2] eq "!Cylindrical"} {
                         create_curve -name ${pp0}_6|A|[lindex $grp 0] -function\
                             "1e4*<${pp0}_NA|[lindex $grp 0]>/<${pp0}_A|Inc>"
                     } else {
@@ -474,7 +474,7 @@ foreach pp $PPAttr {
                     vputs -i3 $var
                     create_curve -name ${pp0}_NR|[lindex $grp 0]\
                         -dataset Data_$pp0 -axisX $xVar -axisY $var
-                    if {$Dim != 3 && [lindex $SimEnv 2] eq "!Cylindrical"} {
+                    if {$DimLen != 3 && [lindex $SimEnv 2] eq "!Cylindrical"} {
                         create_curve -name ${pp0}_7|R|[lindex $grp 0] -function\
                             "1e4*<${pp0}_NR|[lindex $grp 0]>/<${pp0}_A|Inc>"
                     } else {
@@ -502,7 +502,8 @@ foreach pp $PPAttr {
                         vputs -i3 $var[expr abs($idx-$val)]
                         create_curve -name ${pp0}_N|$str -dataset Data_$pp0\
                             -axisX $xVar -axisY $var[expr abs($val-$idx)]
-                        if {$Dim != 3 && [lindex $SimEnv 2] eq "!Cylindrical"} {
+                        if {$DimLen != 3
+                            && [lindex $SimEnv 2] eq "!Cylindrical"} {
                             create_curve -name ${pp0}_8|$str -function\
                                 "1e4*<${pp0}_N|$str>/<${pp0}_A|Inc>"
                         } else {
@@ -1395,7 +1396,7 @@ foreach pp $PPAttr {
             set str [string range [lindex $grp 0] 1 end]
             if {[regexp {^p[^/]+$} [lindex $grp 0]]
                 && [regexp { Dn} $grp]} {
-                if {$Dim == 1} {
+                if {$DimLen == 1} {
                     set txt Pos($str,$var)
                 } else {
                     set txt Pos([string map {_ ,} $str])
@@ -1411,7 +1412,7 @@ foreach pp $PPAttr {
                         $RegGen [lindex $lst 1] 0 1]
                 } else {
                     set lst [string map {// " "} $str]
-                    if {$Dim == 1} {
+                    if {$DimLen == 1} {
                         set txt AveWindow(([lindex $lst 0],0),([lindex\
                             $lst 1],$YMax))
                     } else {
@@ -1773,7 +1774,7 @@ foreach pp $PPAttr {
                 set str [string range [lindex $grp 0] 1 end]
                 if {[regexp {^p[^/]+$} [lindex $grp 0]]
                     && [regexp { Dn} $grp]} {
-                    if {$Dim == 1} {
+                    if {$DimLen == 1} {
                         set txt Pos($str,$var)
                     } else {
                         set txt Pos([string map {_ ,} $str])
@@ -1789,7 +1790,7 @@ foreach pp $PPAttr {
                             $RegGen [lindex $lst 1] 0 1]
                     } else {
                         set lst [string map {// " "} $str]
-                        if {$Dim == 1} {
+                        if {$DimLen == 1} {
                             set txt AveWindow(([lindex $lst 0],0),([lindex\
                                 $lst 1],$YMax))
                         } else {
@@ -1885,9 +1886,10 @@ foreach pp $PPAttr {
 
                 # Manually calculate total semiconductor volume
                 # Will improve accuracy later
-                if {$Dim == 3} {
+                if {$DimLen == 3} {
                     set vol [expr 1e-12*$XMax*$YMax*$ZMax]
-                } elseif {$Dim == 2 && [lindex $SimEnv 2] eq "Cylindrical"} {
+                } elseif {$DimLen == 2
+                    && [lindex $SimEnv 2] eq "Cylindrical"} {
                     set vol [expr 1e-12*$XMax*$PI*$YMax*$YMax]
                 } else {
                     set vol [expr 1e-8*$XMax*$YMax]
@@ -2359,7 +2361,7 @@ foreach pp $PPAttr {
                     # Skip integration of non recombination fields
                     if {![regexp {Recombination$} $val]} continue
                     vputs -i3 $val
-                    if {$Dim == 1} {
+                    if {$DimLen == 1} {
                         set str [string map {p (( // ,0),(}\
                             [lindex $grp 0]],$YMax))
                     } else {

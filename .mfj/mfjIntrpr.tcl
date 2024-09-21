@@ -238,7 +238,7 @@ proc mfjIntrpr::readRaw {} {
 
                 # Properly convert a grammar string to a list
                 set Tmp "[format %02d $VarIdx] $Var: Grammar"
-                set arr(RawGLst|$Var) [str2List $Tmp $GrmStr]
+                set arr(RawGLst|$Var) [str2List $GrmStr $Tmp]
                 set arr(RawCmnt|$Var) $CmntStr
                 set arr(RawCmntB4|$Var) $CmntB4
                 set CmntB4 ""
@@ -251,10 +251,10 @@ proc mfjIntrpr::readRaw {} {
                 set Tmp "[format %02d $VarIdx] $Var: Value"
                 if {$Len == 2 || [llength $arr(Raw|STLst)] == 0} {
                     set arr(RawLvl|$Var) 1
-                    set arr(RawVal|$Var) [str2List $Tmp [lindex $VarStr 1]]
+                    set arr(RawVal|$Var) [str2List [lindex $VarStr 1] $Tmp]
                 } else {
                     set arr(RawLvl|$Var) [incr Len -1]
-                    set arr(RawVal|$Var) [str2List $Tmp [lrange $VarStr 1 end]]
+                    set arr(RawVal|$Var) [str2List [lrange $VarStr 1 end] $Tmp]
                 }
             }
             set VarEnd false
@@ -397,10 +397,10 @@ proc mfjIntrpr::readBrf {} {
                     set Tmp "[format %02d $VarIdx] $VarName:"
                     if {$Len == 1 || $VarName eq "SimEnv"} {
                         set arr(BrfLvl|$VarName) 1
-                        set arr(BrfVal|$VarName) [str2List $Tmp [lindex $Val 0]]
+                        set arr(BrfVal|$VarName) [str2List [lindex $Val 0] $Tmp]
                     } else {
                         set arr(BrfLvl|$VarName) $Len
-                        set arr(BrfVal|$VarName) [str2List $Tmp $Val]
+                        set arr(BrfVal|$VarName) [str2List $Val $Tmp]
                     }
                     set VarEnd false
                     incr VarIdx
@@ -636,10 +636,6 @@ proc mfjIntrpr::activateRR {} {
 
         # Only check variables with multiple levels
         if {$arr(RawLvl|$Var) == 1} continue
-        set FoldLst 0
-        for {set i 1} {$i < $arr(RawLvl|$Var)} {incr i} {
-            lappend FoldLst 0
-        }
         set Cnt [regexp -all {(\s|\{)(-?\d+[:,/&])*-?\d+=} $arr(RawVal|$Var)]
         if {$Cnt} {
             incr Sum $Cnt
@@ -650,6 +646,10 @@ proc mfjIntrpr::activateRR {} {
             set arr(RawVal|$Var) [lindex $NewVal 1]
             vputs -v2 -c "After: \{\{[join $arr(RawVal|$Var) \}\n\{]\}\}\n"
         } else {
+            set FoldLst 0
+            for {set i 1} {$i < $arr(RawLvl|$Var)} {incr i} {
+                lappend FoldLst 0
+            }
             set arr(RawFold|$Var) $FoldLst
         }
     }
@@ -1052,7 +1052,11 @@ proc mfjIntrpr::validateVar {} {
         # Users are responsible for assigning multiple levels to 'RegGen'
         if {$arr(RawLvl|$Var) > 1} {
             set LvlLen $arr(RawLvl|$Var)
-            set RGLvlLen $arr(RawLvl|RegGen)
+            if {[string index $::SimArr(SameDev) 0] ne "!"} {
+                set RGLvlLen 1
+            } else {
+                set RGLvlLen $arr(RawLvl|RegGen)
+            }
             if {$Var eq "RegGen"} {
                 set RGLvlLen 1
             }
@@ -1287,6 +1291,8 @@ proc mfjIntrpr::valRegGen {} {
             if {$Len == 0} {
                 error "no dimension specified for '[lindex $Mat 0]'!"
             }
+
+            # Make sure both methods specify the same dimensions
             if {[string is double -strict [lindex $DimLst 0]]} {
 
                 # Regions are specified using the implicit method, which
@@ -1423,31 +1429,39 @@ proc mfjIntrpr::valRegGen {} {
                 }
 
                 # Make sure all positions tally with the dimension
-                set Lst [lindex $DimLst 0]
-                if {[string equal -nocase $Lst "Block"]} {
+                set Str [lindex $DimLst 0]
+                if {[string equal -nocase $Str "Block"]} {
 
                     # Convert 'pp' to two coordinate lists
-                    set Lst [concat $Lst [string map {p \{ _ " " // "\} \{"}\
+                    set Lst [concat $Str [string map {p \{ _ " " // "\} \{"}\
                         [lindex $DimLst 2]]\}]
-                    if {[llength [lindex $Lst end]] != 3} {
-                        error "position '$Elm' not 3D!"
+                    if {[llength [lindex $Lst end]] == 1} {
+                        error "position '[lindex $Lst end]' is 1D for '$Str'!"
                     }
-                } elseif {[string equal -nocase $Lst "Vertex"]} {
+                } elseif {[string equal -nocase $Str "Vertex"]} {
+                    set Lst $Str
 
                     # Convert each 'p' to a coordinate list
                     foreach Elm [lrange $DimLst 2 end] {
                         lappend Lst [string map {p "" _ " "} $Elm]
                         if {[llength [lindex $Lst end]] != 2} {
-                            error "position '$Elm' not 2D!"
+                            error "position '$Elm' not 2D for '$Str'!"
                         }
                     }
                 } else {
+                    set Lst $Str
 
                     # Convert two 'p' to two coordinate lists
                     foreach Elm [lrange $DimLst 2 3] {
                         lappend Lst [string map {p "" _ " "} $Elm]
-                        if {[llength [lindex $Lst end]] != 3} {
-                            error "position '$Elm' not 3D!"
+                        if {[string equal -nocase $Str "Ellipse"]} {
+                            if {[llength [lindex $Lst end]] == 1} {
+                                error "position '$Elm' is 1D for '$Str'!"
+                            }
+                        } else {
+                            if {[llength [lindex $Lst end]] != 3} {
+                                error "position '$Elm' not 3D for '$Str'!"
+                            }
                         }
                     }
                     set Lst [concat $Lst [lrange $DimLst 4 end]]
@@ -2423,7 +2437,8 @@ proc mfjIntrpr::raw2Fmt {} {
         gets $Inf Line
         close $Inf
         set InfoLst [split $Line |]
-        if {[lindex $InfoLst 2] == [file mtime $::SimArr(FVarRaw)]} {
+        if {[lindex $InfoLst 2] == [file mtime $::SimArr(FVarRaw)]
+            && [lindex $InfoLst 3] == [file mtime $::FScript]} {
             set RawMod false
         } else {
             set RawMod true

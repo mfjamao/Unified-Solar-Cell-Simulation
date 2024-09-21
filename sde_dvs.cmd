@@ -10,7 +10,7 @@
 set inf [open 11ctrlsim.tcl r]
 set str [read $inf]
 close $inf
-if {[regexp {array set SimArr \{(.+)\};\#} $str -> tmp]} {
+if {[regexp {array\s+set\s+SimArr\s+\{(.+)\};\#} $str -> tmp]} {
     array set SimArr [regsub -all {\s+} $tmp " "]
 } else {
     error "'SimArr' not found in '11ctrlsim.tcl'!"
@@ -27,14 +27,14 @@ set Tab [set [file rootname $SimArr(FProc)]::arr(Tab)]
 # 'RegApp2' needs to be drawn before 'RegApp1'
 # Need to remove excess spaces in RegGen and mfjRegInfo
 set tmp [info global RegGen<*>]
-if {$tmp eq ""} {
-    set RegGen [str2List "" [lindex $mfjRegInfo 0]]
+if {$tmp eq "" || $tmp eq "RegGen<1>"} {
+    set RegGen [str2List [lindex $mfjRegInfo 0]]
 } else {
     set idx 0
     upvar 0 $tmp val
-    foreach grp [str2List "" $val] {
+    foreach grp [str2List $val] {
         if {$grp eq $RegGen} {
-            set RegGen [str2List "" [lindex $mfjRegInfo $idx]]
+            set RegGen [str2List [lindex $mfjRegInfo $idx]]
             break
         }
         incr idx
@@ -57,13 +57,13 @@ foreach grp $RegGen {
 set RegGen $lst
 
 # Extract the dimension (1,2,3) from the top dummy layer
-set Dim [llength [lindex $RegGen 0 1]]
-if {![regexp {^[123]$} $Dim]} {
-    error "wrong dimension '$Dim' detected!"
+set DimLen [llength [lindex $RegGen 0 1]]
+if {![regexp {^[123]$} $DimLen]} {
+    error "wrong dimension '$DimLen' detected!"
 }
 
 # Define two boolean values for easy reference later
-set SimEnv [str2List "" $SimEnv]
+set SimEnv [str2List $SimEnv]
 
 # Extract simulation max size (Dummy layers are ignored)
 # Extract the number of regions 'RegLen'
@@ -72,10 +72,10 @@ if {[lindex $SimEnv 3] eq "Optical"} {
 
     # No dummy layers except the top one
     set XMax [lindex $RegGen end 2 0]
-    if {$Dim == 1} {
+    if {$DimLen == 1} {
         set YMax [format %g $SimArr(DfltYMax)]
         set ZMax 0
-    } elseif {$Dim == 2} {
+    } elseif {$DimLen == 2} {
         set YMax [lindex $RegGen end 2 1]
         set ZMax 0
     } else {
@@ -83,11 +83,11 @@ if {[lindex $SimEnv 3] eq "Optical"} {
         set ZMax [lindex $RegGen end 2 2]
     }
 } else {
-    if {$Dim == 1} {
+    if {$DimLen == 1} {
         set XMax [lindex $RegGen end 1]
         set YMax [format %g $SimArr(DfltYMax)]
         set ZMax 0
-    } elseif {$Dim == 2} {
+    } elseif {$DimLen == 2} {
         if {[lindex $SimEnv 2] eq "Cylindrical"} {
             set XMax [lindex $RegGen end-1 1 0]
         } else {
@@ -108,7 +108,7 @@ if {[lindex $SimEnv 3] eq "Optical"} {
 #   (pp_str Vn), (profile file, scaling, lateral factor), ...
 set RegFld [list]
 set IntfFld [list]
-set FldAttr [lsort -index 0 [str2List "" $FldAttr]]
+set FldAttr [lsort -index 0 [str2List $FldAttr]]
 
 # Alert users to remove/combine duplicate regions/interfaces
 if {[llength [lsort -unique -index 0 $FldAttr]] < [llength $FldAttr]} {
@@ -305,7 +305,7 @@ if {![regexp {\{Other\s} $DfltAttr]} {
 foreach elm {IntfSRV IntfTrap IntfCon IntfTun lst} {
     set $elm [list]
 }
-set IntfAttr [str2List "" $IntfAttr]
+set IntfAttr [str2List $IntfAttr]
 foreach grp $IntfAttr {
     set lst [string map {r "" / " "} [lindex $grp 0]]
     regsub {^r(\d+)/(\d+)} $grp {r\2/\1} str
@@ -381,7 +381,7 @@ if {!$LoadTDR && [llength $GopAttr]
 set txt ""
 set LPD 0
 set GopPP [list]
-set GopAttr [str2List "" $GopAttr]
+set GopAttr [str2List $GopAttr]
 foreach grp $GopAttr {
     if {[regexp {^(OBAM|TMM|Raytrace|External)$} [lindex $grp 1]]} {
         if {$txt eq ""} {
@@ -442,7 +442,7 @@ if {[regexp {\sRaytrace\s} $GopAttr] && [lindex $SimEnv 2] eq "Cylindrical"
 #--- Pass all global Tcl parameters to SCHEME
 foreach var {SimEnv RegGen RegApp1 RegApp2 RegFld IntfFld RegIntfFld RegIntfTrap
     DfltAttr IntfAttr IntfSRV IntfTrap IntfCon IntfTun GopAttr GopPP
-    LPD Dim XMax YMax ZMax RegLen} {
+    LPD DimLen XMax YMax ZMax RegLen} {
     vputs "(define $var [tcl2Scheme $var [set $var]])"
 }
 regexp {\{Mesh\s+([^\}]+)} $DfltAttr -> val
@@ -644,7 +644,7 @@ vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
             )
             (cond
                 ((string=? Shp "Block")
-                    (if (= Dim 3)
+                    (if (= DimLen 3)
                         (sdegeo:create-cuboid
                             (apply position P1) (apply position P2) Mat Reg)
                         (sdegeo:create-rectangle
@@ -663,7 +663,7 @@ vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
                     (sdegeo:create-polygon (reverse Lst) Mat Reg)
                 )
                 ((string=? Shp "Ellipse")
-                    (if (= Dim 3)
+                    (if (= DimLen 3)
                         (sdegeo:create-ellipsoid
                             (apply position P1) (apply position P2)
                             (list-ref RGen 4) Mat Reg)
@@ -782,7 +782,7 @@ vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
 ;# Trim everything beyond (0 0 0) to (XMax YMax ZMax)
 ;# 3D can be done with 'sdegeo:body-trim' while 2D is a bit cumbersome
 (if (> (length RegApp2) 0)
-    (if (= Dim 3)
+    (if (= DimLen 3)
         (begin
             (mfj:display "3D: Prune everything beyond (0 0 0) to ("
                 XMax " " YMax " " ZMax ")\n")
@@ -828,11 +828,11 @@ vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
             (mfj:display (make-string 4 #\space) RGen "\n")
             (mfj:display (make-string 8 #\space) "Region name: '" Reg "'\n")
             (cond
-                ((= Dim 1)
+                ((= DimLen 1)
                     (sdegeo:create-rectangle (position P1 0 0)
                         (position P2 YMax 0) Mat Reg)
                 )
-                ((= Dim 2)
+                ((= DimLen 2)
                     (sdegeo:create-rectangle
                         (position (car P1) (cadr P1) 0)
                         (position (car P2) (cadr P2) 0) Mat Reg)
@@ -846,7 +846,7 @@ vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
                     )
                 )
             )
-            (if (= Dim 1)
+            (if (= DimLen 1)
                 (if (and (> P1 0) (< P1 XMax)
                     (not (member P1 XCutLst)))
                     (set! XCutLst (cons P1 XCutLst))
@@ -856,7 +856,7 @@ vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
                     (set! XCutLst (cons (car P1) XCutLst))
                 )
             )
-            (if (and (>= Dim 2) (> (cadr P1) 0)
+            (if (and (>= DimLen 2) (> (cadr P1) 0)
                 (< (cadr P1) YMax) (not (member (cadr P1) YCutLst)))
                 (set! YCutLst (cons (cadr P1) YCutLst))
             )
@@ -927,7 +927,7 @@ vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
             (if (list? IntfID)
                 (begin
                     (set! Str "Line")
-                    (if (= Dim 1)
+                    (if (= DimLen 1)
                         (if (string=? (cadr IntfLst) "+")
                             (begin
                                 (set! P1 (list (car IntfLst) YMax 0))
@@ -941,7 +941,7 @@ vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
                         (begin
                             (set! P1 (mfj:string-split (car IntfLst) #\_))
                             (set! P2 (mfj:string-split (cadr IntfLst) #\_))
-                            (if (= Dim 2)
+                            (if (= DimLen 2)
                                 (begin
                                     (set! P1 (append P1 '(0)))
                                     (set! P2 (append P2 '(0)))
@@ -959,7 +959,7 @@ vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
 
                     ;# 'sdedr:define-body-interface-refwin' works fine for 3D
                     ;# For 2D, however, it only works for one-edge interface
-                    (if (= Dim 3)
+                    (if (= DimLen 3)
                         (begin
                             (sdedr:define-body-interface-refwin (list
                                 (find-region-id Reg1) (find-region-id Reg2))
@@ -1068,7 +1068,7 @@ vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
 
             ;# 'sdedr:define-body-interface-refwin' works fine for 3D
             ;# For 2D, however, it only works for one-edge interface
-            (if (= Dim 3)
+            (if (= DimLen 3)
                 (begin
                     (sdedr:define-body-interface-refwin (list
                         (find-region-id Reg1) (find-region-id Reg2)) Intf)
@@ -1173,7 +1173,7 @@ vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
                         (set! Min (cons ElmMin Min))
                         (set! Min (cons (car Max) Min))
                     )
-                    (if (= Dim 1)
+                    (if (= DimLen 1)
                         (begin
                             (set! Max (cons (mfj:half YMax) Max))
                             (set! Min (cons (mfj:half YMax) Min))
@@ -1252,7 +1252,7 @@ vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
                     (set! Lst (list Val Val Val))
                     (set! Str "Rectangle")
                     (set! Vn (cadr IntfID))
-                    (if (= Dim 1)
+                    (if (= DimLen 1)
                         (begin
                             (set! P1 (list (car IntfLst) 0 0))
                             (set! P2 (map + (list (car IntfLst) YMax 0)
@@ -1261,7 +1261,7 @@ vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
                         (begin
                             (set! P1 (mfj:string-split (car IntfLst) #\_))
                             (set! P2 (mfj:string-split (cadr IntfLst) #\_))
-                            (if (= Dim 2)
+                            (if (= DimLen 2)
                                 (begin
                                     (set! P1 (append P1 '(0)))
                                     (set! P2 (map + (append P2 '(0))
@@ -1317,7 +1317,7 @@ vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
 
             ;# Skip interface refinement for 3D to reduce mesh points
             (if (and (not (or (member (list Reg1 Reg2) Lst)
-                (member (list Reg2 Reg1) Lst))) (< Dim 3))
+                (member (list Reg2 Reg1) Lst))) (< DimLen 3))
                 (begin
                     (if (string=? Grp1 "Semiconductor")
                         (begin
@@ -1362,7 +1362,7 @@ vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
         (define Mat "")
         (define Pos "")
         (cond
-            ((= Dim 1)
+            ((= DimLen 1)
                 (set! MB (string-append "Gop-p" (number->string (car PP))
                     "/" (cadr PP)))
                 (set! P1 (list (car PP) 0 0))
@@ -1372,7 +1372,7 @@ vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
                 )
                 (set! Str "Rectangle")
             )
-            ((= Dim 2)
+            ((= DimLen 2)
                 (set! MB (string-append "Gop-p" (mfj:join (car PP) "_") "/"
                     (mfj:join (cadr PP) "_")))
                 (set! P1 (append (car PP) '(0)))
@@ -1440,7 +1440,7 @@ vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
     (begin
         (mfj:display "Define front, back and surounding optical contacts for"
             " raytrace...\n")
-        (if (= Dim 3)
+        (if (= DimLen 3)
             (begin
                 (mfj:display (make-string 4 #\space) "TOpt:\n"
                     (make-string 8 #\space))
@@ -1599,7 +1599,7 @@ vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
                 (sdegeo:set-contact NFLst "NOpt")
             )
             (begin
-                (if (= Dim 2)
+                (if (= DimLen 2)
                     (set! Lst ((mfj:compose find-edge-id position)
                         (caadar RegGen) (mfj:half YMax) (mfj:half ZMax)))
                     (set! Lst ((mfj:compose find-edge-id position)
@@ -1638,7 +1638,7 @@ vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
                         ) (entity:edges (get-body-list))
                     )
                     (begin
-                        (if (= Dim 2)
+                        (if (= DimLen 2)
                             (set! Lst ((mfj:compose find-edge-id position)
                                 (car (caddar (reverse RegGen))) (mfj:half YMax)
                                 (mfj:half ZMax)))
@@ -1713,7 +1713,7 @@ vputs "(define MeshAttr [tcl2Scheme MeshAttr $val])"
     (set! ZCutLst ZMax)
     (mfj:display ZCutLst)
 )
-(if (= Dim 3)
+(if (= DimLen 3)
     (sdesnmesh:axisaligned "xCuts" XCutLst "yCuts" YCutLst "zCuts" ZCutLst)
     (sdesnmesh:axisaligned "xCuts" XCutLst "yCuts" YCutLst)
 )

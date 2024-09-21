@@ -14,10 +14,13 @@
 # now. Other simulators will be supported in future.
 #
 # Other notes:
-#   HideVar: Hide variables from Sentaurus Workbench unless they have multiple
-#       levels.
-#   OneChild: If adjacent variables have the same multiple levels, one parent
+#   OneChild: If adjacent variables have the same multiple values, one parent
 #       node has only one child node. Disable it to enable full permutation.
+#   SameDev: In case 'RegGen' has multiple values, yet the device remains the
+#       same (e.g. sizes change, not affecting references in other variables).
+#       This key affects the permutation behaviour.
+#   HideVar: Hide variables from Sentaurus Workbench unless they have multiple
+#       values.
 #   FullSchenk: Select whether to calculate BGN using full Schenk model or not,
 #       which is still experimenting
 #   TrapDLN: Default # of levels in Sentaurus is 13
@@ -27,6 +30,7 @@
 #   In Tcl, use braces to suppress string substitution so '\' is literally '\'
 ################################################################################
 array set SimArr {
+    OneChild OneChild SameDev SameDev HideVar HideVar FullSchenk !FullSchenk
     Email "" Time "" Append false Inverse false
     0Raw2Fmt true 1Fmt2Sim true 2PreProc true 3Batch true
     FVarRaw 10variables.txt FVarFmt variables.txt
@@ -36,12 +40,11 @@ array set SimArr {
     FInfo siminfo FLock lock FSTStat .status FDOESum DOESummary.csv
     CodeDir .mfj MDBDir 01mdb OptDir 02opt ExpDir 03exp PMIDir 04code
     EtcDir 05etc OutDir 06out TplDir 07tpl
-    HideVar HideVar OneChild OneChild DfltYMax 2.0 LatFac 0.8 GasThx 0.1
-    TrapDLN 100  EdgeEx 10 IntfEx 0.001 FullSchenk !FullSchenk
+    GasThx 0.1 DfltYMax 2.0 LatFac 0.8 TrapDLN 100  EdgeEx 10 IntfEx 0.001
     NThread 4 BitSize {64 80 128 256} Digits {5 5 6 10}
     RhsMin {1e-10 1e-12 1e-15 1e-25} Iter {10 12 15 20}
     ModTime "" RegInfo "" RegLvl 0 RegMat "" RegIdx "" RegX "" RegY ""
-    RegZ "" MatDB "" ConLst "" ConLen "" VarLen ""
+    RegZ "" MatDB "" ConLst "" ConLen 0 VarLen 0
     VarName {SimEnv RegGen FldAttr IntfAttr GopAttr DfltAttr ProcSeq ModPar
         VarVary GetFld PPAttr}
     BIDLst {{c\d} {(\w+/)?\w+/\w+(/[\deE.+-]+)?} {S\w*} {M\w*} {W\w*}}
@@ -356,7 +359,8 @@ if {$SimArr(0Raw2Fmt)} {
 
     # Update FInfo if necessary
     set Lst [list [lindex $mfjIntrpr::arr(FmtVal|SimEnv) 0]\
-        [lindex $mfjIntrpr::arr(FmtVal|SimEnv) 4] [file mtime $SimArr(FVarRaw)]]
+        [lindex $mfjIntrpr::arr(FmtVal|SimEnv) 4] [file mtime $SimArr(FVarRaw)]\
+        [file mtime $FScript]]
     if {$InfoLst ne $Lst} {
         set InfoLst $Lst
         set Ouf [open $FInfo w]

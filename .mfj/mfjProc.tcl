@@ -665,22 +665,19 @@ proc mfjProc::replaceElm {VarName VarVal} {
             # for any element in case all elements have the same number of
             # values and ::SimArr(OneChild) is the column mode; Otherwise, it is
             # the product of the number of element values:
-            #   1. Generate all values for each element
+            #   1. Generate all values including the initial for each element
             #   2. Determine the number of permutations
             #   3. Generate all the permutations of element values
             set Prod 1
             set ValSubLst [list]
             set ValCntLst [list]
             foreach Idx $IdxLst ElmVal $ElmValLst {
-                set Lst [list]
-                set Cnt 0
-                set Begin ""
+                set Cnt 1
+                set Begin [lindex $NewVal $Idx]
+                set Lst $Begin
                 foreach Val [split $ElmVal ~] {
                     if {[regexp {^([^@]+)@(\d+)([^\d]+)?$} $Val\
                         -> End Steps Str]} {
-                        if {$Begin eq ""} {
-                            set Begin [lindex $NewVal $Idx]
-                        }
                         if {![string is double -strict $Begin]} {
                             error "'$Begin' of index '$Idx' not a number\
                                 for $Msg!"
@@ -693,16 +690,19 @@ proc mfjProc::replaceElm {VarName VarVal} {
                         }
 
                         # Even distribution logarithmically
+                        set Sign 1.
                         if {$Str ne ""} {
-                            if {$Begin <= 0} {
-                                error "'$Begin' of index '$Idx' not positive\
+                            if {[expr $Begin*$End] <= 0} {
+                                error "either '$Begin' or '$End' not positive\
                                     for $Msg!"
                             }
-                            if {$End <= 0} {
-                                error "'$End' in '$Val' not positive for $Msg!"
+                            if {$Begin < 0} {
+                                set Sign -1.
+                                set Begin [expr $Sign*$Begin]
+                                set End [expr $Sign*$End]
                             }
                             for {set i 1} {$i <= $Steps} {incr i} {
-                                lappend Lst [expr {exp(log($Begin)\
+                                lappend Lst [expr {$Sign*exp(log($Begin)\
                                     +1.*(log($End)-log($Begin))*$i/$Steps)}]
                             }
                         } else {
@@ -711,7 +711,7 @@ proc mfjProc::replaceElm {VarName VarVal} {
                                     +1.*($End-$Begin)*$i/$Steps}]
                             }
                         }
-                        set Begin $End
+                        set Begin [expr $Sign*$End]
                         incr Cnt $Steps
                     } else {
                         lappend Lst $Val
@@ -723,8 +723,8 @@ proc mfjProc::replaceElm {VarName VarVal} {
                 # The number of permutations is updated only when the number
                 # of values is higher than one and different from the previous
                 # or ::SimArr(OneChild) is !OneChild
-                if {$Cnt > 1 && ($Cnt != [lindex $ValCntLst end]
-                    || [string index $::SimArr(OneChild) 0] eq "!")} {
+                if {$Cnt != [lindex $ValCntLst end]
+                    || [string index $::SimArr(OneChild) 0] eq "!"} {
                     set Prod [expr $Prod*$Cnt]
                 }
                 lappend ValSubLst $Lst
@@ -733,7 +733,7 @@ proc mfjProc::replaceElm {VarName VarVal} {
 
             # No expanding to the full list yet so the indexing afterwards is ok
             # These permutations are generated similar to the depth-first search
-            if {$Prod > 1} {
+            if {$Prod > 2} {
                 set Lst [list]
 
                 # Dividend ÷ Divisor = Quotient, Dividend % Divisor = Remainder
@@ -748,7 +748,7 @@ proc mfjProc::replaceElm {VarName VarVal} {
                     }
                     lappend DivrLst $Quo
                 }
-                for {set i 0} {$i < $Prod} {incr i} {
+                for {set i 1} {$i < $Prod} {incr i} {
                     for {set j 0} {$j < $IdxLen} {incr j} {
                         set Cnt [lindex $ValCntLst $j]
                         set Divr [lindex $DivrLst $j]
@@ -771,7 +771,7 @@ proc mfjProc::replaceElm {VarName VarVal} {
             }
 
             # One level already has a value without folding
-            lappend FoldLst [incr Prod -1]
+            lappend FoldLst [incr Prod -2]
         } else {
 
             # This level has no element-replacement pattern
@@ -1482,11 +1482,11 @@ proc mfjProc::lPolation {XList YList X {LinX ""} {LinY ""}} {
     # recursive mechanism. It trims excess spaces due to multiple lines and
     # user input.
 # Arguments:
-    # VarInfo     Variable info
     # StrList     Original string list entered by a user
+    # VarInfo     Optional variable info, default null string
     # Level       Optional, default list level starts from 0
 # Result: Return the formatted list
-proc mfjProc::str2List {VarInfo StrList {Level 0}} {
+proc mfjProc::str2List {StrList {VarInfo ""} {Level 0}} {
 
     # Validate arguments
     # A level should not be a negative integer
@@ -1511,8 +1511,8 @@ proc mfjProc::str2List {VarInfo StrList {Level 0}} {
             # a string or number, but a nested list instead e.g. {{{}}} or
             # {{{1 2 3 ...}}}
             # The function name is adaptive using '[lindex [info level 0] 0]'
-            lappend FmtLst [[lindex [info level 0] 0] $VarInfo\
-                $SubLst [expr $Level+1]]
+            lappend FmtLst [[lindex [info level 0] 0] $SubLst\
+                $VarInfo [expr $Level+1]]
         } else {
 
             # A string or a number
@@ -2174,17 +2174,23 @@ proc mfjProc::verifyPos {PosStr GStr DimLst Context} {
         set Cnt 0
         set NewPosLst [list]
         foreach Pos $PosLst {
-            if {$DimLen > 0 && [llength $Pos] != $DimLen} {
+            if {$DimLen == 0} {
+                
+                # Update 'DimLen' if it is not set
+                set DimLen [llength $Pos]
+            } else {
+                if {[llength $Pos] != $DimLen} {
 
-                # For 'p' test, skip a string having only one dimension.
-                # If the previous string is not a position, it is likely to an
-                # unrelevant string
-                if {$PosLen == 1 && [llength $Pos] == 1 && !$Bool} {
-                    return $NewStrLst
-                } else {
-                    error "element '$Pos' of $Context should\
-                        have the same number of coordinates as\
-                        variable 'RegGen'!"
+                    # For 'p' test, skip a string having only one dimension.
+                    # If the previous string is not a position, it is likely to
+                    # an unrelevant string
+                    if {$PosLen == 1 && [llength $Pos] == 1 && !$Bool} {
+                        return $NewStrLst
+                    } else {
+                        error "element '$Pos' of $Context should\
+                            have the same number of coordinates as\
+                            variable 'RegGen'!"
+                    }
                 }
             }
 

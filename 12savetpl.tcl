@@ -54,7 +54,7 @@ if {[file isfile 11ctrlsim.tcl]} {
     set Inf [open 11ctrlsim.tcl r]
     set Buff [read $Inf]
     close $Inf
-    if {[regexp {array set SimArr \{(.+)\};\#} $Buff -> Tmp]} {
+    if {[regexp {array\s+set\s+SimArr\s+\{(.+)\};\#} $Buff -> Tmp]} {
         array set SimArr $Tmp
     } else {
         mputs $Ouf "'SimArr' not found in '11ctrlsim.tcl'!"

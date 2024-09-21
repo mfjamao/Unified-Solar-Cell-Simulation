@@ -44,25 +44,25 @@ if {[file isfile $Dir/11ctrlsim.tcl]} {
 source $Dir/$SimArr(CodeDir)/$SimArr(FProc)
 namespace import [file rootname $SimArr(FProc)]::*
 
-set NPyr 60
+set NPyr 700
 
 # Square area side
-set Side 5
+set Side 2
 
 # Base and slant angle
-set LBase 5
+set LBase 0.5
 set ASlant 54.74
 
 set H [expr 0.5*$LBase*tan(asin(1)*$ASlant/90.)]
 set Str "\{"
 while {$NPyr > 0} {
     set X2 [expr $H*(1.-rand())]
-    set Y [expr -0.5*$LBase+($Side+$LBase)*rand()]
-    set Z [expr -0.5*$LBase+($Side+$LBase)*rand()]
-    append Str "\{Gas P R p${H}_${Y}_${Z}/${X2}_${Y}_${Z} $ASlant\} "
+    set Y [expr -$LBase+($Side+2*$LBase)*rand()]
+    set Z [expr -$LBase+($Side+2*$LBase)*rand()]
+    append Str "\{Gas P R p${H}_${Y}_${Z} p${X2}_${Y}_${Z} $ASlant\} "
     incr NPyr -1
 }
-append Str "\{Gas B K p0_0_0/${H}_${Side}_${Side}\} "
+append Str "\{Gas B K p0_0_0//${H}_${Side}_${Side}\} "
 append Str "\{Silicon 180 $Side $Side\} "
 append Str "\{Aluminum 1 $Side $Side\}\}"
 

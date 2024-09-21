@@ -53,7 +53,7 @@ if {[llength $ProcSeq]} {
                     set str "deposit material= [lindex $grp 1]\
                         thickness= [lindex $grp 2]<um> type= [lindex $grp 3]"
                 }
-                if {$Dim > 1 && [lindex $grp 4] >= 0
+                if {$DimLen > 1 && [lindex $grp 4] >= 0
                     && [lindex $grp 4] <= $cnt} {
                     append str " mask= \"M[lindex $grp 4]\""
                 }
@@ -111,7 +111,7 @@ if {[llength $ProcSeq]} {
                     set str "etch material= [lindex $grp 1]\
                         thickness= [lindex $grp 2]<um> type= [lindex $grp 3]"
                 }
-                if {$Dim > 1 && [lindex $grp 4] >= 0
+                if {$DimLen > 1 && [lindex $grp 4] >= 0
                     && [lindex $grp 4] <= $cnt} {
                     append str " mask= \"M[lindex $grp 4]\""
                 }
@@ -139,7 +139,7 @@ if {[llength $ProcSeq]} {
                     puts $ouf "line x loc= 1.0 spac= 0.05"
                 }
                 puts $ouf "line x loc= $val spac= 0.05 tag= bot"
-                if {$Dim > 1} {
+                if {$DimLen > 1} {
                     set val [lindex $var 1 1]
                     puts $ouf "line y loc= 0.0 spac= 0.001 tag= left"
                     if {$val > 0.05} {
@@ -150,7 +150,7 @@ if {[llength $ProcSeq]} {
                     }
                     puts $ouf "line y loc= $val spac= 0.05 tag= right"
                 }
-                if {$Dim == 3} {
+                if {$DimLen == 3} {
                     set val [lindex $var 1 2]
                     puts $ouf "line z loc= 0.0 spac= 0.001 tag= far"
                     if {$val > 0.05} {
@@ -161,9 +161,9 @@ if {[llength $ProcSeq]} {
                     }
                     puts $ouf "line z loc= $val spac= 0.05 tag= near"
                 }
-                if {$Dim == 1} {
+                if {$DimLen == 1} {
                     puts $ouf "region [lindex $grp 1] xlo= top xhi= bot"
-                } elseif {$Dim == 2} {
+                } elseif {$DimLen == 2} {
                     puts $ouf "region [lindex $grp 1] xlo= top xhi= bot\
                         ylo= left yhi= right"
                 } else {
@@ -194,10 +194,10 @@ if {[llength $ProcSeq]} {
                     }
                     set var [string map {p \{ _ " " // "\} \{"}\
                         [lindex $grp 1]]\}
-                    if {$Dim == 1} {
+                    if {$DimLen == 1} {
                         incr idx
                         continue
-                    } elseif {$Dim == 2} {
+                    } elseif {$DimLen == 2} {
                         append str " left= [lindex $var 0 1]\
                             right= [lindex $var 1 1]"
                     } else {
@@ -230,9 +230,9 @@ if {[llength $ProcSeq]} {
                 set var [split [string range [lindex $grp 1] 1 end] _]
                 set val $SimArr(OutDir)/n@node@_p${idx}_1DCut.plx
                 set str "WritePlx $val"
-                if {$Dim == 1} {
+                if {$DimLen == 1} {
                     append str " y= [expr $YMax*0.5]"
-                } elseif {$Dim == 2} {
+                } elseif {$DimLen == 2} {
                     append str " y= [lindex $var 1]"
                 } else {
                     append str " y= [lindex $var 1] z= [lindex $var 2]"

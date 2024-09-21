@@ -4,7 +4,7 @@
 #include "varSim.tcl"
 
 # Check 'VarVary' for optical requirement
-set VarVary [str2List "" $VarVary]
+set VarVary [str2List $VarVary]
 if {([regexp {\{MonoScaling\s} $VarVary] && $LPD == 0)
     || ([regexp {\{SpecScaling\s} $VarVary] && !$LoadTDR && $LPD == 0)} {
     error "no optical solver in 'GopAttr' for varying optics in 'VarVary'!"
@@ -71,7 +71,7 @@ vputs [wrapText "'ModPar': \{$ModPar\}" "* "]
 # Split 'GetFld' into 'VV2Fld' and 'SS2Fld'
 set VV2Fld [list]
 set SS2Fld [list]
-foreach grp [str2List "" $GetFld] {
+foreach grp [str2List $GetFld] {
     if {[regexp {^p[^/]+} [lindex $grp 0]]} {
         if {[string is integer -strict [lindex $grp 1]]} {
             lappend SS2Fld $grp
@@ -301,7 +301,7 @@ if {[regexp {\sRaytrace\s} $GopAttr]} {
         RayTraceBC \{ * Default Reflectivity boundary condition
             \{Name= \"TOpt\" reflectivity= 0 transmittivity= 0\}
             \{Name= \"BOpt\" reflectivity= 0 transmittivity= 0\}"
-    if {$Dim == 3} {
+    if {$DimLen == 3} {
         vputs -n -i-2 "
             \{Name= \"LOpt\" reflectivity= 1.0\}
             \{Name= \"ROpt\" reflectivity= 1.0\}
@@ -511,7 +511,7 @@ CurrentPlot {
             foreach str $val {
                 if {![regexp \\s$elm $str]} continue
                 if {[regexp {^p[^/]+$} [lindex $str 0]]} {
-                    if {$Dim == 1} {
+                    if {$DimLen == 1} {
                         vputs -n -i-5 "
                             ([string map {p "" _ " "} [lindex $str 0]]\
                             [format %g [expr $YMax/2.]])"
@@ -538,7 +538,7 @@ CurrentPlot {
                     } elseif {[regexp {^p[^/]+//[^/]+$} [lindex $str 0]]} {
                         set tmp [string map {p \{ _ " " // "\} \{"}\
                             [lindex $str 0]]\}
-                        if {$Dim == 1} {
+                        if {$DimLen == 1} {
                             set tmp "[lindex $var 0] (Window\[([lindex $tmp\
                                 0] 0) ([lindex $tmp 1] $YMax)\]"
                         } else {
@@ -593,7 +593,7 @@ CurrentPlot {
             foreach str $val {
                 if {![regexp \\s$elm $str]} continue
                 if {[regexp {^p[^/]+$} [lindex $str 0]]} {
-                    if {$Dim == 1} {
+                    if {$DimLen == 1} {
                         vputs -n -i-5 "
                             ([string map {p "" _ " "} [lindex $str 0]]\
                             [format %g [expr $YMax/2.]])"
@@ -620,7 +620,7 @@ CurrentPlot {
                     } elseif {[regexp {^p[^/]+//[^/]+$} [lindex $str 0]]} {
                         set tmp [string map {p \{ _ " " // "\} \{"}\
                             [lindex $str 0]]\}
-                        if {$Dim == 1} {
+                        if {$DimLen == 1} {
                             set tmp "[lindex $var 0] (Window\[([lindex $tmp\
                                 0] 0) ([lindex $tmp 1] $YMax)\]"
                         } else {
@@ -673,7 +673,7 @@ CurrentPlot {
             foreach str $val {
                 if {![regexp \\s$elm $str]} continue
                 if {[regexp {^p[^/]+$} [lindex $str 0]]} {
-                    if {$Dim == 1} {
+                    if {$DimLen == 1} {
                         vputs -n -i-5 "
                             ([string map {p "" _ " "} [lindex $str 0]]\
                             [format %g [expr $YMax/2.]])"
@@ -700,7 +700,7 @@ CurrentPlot {
                     } elseif {[regexp {^p[^/]+//[^/]+$} [lindex $str 0]]} {
                         set tmp [string map {p \{ _ " " // "\} \{"}\
                             [lindex $str 0]]\}
-                        if {$Dim == 1} {
+                        if {$DimLen == 1} {
                             set tmp "[lindex $var 0] (Window\[([lindex $tmp\
                                 0] 0) ([lindex $tmp 1] $YMax)\]"
                         } else {
@@ -727,7 +727,7 @@ CurrentPlot {
             foreach str $val {
                 if {![regexp \\s$elm $str]} continue
                 if {[regexp {^p[^/]+$} [lindex $str 0]]} {
-                    if {$Dim == 1} {
+                    if {$DimLen == 1} {
                         vputs -n -i-5 "
                             ([string map {p "" _ " "} [lindex $str 0]]\
                             [format %g [expr $YMax/2.]])"
@@ -770,7 +770,7 @@ CurrentPlot {
                     } else {
                         set tmp [string map {p \{ _ " " // "\} \{"}\
                             [lindex $str 0]]\}
-                        if {$Dim == 1} {
+                        if {$DimLen == 1} {
                             set tmp "[lindex $var 0] (Window\[([lindex $tmp\
                                 0] 0) ([lindex $tmp 1] $YMax)\]"
                         } else {
@@ -938,7 +938,7 @@ if {[regexp {\{(Mono|Spec)Scaling\s} $VarVary]} {
     } else {
         set var [expr 90.+$var]
     }
-    if {$Dim == 3} {
+    if {$DimLen == 3} {
         vputs -n -i-1 "
                 Theta= $var * deg
                 Phi= $tmp * deg"
@@ -958,7 +958,7 @@ if {[regexp {\{(Mono|Spec)Scaling\s} $VarVary]} {
             }
             vputs -n -i-1 "
                 Window (\"W$idx\") ("
-            if {$Dim == 3} {
+            if {$DimLen == 3} {
                 vputs -n -i-1 "
                     Origin= ([lindex $lst 0 0], [expr ([lindex $lst 0 1]\
                         +[lindex $lst 1 1])*0.5], [expr ([lindex $lst 0 2]\
@@ -968,7 +968,7 @@ if {[regexp {\{(Mono|Spec)Scaling\s} $VarVary]} {
                         Dx= [expr abs([lindex $lst 1 2]-[lindex $lst 0 2])]
                         Dy= [expr abs([lindex $lst 1 1]-[lindex $lst 0 1])]
                     )"
-            } elseif {$Dim == 2} {
+            } elseif {$DimLen == 2} {
                 vputs -n -i-1 "
                     Origin= ([lindex $lst 0 0], [expr ([lindex $lst 0 1]\
                         +[lindex $lst 1 1])*0.5])
@@ -1582,7 +1582,7 @@ Math {
         vputs -n -i-2 "
             ExtendedPrecision([lindex $lst 0])"
     }
-    if {$Dim == 2 && [lindex $SimEnv 2] eq "Cylindrical"} {
+    if {$DimLen == 2 && [lindex $SimEnv 2] eq "Cylindrical"} {
         vputs -n -i-2 "
             Cylindrical (yAxis= 0)"
     }
@@ -1784,7 +1784,7 @@ foreach grp $VarVary {
                 # Realise the logarithmic scale (Equidistant logarithmically)
                 # for intensity scaling: MPP for Suns-Voc is around 4-5% sun
                 if {$val == 0} {
-                    
+
                     # Remove 0 for QSSPC
                     if {[regexp {c\d } [array get arr]]} {
                         set txt 0\;
@@ -1805,7 +1805,7 @@ foreach grp $VarVary {
                         append txt "[expr exp(log($val)+[incr tmp]\
                             *(log(1e-5)-log($val))/[lindex $grp 2])/$val]\; "
                     }
-                    
+
                     # Remove 0 for QSSPC
                     if {[regexp {c\d } [array get arr]]} {
                         append txt 1

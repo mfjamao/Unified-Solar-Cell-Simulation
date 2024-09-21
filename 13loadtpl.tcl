@@ -5,8 +5,8 @@
 # project directory where the script resides. If the target files are the same
 # or newer, they are not replaced. Nevertheless, 10variables-brief.txt is always
 # overwritten. Additionally, Special treatment is applied to 11ctrlsim.tcl so
-# that values of ST|Hosts, ST|Paths, ST|Licns, Email|Sufx, Email, and OneChild
-# in 'SimArr' are still preserved in the target file.
+# that values of ST|Hosts, ST|Paths, ST|Licns, Email|Sufx, Email, OneChild,
+# SameDev, and HideVar in 'SimArr' are still preserved in the target file.
 #
 # Maintained by Dr. Fa-Jun MA (mfjamao@yahoo.com)
 ################################################################################
@@ -157,19 +157,21 @@ if {$Flg} {
     mputs $Ouf "Located the template file: '$argv'"
 
     # If the template is under WD, move it to 'TplDir' if not
-    if {[lindex [file split $argv] 0] ne $TplDir} {
-        if {[file pathtype $argv] eq "relative"} {
+    if {[lindex [file split $argv] 0] ne $TplDir
+        && [file pathtype $argv] eq "relative"} {
             mputs $Ouf "${Tab}Move '$argv' to '$TplDir'!"
             set FTpl $TplDir/[file tail $argv]
             file copy -force $argv $FTpl
             file delete $argv
             set argv $FTpl
-        } else {
-            mputs $Ouf "${Tab}Copy '$argv' to '$TplDir'!"
-            set FTpl $TplDir/[file tail $argv]
-            file copy -force $argv $FTpl
-            set argv $FTpl
-        }
+    }
+
+    # If the template is elsewhere, copy it to 'TplDir'
+    if {[file pathtype $argv] eq "absolute"} {
+        mputs $Ouf "${Tab}Copy '$argv' to '$TplDir'!"
+        set FTpl $TplDir/[file tail $argv]
+        file copy -force $argv $FTpl
+        set argv $FTpl
     }
 } else {
     mputs $Ouf "\n'$argv' not found!\n"
@@ -225,7 +227,7 @@ if {[file isfile $FStr]} {
         }
 
         # Preserve the following settings in the target 11ctrlsim.tcl
-        #   ST|Hosts ST|Paths ST|Licns Email|Sufx Email OneChild
+        #   ST|Hosts ST|Paths ST|Licns Email|Sufx Email OneChild SameDev HideVar
         foreach Elm {ST\\|Hosts ST\\|Paths ST\\|Licns Email\\|Sufx} {
 
             # Both REs work, yet the 2nd RE is more generetic than the 1st
@@ -239,10 +241,16 @@ if {[file isfile $FStr]} {
                 regsub $Elm\\s+\\\{\[^\\\}\]+\\\} $Src $TgtArr($Elm) Src
             }
         }
+        regexp {(OneChild\s+\S+\s+SameDev)} $Tgt -> Val
+        regsub {OneChild\s+\S+\s+SameDev} $Src $Val Src
+        regexp {(SameDev\s+\S+\s+HideVar)} $Tgt -> Val
+        regsub {SameDev\s+\S+\s+HideVar} $Src $Val Src
+        regexp {(HideVar\s+\S+\s+FullSchenk)} $Tgt -> Val
+        regsub {HideVar\s+\S+\s+FullSchenk} $Src $Val Src
+        regexp {(FullSchenk\s+\S+\s+Email)} $Tgt -> Val
+        regsub {FullSchenk\s+\S+\s+Email} $Src $Val Src
         regexp {(Email\s+\S+\s+Time)} $Tgt -> Val
         regsub {Email\s+\S+\s+Time} $Src $Val Src
-        regexp {(OneChild\s+\S+\s+DfltYMax)} $Tgt -> Val
-        regsub {OneChild\s+\S+\s+DfltYMax} $Src $Val Src
         set Tmp [open $FStr w]
         puts -nonewline $Tmp $Src
         close $Tmp
