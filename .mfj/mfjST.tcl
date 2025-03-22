@@ -525,7 +525,7 @@ proc mfjST::tclvsFmt {} {
                         vputs -i1 $Msg
                     }
                     if {$Flg && $STIdx > 0 && $arr(StartIdx) == -1} {
-                        set arr(StartIdx) [expr $STIdx-1]
+                        set arr(StartIdx) $STIdx
                         set Flg false
                     }
                     vputs -i2 "Simulation variable '$Var' of '$Tool' removed!"
@@ -537,7 +537,7 @@ proc mfjST::tclvsFmt {} {
                         vputs -i1 $Msg
                     }
                     if {$Flg && $STIdx > 0 && $arr(StartIdx) == -1} {
-                        set arr(StartIdx) [expr $STIdx-1]
+                        set arr(StartIdx) $STIdx
                         set Flg false
                     }
                     vputs -i2 "Simulation variable '$Var' has a value of\
@@ -552,7 +552,7 @@ proc mfjST::tclvsFmt {} {
                         vputs -i1 $Msg
                     }
                     if {$Flg && $STIdx > 0 && $arr(StartIdx) == -1} {
-                        set arr(StartIdx) [expr $STIdx-1]
+                        set arr(StartIdx) $STIdx
                         set Flg false
                     }
                     vputs -i2 "Simulation variable '$Var' of '$Tool' added!"
@@ -1602,8 +1602,8 @@ proc mfjST::fmt2swb {} {
     foreach Elm [list validatePath readTcl tclvsFmt updateTcl ReadSWB\
         SWBvsTcl UpdateSWB readBatch batchvsTcl updatePP_Bat\
         updateDOESum miscTask] {
-        if {[catch $Elm ErrMsg]} {
-            vputs -c "\nError in proc '$Elm':\n$ErrMsg\n"
+        if {[catch $Elm Err]} {
+            vputs -c "\nError in proc '$Elm':\n$Err\n"
             exit 1
         }
     }
@@ -1613,8 +1613,8 @@ proc mfjST::fmt2swb {} {
 #   Translate changes in gtree.dat to the Tcl file only
 proc mfjST::swb2tcl {} {
   foreach Elm {ReadSWB readTcl TclvsSWB arrvsSWB updateTcl updateArr} {
-        if {[catch $Elm ErrMsg]} {
-            vputs -c "\nError in proc '$Elm':\n$ErrMsg\n"
+        if {[catch $Elm Err]} {
+            vputs -c "\nError in proc '$Elm':\n$Err\n"
             exit 1
         }
     }

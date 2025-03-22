@@ -32,8 +32,8 @@ namespace eval mfjIntrpr {
 proc mfjIntrpr::readRaw {} {
     variable arr
     vputs "Reading the raw variable file '$::SimArr(FVarRaw)'..."
-    if {[catch {iFileExists ::SimArr(FVarRaw)}]} {
-        error "'$::SimArr(FVarRaw)' missing in directory '[file tail [pwd]]'!"
+    if {[catch {iFileExists ::SimArr(FVarRaw)} Err]} {
+        error "failed to find '$::SimArr(FVarRaw)': $Err'!"
     }
 
     # Set the following indentation as 2 (8 spaces)
@@ -943,11 +943,7 @@ proc mfjIntrpr::updateGrm {} {
         }
         if {$Diff} {
             set UpdateGrm true
-            set Lst ""
-            foreach Elm $arr(Host|AllSTVer) {
-                lappend Lst [string map {- <-} $Elm]>
-            }
-            set GrmStr ([concat [lrange $GrmStr 0 4] $Lst])
+            set GrmStr ([concat [lrange $GrmStr 0 4] $arr(Host|AllSTVer)])
 
             # Substitute matched string
             lset SimGrm 1 [regsub {\([^)]+\)} [lindex $SimGrm 1] $GrmStr]
@@ -1430,15 +1426,7 @@ proc mfjIntrpr::valRegGen {} {
 
                 # Make sure all positions tally with the dimension
                 set Str [lindex $DimLst 0]
-                if {[string equal -nocase $Str "Block"]} {
-
-                    # Convert 'pp' to two coordinate lists
-                    set Lst [concat $Str [string map {p \{ _ " " // "\} \{"}\
-                        [lindex $DimLst 2]]\}]
-                    if {[llength [lindex $Lst end]] == 1} {
-                        error "position '[lindex $Lst end]' is 1D for '$Str'!"
-                    }
-                } elseif {[string equal -nocase $Str "Vertex"]} {
+                if {[string equal -nocase $Str "Vertex"]} {
                     set Lst $Str
 
                     # Convert each 'p' to a coordinate list
@@ -1454,7 +1442,8 @@ proc mfjIntrpr::valRegGen {} {
                     # Convert two 'p' to two coordinate lists
                     foreach Elm [lrange $DimLst 2 3] {
                         lappend Lst [string map {p "" _ " "} $Elm]
-                        if {[string equal -nocase $Str "Ellipse"]} {
+                        if {[string equal -nocase $Str "Ellipse"]
+                            || [string equal -nocase $Str "Block"]} {
                             if {[llength [lindex $Lst end]] == 1} {
                                 error "position '$Elm' is 1D for '$Str'!"
                             }
@@ -2423,8 +2412,8 @@ proc mfjIntrpr::updateFmt {} {
 proc mfjIntrpr::raw2Fmt {} {
     variable arr
     foreach Elm {readHost readRaw readBrf rawvsBrf} {
-        if {[catch $Elm ErrMsg]} {
-            vputs -c "\nError in proc '$Elm':\n$ErrMsg\n"
+        if {[catch $Elm Err]} {
+            vputs -c "\nError in proc '$Elm':\n$Err\n"
             exit 1
         }
     }
@@ -2449,16 +2438,16 @@ proc mfjIntrpr::raw2Fmt {} {
     if {$arr(UpdateBrf) || $arr(UpdateRaw) || $RawMod} {
         foreach Elm {updateBrf activateRR sortVar updateGrm validateVar
             readFmt fmtvsRaw updateFmt updateRaw} {
-            if {[catch $Elm ErrMsg]} {
-                vputs -c "\nError in proc '$Elm':\n$ErrMsg\n"
+            if {[catch $Elm Err]} {
+                vputs -c "\nError in proc '$Elm':\n$Err\n"
                 exit 1
             }
         }
     } else {
         vputs "Skip grammar check as variable files are not modified :)\n"
         foreach Elm {readFmt updateModTime updateFmt} {
-            if {[catch $Elm ErrMsg]} {
-                vputs -c "\nError in proc '$Elm':\n$ErrMsg\n"
+            if {[catch $Elm Err]} {
+                vputs -c "\nError in proc '$Elm':\n$Err\n"
                 exit 1
             }
         }
@@ -2470,8 +2459,8 @@ proc mfjIntrpr::raw2Fmt {} {
 proc mfjIntrpr::tcl2Raw {} {
     foreach Elm {readFmt fmtvsTcl updateFmt readRaw rawvsFmt updateRaw
         updateBrf} {
-        if {[catch $Elm ErrMsg]} {
-            vputs -c "\nError in proc '$Elm':\n$ErrMsg\n"
+        if {[catch $Elm Err]} {
+            vputs -c "\nError in proc '$Elm':\n$Err\n"
             exit 1
         }
     }

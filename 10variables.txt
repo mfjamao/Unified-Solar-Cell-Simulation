@@ -36,9 +36,9 @@ Specification (after semicolon):
    7 Number of CPUs (i >= 1): 4
 
 <GRAMMAR>{a = Sentaurus | s Sentaurus}
-{a = U-2022.12 | `s E-2010.12 F-2011.09 G-2012.06 H-2013.03 I-2013.12 J-2014.09
+{a = V-2023.09 | `s E-2010.12 F-2011.09 G-2012.06 H-2013.03 I-2013.12 J-2014.09
     K-2015.06 L-2016.03 M-2016.12 N-2017.09 O-2018.06 P-2019.03 Q-2019.12
-    R-2020.09 S-2021.06 T-2022.03 U-2022.12}
+    R-2020.09 S-2021.06 T-2022.03 U-2022.12 V-2023.09}
 {a = !Cylindrical | s C<ylindrical> !Cylindrical}
 {a = Electrical | s O<ptical> P<rocess> Electrical}
 {a = Local | s P<BS> Local}
@@ -46,7 +46,7 @@ Specification (after semicolon):
 {!= v-3 Local & (a = 20 | `i & `>= 1) | a}
 {!= v-4 Local & (a = 4 | `i & `>= 1) | a}
 
-<VAR>SimEnv     {Sentaurus T-2022.03 !Cylindrical Electrical pbs 1 5 8}
+<VAR>SimEnv     {Sentaurus T-2022.03 !Cylindrical Electrical pbs 1 6 8}
 
 <SENTAURUS>Tool_label = sde Tool_name = sde
 
@@ -93,7 +93,7 @@ Specifications for regions employing the implicit method:
         Mat6 x3 y3 z3 ...}
 
 Specifications for regions employing the explicit method:
-    Block (2D/3D) specify its diagonal vertices: mat Block Keep px1_y1//x2_y2
+    Block (2D/3D) specify its diagonal vertices: mat Block Keep px1_y1 px2_y2
     Vertices (2D polygon) specify its vertices (>= 3): mat V K px1_y1 px2_y2 ...
     Ellipse (2D/3D) specify its centre to its major radius followed by an
         optional MinR/MaxR: mat Ellipse Keep px1_y1 px2_y2 [MinR/MaxR]
@@ -107,8 +107,8 @@ Specifications for regions employing the explicit method:
 <GRAMMAR>m
 {`!a & n & `> 0 | s E<llipse> V<ertices> P<yramid> C<one> Block}
 {n v1 & (a | `n & `> 0) | `!a & s K<eep>  M<erge> Remove}
-{n v1 & (a | `n & `> 0) | `!a & (== v1 Block & `pp | `p)}
-{(n v1 | == v1 Block) & `a | `!a & `p}
+{n v1 & (a | `n & `> 0) | `!a & `p}
+{n v1 & `a | `!a & `p}
 {(n v1 | == v1 Block) & `a | == v1 Ellipse & (a = 1 | `n & `> 0 & `<= 1)
     | == v1 Pyramid & (a = 54.74 | `n & `> 0 & `< 90)
     | `!a & (== v1 Cone & (`n & `> 0) | `p)}
@@ -386,13 +386,13 @@ Specification for write 1D profile along x:
     1 Position: p0_1
 
 <GRAMMAR>{q}
-{== v0 Calibrate & (a = U-2022.12 | `s E<-2010.12> F<-2011.09> G<-2012.06>
-    H<-2013.03> I<-2013.12> J<-2014.09> K<-2015.06> L<-2016.03> M<-2016.12>
-    N<-2017.09> O<-2018.06> P<-2019.03> Q<-2019.12> R<-2020.09> S<-2021.06>
-    T<-2022.03> U<-2022.12>) | == v0 (Deposit|Etch) & (`!a & `m) | == v0 Diffuse
-    & (`!a & `f) | == v0 Implant & (`!a & `s As B P) | == v0 Init & (`!a & `m) |
-    == v0 Mask & (`!a & `pp) | == v0 Select & (`!a & `s Int Vac) | == v0
-    Transform & (`!a & s flip) | == v0 Write & (`!a & `p)}
+{== v0 Calibrate & (a = V-2023.09 | `s E-2010.12 F-2011.09 G-2012.06 H-2013.03
+    I-2013.12 J-2014.09 K-2015.06 L-2016.03 M-2016.12 N-2017.09 O-2018.06
+    P-2019.03 Q-2019.12 R-2020.09 S-2021.06 T-2022.03 U-2022.12 V-2023.09) | ==
+    v0 (Deposit|Etch) & (`!a & `m) | == v0 Diffuse & (`!a & `f) | == v0 Implant
+    & (`!a & `s As B P) | == v0 Init & (`!a & `m) | == v0 Mask & (`!a & `pp) |
+    == v0 Select & (`!a & `s Int Vac) | == v0 Transform & (`!a & s flip) | == v0
+    Write & (`!a & `p)}
 {== v0 Write & `a | == v0 Calibrate & (a | `f) | == v0 (Deposit|Etch) & (`!a &
     `n & `> 0) | == v0 Diffuse & (a = atm | s torr Pa atm) | == v0 Implant &
     (`!a & `n & `> 0) | == v0 Init & (`!a & `pp) | == v0 Mask & (a = positive |
@@ -660,16 +660,22 @@ Specification for field integration from snapshots:
 <COMMENT>Data extraction and analysis for variable varying 'VarVary'
 Extract data from 'VarVary', prepare XY plots and make further analysis
 
-Specification:
+Specification for data analysis:
     0 A reference to VarVary step to extract data: v#
     1 Optional analysis of extracted data: JV
     2 Optional Dn (n > 0) [cm-3] for lifetime extraction: 1e15
+      or optional Rs [ohmcm2] for external series resistance: 0.1
     3 Optional JOG (n > 0) [mA/cm2] for iVoc extraction: 38
+      or optional Rsh [ohmcm2] for external shunt resistance: 5000
+Sepcification for extraction precision of characteristics:
+    0 Variable identifier: Pr<ecision>
+    1 Number of digits on both sides of decimal point: 5
 
 <GRAMMAR>v
-{a | `s CV JV QE SunsVoc SunsJsc QSSPC RAT}
-{== v-2 QSSPC & (a = 1e15 | `n & `> 0) | `a}
-{== v-3 QSSPC & (a = 38 | `n & `> 0) | `a}
+{== v0 Precision & (a = 5 | `i & `> 0)
+    | a | `s CV JV QE SunsVoc SunsJsc QSSPC RAT}
+{== v1 QSSPC & (a = 1e15 | `n & `> 0) | == v1 JV & (a | `n & `> 0) | `a}
+{== v1 QSSPC & (a = 38 | `n & `> 0) | == v1 JV & (a | `n & `> 0) | `a}
 
 <VAR>PPAttr     {{v2 QE} {v5 JV}}
 

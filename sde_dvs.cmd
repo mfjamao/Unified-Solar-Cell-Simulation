@@ -10,7 +10,7 @@
 set inf [open 11ctrlsim.tcl r]
 set str [read $inf]
 close $inf
-if {[regexp {array\s+set\s+SimArr\s+\{(.+)\};\#} $str -> tmp]} {
+if {[regexp {array set SimArr \{(.+)\};\#} $str -> tmp]} {
     array set SimArr [regsub -all {\s+} $tmp " "]
 } else {
     error "'SimArr' not found in '11ctrlsim.tcl'!"
@@ -306,6 +306,8 @@ foreach elm {IntfSRV IntfTrap IntfCon IntfTun lst} {
     set $elm [list]
 }
 set IntfAttr [str2List $IntfAttr]
+set var [list]
+set val [list]
 foreach grp $IntfAttr {
     set lst [string map {r "" / " "} [lindex $grp 0]]
     regsub {^r(\d+)/(\d+)} $grp {r\2/\1} str

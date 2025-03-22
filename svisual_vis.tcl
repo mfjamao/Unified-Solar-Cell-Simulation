@@ -50,6 +50,12 @@ set k 1.380649e-23
 set kB [expr {$k/$q}]
 regexp {\{Other\s+([^\}]+)} $DfltAttr -> lst
 set T [expr [lindex $lst 0]+273.15]
+if {[lindex $PPAttr 0 0] eq "Precision"} {
+    set Prec [lindex $PPAttr 0 1]
+    set PPAttr [lrange $PPAttr 1 end]
+} else {
+    set Prec 5
+}
 
 #--- Automatic alternating color, marker and line assignment
 set colorLst {black red darkRed green darkGreen blue darkBlue cyan darkCyan
@@ -521,7 +527,6 @@ foreach pp $PPAttr {
                 create_curve -name ${pp0}_9|Shading -function\
                     "$fShd*<${pp0}_A|Inc>/<${pp0}_A|Inc>"
             }
-            remove_curves ${pp0}_A|Inc
 
             set lst [list]
             foreach curve [list_curves -plot PltRAT_$pp0] {
@@ -609,7 +614,6 @@ foreach pp $PPAttr {
                 }
                 vputs
             }
-            remove_curves ${pp0}_A|Inc
 
         } elseif {[regexp {\sOBAM} $GopAttr]} {
 
@@ -647,7 +651,6 @@ foreach pp $PPAttr {
                     vputs
                 }
             }
-            remove_curves ${pp0}_A|Inc
 
         } else {
         }
@@ -665,7 +668,16 @@ foreach pp $PPAttr {
         set_axis_prop -axis y -title_font_size 20 -type linear\
             -scale_font_size 16 -scale_format preferred\
             -title {RAT} -range "0 1.01"
+        set_axis_prop -axis y2 -title_font_size 20 -type linear\
+            -scale_font_size 16 -scale_format preferred\
+            -title {Flux|mA/cm2} -range "0 1"
         set_legend_prop -location top_right
+
+        # Append spectral flux [mA*cm^-2]
+        create_curve -name ${pp0}_9|Flux -function\
+            "<${pp0}_A|Inc>*$q*1e3"
+        set_curve_prop ${pp0}_9|Flux -axis right
+        remove_curves ${pp0}_A|Inc
 
         vputs -i2 "Save all curves to $fRAT"
         foreach curve [list_curves -plot PltRAT_$pp0] {
@@ -899,7 +911,8 @@ foreach pp $PPAttr {
                 set ogLst $newLst
             }
 
-            if {[info exists arr(ARCMat)] && [llength $arr(ARCMat)]} {
+            if {[llength $specLst]
+                && [info exists arr(ARCMat)] && [llength $arr(ARCMat)]} {
                 vputs -i2 "Save 1D weighted sum of optical generation rate\
                     with ARC to '$fGopARCWS'"
                 set ouf [open $fGopARCWS w]
@@ -996,11 +1009,51 @@ foreach pp $PPAttr {
         create_curve -name ${pp0}_P -function "<${pp0}_JV>*<${pp0}_VV>"
         remove_curves "${pp0}_IV ${pp0}_VV"
 
+        # Circuit calculation if Rs is specified
+        if {[lindex $pp 1] eq "JV" && [llength $pp] > 2} {
+            set Rs [lindex $pp 2]
+            set Jcct "$bCon CircuitCurrentDensity"  ;# mA/cm2
+            set Vcct "$bCon CircuitVoltage"         ;# V
+            if {[llength $pp] > 3} {
+                set Rsh [lindex $pp 3]
+                create_variable -name $Jcct -dataset Data_$pp0\
+                    -function "1e3*(<$bCon TotalCurrent:Data_$pp0>/$jArea\
+                    +<$xVar:Data_$pp0>/$Rsh)"
+            } else {
+                create_variable -name $Jcct -dataset Data_$pp0\
+                    -function "1e3*<$bCon TotalCurrent:Data_$pp0>/$jArea"
+            }
+            create_variable -name $Vcct -dataset Data_$pp0\
+                -function "<$xVar:Data_$pp0>+1e-3*<$Jcct:Data_$pp0>*$Rs"
+            create_curve -name ${pp0}_JV_cct -dataset Data_$pp0\
+                -axisX $Vcct -axisY $Jcct
+            create_curve -name ${pp0}_VV_cct -dataset Data_$pp0\
+                -axisX $Vcct -axisY $Vcct
+            create_curve -name ${pp0}_P_cct\
+                -function "<${pp0}_JV_cct>*<${pp0}_VV_cct>"
+
+            set jcctLst [get_curve_data ${pp0}_JV_cct -axisY -plot PltJV_$pp0]
+            if {$xLow <= 0 && $xHigh >= 0} {
+                set jsc_cct [lindex [probe_curve ${pp0}_JV_cct -valueX 0\
+                    -plot PltJV_$pp0] 0]
+            } else {
+                set jsc_cct [lindex [lsort -real $jcctLst] 0]
+            }
+            if {$jsc_cct < 0} {
+                set tmp [format %.${Prec}g [expr abs($jsc_cct)]]
+                vputs -i2 [format "Short circuit current density with Rs:\
+                    %.${Prec}g mA*cm^-2" $tmp]
+                vputs -i2 "DOE: ${pp0}_Jsc_cct $tmp"
+                set gVarArr(${pp0}_Jsc_cct|mA*cm^-2) $tmp
+            }
+            remove_curves "${pp0}_VV_cct"
+        }
+
         # Extract maximum current density
         set jLst [get_curve_data ${pp0}_JV -axisY -plot PltJV_$pp0]
         set pLst [get_curve_data ${pp0}_P -axisY -plot PltJV_$pp0]
         set maxJ [lindex [lsort -real $jLst] end]
-        vputs -i2 [format "Max current density: %.4g mA*cm^-2" $maxJ]
+        vputs -i2 [format "Max current density: %.${Prec}g mA*cm^-2" $maxJ]
         if {$xLow <= 0 && $xHigh >= 0} {
             set jsc [lindex [probe_curve ${pp0}_JV -valueX 0\
                 -plot PltJV_$pp0] 0]
@@ -1009,14 +1062,15 @@ foreach pp $PPAttr {
         }
 
         # Check monochromatic and spectrum scaling for light JV
-        if {$ValArr(SpecScaling) > 0 || $ValArr(MonoScaling) > 0} {
+        if {$ValArr(SpecScaling) > 0 || $ValArr(MonoScaling) > 0
+            && [lindex $pp 1] eq "JV"} {
 
             # Calculate photogeneration current density
             set jog [expr 1e3*$q*[lindex [get_variable_data -dataset\
                 Data_$pp0 "IntegrSemiconductor $ogPlt"] end]/$intArea]
             vputs -i2 [format "Photogeneration current density:\
-                %.4g mA*cm^-2" $jog]
-            set tmp [format %.4g $jog]
+                %.${Prec}g mA*cm^-2" $jog]
+            set tmp [format %.${Prec}g $jog]
             vputs -i2 "DOE: ${pp0}_Jog $tmp"
             set gVarArr(${pp0}_Jog|mA*cm^-2) $tmp
 
@@ -1027,7 +1081,7 @@ foreach pp $PPAttr {
 
                 # Extract the spectrum power [mW*cm^-2]
                 set pSpec [expr [specInt $str]*$ValArr(SpecScaling)]
-                set tmp [format %.4g $pSpec]
+                set tmp [format %.${Prec}g $pSpec]
                 vputs -i2 "DOE: ${pp0}_Pspec $tmp"
                 set gVarArr(${pp0}_Pspec|mW*cm^-2) $tmp
                 set pSum [expr $pSum+$pSpec]
@@ -1035,20 +1089,20 @@ foreach pp $PPAttr {
             if {$ValArr(MonoScaling) > 0 && [regexp\
                 {\{Monochromatic\s+\S+\s+([^\s\}]+)} $GopAttr -> tmp]} {
                 set pMono [expr 1e3*$tmp*$ValArr(MonoScaling)]
-                set tmp [format %.4g $pMono]
+                set tmp [format %.${Prec}g $pMono]
                 vputs -i2 "DOE: ${pp0}_Pmono $tmp"
                 set gVarArr(${pp0}_Pmono|mW*cm^-2) $tmp
                 set pSum [expr $pSum+$pMono]
             }
-            set tmp [format %.4g $pSum]
+            set tmp [format %.${Prec}g $pSum]
             vputs -i2 "DOE: ${pp0}_Psum $tmp"
             set gVarArr(${pp0}_Psum|mW*cm^-2) $tmp
 
             # Extract Jsc, Voc, Eff and FF for forward bias only
             if {$jsc < 0} {
-                set tmp [format %.4g [expr abs($jsc)]]
+                set tmp [format %.${Prec}g [expr abs($jsc)]]
                 vputs -i2 [format "Short circuit current density:\
-                    %.4g mA*cm^-2" $tmp]
+                    %.${Prec}g mA*cm^-2" $tmp]
                 vputs -i2 "DOE: ${pp0}_Jsc $tmp"
                 set gVarArr(${pp0}_Jsc|mA*cm^-2) $tmp
                 set pmpp 0
@@ -1061,24 +1115,27 @@ foreach pp $PPAttr {
                         set jmpp $j
                     }
                 }
-                set tmp [format %.4g [expr abs($pmpp)]]
+                set tmp [format %.${Prec}g [expr abs($pmpp)]]
                 vputs -i2 "DOE: ${pp0}_Pmpp $tmp"
                 set gVarArr(${pp0}_Pmpp|mW*cm^-2) $tmp
                 if {$pSum > 0} {
-                    set tmp [format %.4g [expr 1e2*abs($pmpp)/$pSum]]
+                    set tmp [format %.${Prec}g [expr 1e2*abs($pmpp)/$pSum]]
                     vputs -i2 "DOE: ${pp0}_Eff $tmp"
                     set gVarArr(${pp0}_Eff|%) $tmp
                 } else {
                     vputs -i2 "no spectrum specified!"
                 }
-                set tmp [format %.4g $vmpp]
+                set tmp [format %.${Prec}g $vmpp]
                 vputs -i2 "DOE: ${pp0}_Vmpp $tmp"
                 set gVarArr(${pp0}_Vmpp|V) $tmp
+                set tmp [format %.${Prec}g [expr abs($jmpp)]]
+                vputs -i2 "DOE: ${pp0}_Jmpp $tmp"
+                set gVarArr(${pp0}_Jmpp|mA*cm^-2) $tmp
                 if {$maxJ > 0} {
                     set voc [lindex [probe_curve ${pp0}_JV -valueY 0\
                         -plot PltJV_$pp0] 0]
                     set foundVoc true
-                    set tmp [format %.5g $voc]
+                    set tmp [format %.${Prec}g $voc]
                     vputs -i2 "DOE: ${pp0}_Voc $tmp"
                     set gVarArr(${pp0}_Voc|V) $tmp
                 } else {
@@ -1086,12 +1143,27 @@ foreach pp $PPAttr {
                     vputs -i2 "Voc could NOT be extracted!"
                 }
                 if {$foundVoc} {
-                    set tmp [format %.4g [expr 1e2*$pmpp/$voc/$jsc]]
+                    set tmp [format %.${Prec}g [expr 1e2*$pmpp/$voc/$jsc]]
                     vputs -i2 "DOE: ${pp0}_FF $tmp"
                     set gVarArr(${pp0}_FF) $tmp
-                    set tmp [format %.4g [expr abs($jmpp)]]
-                    vputs -i2 "DOE: ${pp0}_Jmpp $tmp"
-                    set gVarArr(${pp0}_Jmpp|mA*cm^-2) $tmp
+
+                    # Extract circuit efficiency and FF
+                    if {[llength $pp] > 2} {
+                        set pmpp 0
+                        foreach p [get_curve_data ${pp0}_P_cct -axisY\
+                            -plot PltJV_$pp0] {
+                            if {$p < $pmpp} {
+                                set pmpp $p
+                            }
+                        }
+                        set tmp [format %.${Prec}g\
+                            [expr 1e2*$pmpp/$voc/$jsc_cct]]
+                        vputs -i2 "DOE: ${pp0}_FF_cct $tmp"
+                        set gVarArr(${pp0}_FF_cct) $tmp
+                        set tmp [format %.${Prec}g [expr 1e2*abs($pmpp)/$pSum]]
+                        vputs -i2 "DOE: ${pp0}_Eff_cct $tmp"
+                        set gVarArr(${pp0}_Eff_cct|%) $tmp
+                    }
                 }
             } else {
                 vputs -i2 "\nerror: '$bCon' not a hole contact!\n"
@@ -1123,7 +1195,7 @@ foreach pp $PPAttr {
         vputs -i2 "Save all curves to $fJV"
         foreach curve [list_curves -plot PltJV_$pp0] {
             regexp {^v\d+_(.+)$} $curve -> str
-            if {$str eq "JV"} {
+            if {[string range $str 0 1] eq "JV"} {
                 set_curve_prop $curve -label $str -markers_type\
                     [lindex $markerLst [expr $pCnt%$markerLen]]
                 regexp {\|(\S+)$} [get_axis_prop -axis Y -title] -> str
@@ -1242,7 +1314,7 @@ foreach pp $PPAttr {
                 "$bCon TotalCurrent"]
             set jBias [lindex $lst 0]
             vputs -i2 [format "Extracted Jsc/JOG at bias light:\
-                %.4g/%.4g mA*cm^-2" [expr 1e3*$jBias/$jArea] $jOGBias]
+                %.${Prec}g/%.${Prec}g mA*cm^-2" [expr 1e3*$jBias/$jArea] $jOGBias]
 
             regexp {\{Monochromatic\s+\S+\s+([^\s\}]+)} $GopAttr -> val
             set pMono [expr $val*$ValArr(MonoScaling)]
@@ -1393,30 +1465,50 @@ foreach pp $PPAttr {
         set dnLst [list]
         foreach grp $VV2Fld {
             set txt ""
-            set str [string range [lindex $grp 0] 1 end]
             if {[regexp {^p[^/]+$} [lindex $grp 0]]
                 && [regexp { Dn} $grp]} {
+                set str ""
+                foreach tmp [string map {p "" _ " "} [lindex $grp 0]] {
+                    if {$str eq ""} {
+                        append str [format %g $tmp]
+                    } else {
+                        append str ,[format %g $tmp]
+                    }
+                }
                 if {$DimLen == 1} {
                     set txt Pos($str,$var)
                 } else {
-                    set txt Pos([string map {_ ,} $str])
+                    set txt Pos($str)
                 }
             }
             if {![regexp {^p[^/]+$} [lindex $grp 0]]
                 && [regexp {\{Average[^\}]+Dn} $grp]} {
+                set str [string map {r "" / " "} [lindex $grp 0]]
                 if {[regexp {r\d+} [lindex $grp 0]]} {
                     set txt Ave[lindex $RegGen $str 0 1]
                 } elseif {[regexp {r\d+/\d+} [lindex $grp 0]]} {
-                    set lst [split $str /]
-                    set txt Ave[lindex $RegGen [lindex $lst 0] 0 1]/[lindex\
-                        $RegGen [lindex $lst 1] 0 1]
+                    set txt Ave[lindex $RegGen [lindex $str 0] 0 1]/[lindex\
+                        $RegGen [lindex $str 1] 0 1]
                 } else {
-                    set lst [string map {// " "} $str]
+                    set strLst [list]
+                    foreach tmpLst \{[string map {p "" _ " " // "\} \{"}\
+                        [lindex $grp 0]]\} {
+                        set str ""
+                        foreach tmp $tmpLst {
+                            if {$str eq ""} {
+                                append str [format %g $tmp]
+                            } else {
+                                append str ,[format %g $tmp]
+                            }
+                        }
+                        lappend strLst $str
+                    }
                     if {$DimLen == 1} {
-                        set txt AveWindow(([lindex $lst 0],0),([lindex\
-                            $lst 1],$YMax))
+                        set txt AveWindow(([lindex $strLst 0],0),([lindex\
+                            $strLst 1],$YMax))
                     } else {
-                        set txt AveWindow(([string map {_ , // ),(} $str]))
+                        set txt AveWindow(([lindex $strLst 0]),([lindex\
+                            $strLst 1]))
                     }
                 }
             }
@@ -1541,8 +1633,8 @@ foreach pp $PPAttr {
         if {[lindex $pp 3] > $jLow && [lindex $pp 3] < $jHigh} {
             set tmp [lindex [probe_curve ${pp0}_0|iVoc|$var\
                 -valueX [lindex $pp 3] -plot PltiVoc_$pp0] 0]
-            vputs -i3 "DOE: ${pp0}_iVoc [format %.5g $tmp]"
-            set gVarArr(${pp0}_iVoc) [format %.5g $tmp]
+            vputs -i3 "DOE: ${pp0}_iVoc [format %.${Prec}g $tmp]"
+            set gVarArr(${pp0}_iVoc) [format %.${Prec}g $tmp]
         }
 
         vputs -i2 "Save all curves to $fiVoc"
@@ -1594,7 +1686,7 @@ foreach pp $PPAttr {
         # Extract the spectrum power [mW*cm^-2]
         regexp {\{Spectrum\s+(\S+)} $GopAttr -> str
         set pSpec [specInt $str]
-        set tmp [format %.4g $pSpec]
+        set tmp [format %.${Prec}g $pSpec]
         vputs -i2 "DOE: ${pp0}_Pspec $tmp"
         set gVarArr(${pp0}_Pspec|mW*cm^-2) $tmp
 
@@ -1658,19 +1750,19 @@ foreach pp $PPAttr {
                         set smpp $s
                     }
                 }
-                set tmp [format %.4g $vmpp]
+                set tmp [format %.${Prec}g $vmpp]
                 vputs -i2 "DOE: ${pp0}_Vocmpp_$elm $tmp"
                 set gVarArr(${pp0}_Vocmpp_$elm|V) $tmp
-                set tmp [format %.4g $smpp]
+                set tmp [format %.${Prec}g $smpp]
                 vputs -i2 "DOE: ${pp0}_Sunsmpp_$elm $tmp"
                 set gVarArr(${pp0}_Sunsmpp_$elm) $tmp
                 if {$xLow <= 1 && $xHigh >= 1} {
                     set voc [lindex [probe_curve ${pp0}_SVoc_$elm -valueX 1\
                         -plot PltSuns_$pp0] 0]
-                    set tmp [format %.5g $voc]
+                    set tmp [format %.${Prec}g $voc]
                     vputs -i2 "DOE: ${pp0}_Voc_$elm $tmp"
                     set gVarArr(${pp0}_Voc_$elm|V) $tmp
-                    set tmp [format %.4g [expr 1e2*(1.-$smpp)*$vmpp/$voc]]
+                    set tmp [format %.${Prec}g [expr 1e2*(1.-$smpp)*$vmpp/$voc]]
                     vputs -i2 "DOE: ${pp0}_FF_$elm $tmp"
                     set gVarArr(${pp0}_FF_$elm) $tmp
                 }
@@ -1686,7 +1778,7 @@ foreach pp $PPAttr {
                 if {$xLow <= 1 && $xHigh >= 1} {
                     set jsc [lindex [probe_curve ${pp0}_SJsc_$elm -valueX 1\
                         -plot PltSuns_$pp0] 0]
-                    set tmp [format %.4g [expr abs($jsc)]]
+                    set tmp [format %.${Prec}g [expr abs($jsc)]]
                     vputs -i2 "DOE: ${pp0}_Jsc_$elm $tmp"
                     set gVarArr(${pp0}_Jsc_$elm|mA*cm^-2) $tmp
                 }
@@ -1771,30 +1863,50 @@ foreach pp $PPAttr {
             set dnLst [list]
             foreach grp $VV2Fld {
                 set txt ""
-                set str [string range [lindex $grp 0] 1 end]
                 if {[regexp {^p[^/]+$} [lindex $grp 0]]
                     && [regexp { Dn} $grp]} {
+                    set str ""
+                    foreach tmp [string map {p "" _ " "} [lindex $grp 0]] {
+                        if {$str eq ""} {
+                            append str [format %g $tmp]
+                        } else {
+                            append str ,[format %g $tmp]
+                        }
+                    }
                     if {$DimLen == 1} {
                         set txt Pos($str,$var)
                     } else {
-                        set txt Pos([string map {_ ,} $str])
+                        set txt Pos($str)
                     }
                 }
                 if {![regexp {^p[^/]+$} [lindex $grp 0]]
                     && [regexp {\{Average[^\}]+Dn} $grp]} {
+                    set str [string map {r "" / " "} [lindex $grp 0]]
                     if {[regexp {r\d+} [lindex $grp 0]]} {
                         set txt Ave[lindex $RegGen $str 0 1]
                     } elseif {[regexp {r\d+/\d+} [lindex $grp 0]]} {
-                        set lst [split $str /]
-                        set txt Ave[lindex $RegGen [lindex $lst 0] 0 1]/[lindex\
-                            $RegGen [lindex $lst 1] 0 1]
+                        set txt Ave[lindex $RegGen [lindex $str 0] 0 1]/[lindex\
+                            $RegGen [lindex $str 1] 0 1]
                     } else {
-                        set lst [string map {// " "} $str]
+                        set strLst [list]
+                        foreach tmpLst \{[string map {p "" _ " " // "\} \{"}\
+                            [lindex $grp 0]]\} {
+                            set str ""
+                            foreach tmp $tmpLst {
+                                if {$str eq ""} {
+                                    append str [format %g $tmp]
+                                } else {
+                                    append str ,[format %g $tmp]
+                                }
+                            }
+                            lappend strLst $str
+                        }
                         if {$DimLen == 1} {
-                            set txt AveWindow(([lindex $lst 0],0),([lindex\
-                                $lst 1],$YMax))
+                            set txt AveWindow(([lindex $strLst 0],0),([lindex\
+                                $strLst 1],$YMax))
                         } else {
-                            set txt AveWindow(([string map {_ , // ),(} $str]))
+                            set txt AveWindow(([lindex $strLst 0]),([lindex\
+                                $strLst 1]))
                         }
                     }
                 }
@@ -2361,22 +2473,35 @@ foreach pp $PPAttr {
                     # Skip integration of non recombination fields
                     if {![regexp {Recombination$} $val]} continue
                     vputs -i3 $val
+                    set strLst [list]
+                    foreach tmpLst \{[string map {p "" _ " " // "\} \{"}\
+                        [lindex $grp 0]]\} {
+                        set str ""
+                        foreach tmp $tmpLst {
+                            if {$str eq ""} {
+                                append str [format %g $tmp]
+                            } else {
+                                append str ,[format %g $tmp]
+                            }
+                        }
+                        lappend strLst $str
+                    }
                     if {$DimLen == 1} {
-                        set str [string map {p (( // ,0),(}\
-                            [lindex $grp 0]],$YMax))
+                        set txt IntegrWindow(([lindex $strLst 0],0),([lindex\
+                            $strLst 1],$YMax))
                     } else {
-                        set str [string map {p (( _ , // ),(}\
-                            [lindex $grp 0]]))
+                        set txt IntegrWindow(([lindex $strLst 0]),([lindex\
+                            $strLst 1]))
                     }
                     create_variable -name tau|[lindex $grp 0]|$elm|s\
                         -dataset Data_$pp0 -function "<$xVar:Data_$pp0>*$vol\
-                        /<IntegrWindow$str $val:Data_$pp0>"
+                        /<$txt $val:Data_$pp0>"
                     create_curve -name ${pp0}_7|tau|[lindex $grp 0]|$elm\
                         -dataset Data_$pp0 -plot Plttau_$pp0 -axisX $xVar\
                         -axisY tau|[lindex $grp 0]|$elm|s
                     create_variable -name J0|[lindex $grp 0]|$elm|fA*cm^-2\
-                        -dataset Data_$pp0 -function "1e15*$q*<IntegrWindow$str\
-                        $val:Data_$pp0>/$intArea/<$DnPlt Normd_pn:Data_$pp0>"
+                        -dataset Data_$pp0 -function "1e15*$q/$intArea*<$txt\
+                        $val:Data_$pp0>/<$DnPlt Normd_pn:Data_$pp0>"
                     create_curve -name ${pp0}_7|J0|[lindex $grp 0]|$elm\
                         -dataset Data_$pp0 -plot PltJ0_$pp0 -axisX $xVar\
                         -axisY J0|[lindex $grp 0]|$elm|fA*cm^-2

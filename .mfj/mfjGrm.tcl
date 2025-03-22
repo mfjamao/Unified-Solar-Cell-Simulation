@@ -187,9 +187,9 @@ namespace eval mfjGrm {
                 set Inv ""
             }
 
-            # Extract boundaries for tests: 'p', 'r', 'x', 'y', 'z'
+            # Extract boundaries for tests: 'i', 'n', 'p', 'r', 'x', 'y', 'z'
             set DimLst [list]
-            if {$varName ne "RegGen" && [regexp {[prxyz]} $Test]} {
+            if {$varName ne "RegGen" && [regexp {[inprxyz]} $Test]} {
 
                 # Get values from global array 'SimArr'.
                 # Skip to-be-removed and to-be-merged regions from 'RegInfo'
@@ -314,6 +314,19 @@ namespace eval mfjGrm {
                         set Val [lindex $Arg 0]
                     }
                     if {[string is integer -strict $Val]} {
+                        set Flg true
+                    } else {
+                        if {[catch {set Val [evalNum $Val $DimLst $varVal]}]} {
+                            set Flg false
+                        } else {
+                            if {[string is integer -strict $Val]} {
+                                set Flg true
+                            } else {
+                                set Flg false
+                            }
+                        }
+                    }
+                    if {$Flg} {
                         set Bool [expr "$Inv true"]
 
                         # No arguments, update the current element
@@ -385,6 +398,19 @@ namespace eval mfjGrm {
                         set Val [lindex $Arg 0]
                     }
                     if {[string is double -strict $Val]} {
+                        set Flg true
+                    } else {
+                        if {[catch {set Val [evalNum $Val $DimLst $varVal]}]} {
+                            set Flg false
+                        } else {
+                            if {[string is double -strict $Val]} {
+                                set Flg true
+                            } else {
+                                set Flg false
+                            }
+                        }
+                    }
+                    if {$Flg} {
                         set Bool [expr "$Inv true"]
 
                         # No arguments, update the current element

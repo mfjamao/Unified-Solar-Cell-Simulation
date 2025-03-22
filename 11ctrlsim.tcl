@@ -14,13 +14,10 @@
 # now. Other simulators will be supported in future.
 #
 # Other notes:
-#   OneChild: If adjacent variables have the same multiple values, one parent
-#       node has only one child node. Disable it to enable full permutation.
-#   SameDev: In case 'RegGen' has multiple values, yet the device remains the
-#       same (e.g. sizes change, not affecting references in other variables).
-#       This key affects the permutation behaviour.
 #   HideVar: Hide variables from Sentaurus Workbench unless they have multiple
-#       values.
+#       levels.
+#   OneChild: If adjacent variables have the same multiple levels, one parent
+#       node has only one child node. Disable it to enable full permutation.
 #   FullSchenk: Select whether to calculate BGN using full Schenk model or not,
 #       which is still experimenting
 #   TrapDLN: Default # of levels in Sentaurus is 13
@@ -30,7 +27,6 @@
 #   In Tcl, use braces to suppress string substitution so '\' is literally '\'
 ################################################################################
 array set SimArr {
-    OneChild OneChild SameDev SameDev HideVar HideVar FullSchenk !FullSchenk
     Email "" Time "" Append false Inverse false
     0Raw2Fmt true 1Fmt2Sim true 2PreProc true 3Batch true
     FVarRaw 10variables.txt FVarFmt variables.txt
@@ -40,7 +36,8 @@ array set SimArr {
     FInfo siminfo FLock lock FSTStat .status FDOESum DOESummary.csv
     CodeDir .mfj MDBDir 01mdb OptDir 02opt ExpDir 03exp PMIDir 04code
     EtcDir 05etc OutDir 06out TplDir 07tpl
-    GasThx 0.1 DfltYMax 2.0 LatFac 0.8 TrapDLN 100  EdgeEx 10 IntfEx 0.001
+    SameDev SameDev HideVar HideVar OneChild OneChild DfltYMax 2.0 LatFac 0.8
+    GasThx 0.1 TrapDLN 100 EdgeEx 10 IntfEx 0.001 FullSchenk !FullSchenk
     NThread 4 BitSize {64 80 128 256} Digits {5 5 6 10}
     RhsMin {1e-10 1e-12 1e-15 1e-25} Iter {10 12 15 20}
     ModTime "" RegInfo "" RegLvl 0 RegMat "" RegIdx "" RegX "" RegY ""
@@ -175,7 +172,7 @@ while {[llength $argv]} {
         }
         -[rR] {
             set Tmp [lindex $argv 1]
-            if {[regexp {^\d$|^[1-9]\d+$} $Tmp] && $Tmp < 4} {
+            if {[regexp {^[0-3]$} $Tmp]} {
                 for {set i 0} {$i < 4} {incr i} {
                     if {$i != $Tmp} {
                         set Key [lindex [array get SimArr ${i}*] 0]
@@ -187,8 +184,8 @@ while {[llength $argv]} {
         }
         -[tT] {
             set Tmp [lindex $argv 1]
-            if {[regexp {^\d$|^[1-9]\d+$} $Tmp] && $Tmp < 4} {
-                for {set i [incr Tmp]} {$i < 4} {incr i} {
+            if {[regexp {^[0-3]$} $Tmp]} {
+                for {set i 3} {$i > $Tmp} {incr i -1} {
                     set Key [lindex [array get SimArr ${i}*] 0]
                     set SimArr($Key) false
                 }
@@ -297,8 +294,8 @@ if {[lindex $InfoLst 0] eq "Sentaurus"
         vputs -i1 "Stop the previous batch managed by 'SLURM'...\n"
         if {[regexp {Submitted batch job (\d+)$} $BatOut -> BID]} {
             vputs -i2 "Cancelling SLURM batch: $BID\n"
-            if {[catch {exec scancel $BID >$FNull 2>@1}]} {
-                vputs -i2 "Failed! Maybe batch no longer active\n"
+            if {[catch {exec scancel $BID >$FNull 2>@1} Err]} {
+                vputs -i2 "failed to stop '$BID': $Err\n"
             } else {
                 vputs -i2 "Batch cancelled successfully!\n"
             }
@@ -310,8 +307,8 @@ if {[lindex $InfoLst 0] eq "Sentaurus"
         vputs -i1 "Stop the previous batch managed by 'PBS'...\n"
         if {[regexp {^(\d+)\.[^\d]+} $BatOut -> BID]} {
             vputs -i2 "Deleting PBS batch: $BID\n"
-            if {[catch {exec qdel $BID >$FNull 2>@1}]} {
-                vputs -i2 "Failed! Maybe batch no longer active\n"
+            if {[catch {exec qdel $BID >$FNull 2>@1} Err]} {
+                vputs -i2 "failed to stop '$BID': $Err\n"
             } else {
                 vputs -i2 "Batch deleted successfully!\n"
             }
@@ -325,10 +322,10 @@ if {[lindex $InfoLst 0] eq "Sentaurus"
         if {[string is integer -strict $PID]} {
             vputs -i2 "Killing PID: $PID\n"
             if {($tcl_platform(platform) eq "unix"
-                && [catch {exec kill $PID >$FNull 2>@1}])
+                && [catch {exec kill $PID >$FNull 2>@1} Err])
                 || ($tcl_platform(platform) eq "windows"
-                && [catch {exec taskkill /pid $PID >$FNull 2>@1}])} {
-                vputs -i2 "Failed! Maybe PID no longer active\n"
+                && [catch {exec taskkill /pid $PID >$FNull 2>@1} Err])} {
+                vputs -i2 "Failed to kill '$PID': $Err\n"
             } else {
                 vputs -i2 "PID killed successfully!\n"
             }
@@ -395,8 +392,8 @@ if {$SimArr(2PreProc) && [lindex $InfoLst 0] eq "Sentaurus"} {
     set FSTPPOut [file rootname $FSTPP].out
     close [open $FSTPPOut w]
     if {[catch {exec $FSTPP >$FSO | tee -a $FSTPPOut\
-        $mfjProc::arr(FOut) $mfjProc::arr(FLog)} ErrMsg]} {
-        vputs -c "\nerror: $ErrMsg\n"
+        $mfjProc::arr(FOut) $mfjProc::arr(FLog)} Err]} {
+        vputs -c "\nfailed in preprocessing: $Err\n"
         exit 1
     }
 }

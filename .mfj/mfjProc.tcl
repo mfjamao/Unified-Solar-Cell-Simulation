@@ -48,9 +48,70 @@ namespace eval mfjProc {
 
 # Performance hints: http://wiki.tcl.tk/348
 
+# mfjProc::safeLog
+    # Designed to log a message to files with directory creation and symbolic
+    # link checks
+# Arguments:
+    # FName       A log file name
+    # Access      File access mode, 'w' or 'a'
+    # Msg         A message to be logged
+    # NewLine     New line flag
+# Result: Return 1 as success or run into an error
+proc mfjProc::safeLog {FName Access Msg {NewLine true}} {
+
+    # Validate arguments. Return if no file name specified
+    if {![llength $FName]} {
+        return 1
+    }
+    set Access [string tolower $Access]
+    if {$Access ne "w" && $Access ne "a"} {
+        error "invalid access mode: must be 'w' or 'a'!"
+    }
+
+    # Create parent directory if needed
+    if {![file isfile $FName]} {
+        set Dir [file dirname $FName]
+        if {![file isdirectory $Dir]} {
+            file mkdir $Dir
+        }
+    } else {
+
+        # Avoid a symbolic link under Unix
+        if {$::tcl_platform(platform) eq "unix"
+            && [file type $FName] eq "link"} {
+            error "a symbolic link not allowed: '$FName'"
+        }
+    }
+
+    # Handle backup creation for write mode
+    if {$Access eq "w"} {
+        set Bak "${FName}.backup"
+        if {[file isfile $FName]} {
+            file copy -force $FName $Bak
+        }
+    }
+
+    # Open the file with error handling
+    if {[catch {set Ouf [open $FName $Access]} Err]} {
+        error "failed to open '$FName': $Err"
+    }
+
+    # Log with or without newline
+    if {$NewLine} {
+        puts $Ouf $Msg
+    } else {
+        puts -nonewline $Ouf $Msg
+    }
+    close $Ouf
+    return 1
+}
+
 # mfjProc::vputs
-    # This function adds additional controls to 'puts' to achieve versatile
-    # output profiles.
+    # Designed to handle formatted output with various options for verbosity,
+    # indentation, and file logging by adding additional controls to 'puts'
+    # to achieve versatile output styles. It handles a wide range of formatting
+    # scenarios and ensures that messages are output correctly based on the
+    # specified options.
     # 1. Terminal output is determined by a global verbosity level. A string
         # with a higher verbosity is not sent to a terminal.
     # 2. Output is typically indented and indentation is controlled by 'Tab',
@@ -81,6 +142,10 @@ namespace eval mfjProc {
 proc mfjProc::vputs args {
     variable arr
 
+    # Separate string from options
+    set Str [lindex $args end]
+    set args [lrange $args 0 end-1]
+
     # Default vputs behaviour
     set Access a
     set Continue false
@@ -89,86 +154,82 @@ proc mfjProc::vputs args {
     set SameInt false
     set Indent 0
     set Verbosity 1
-    set Str [lindex $args end]
-    set args [lrange $args 0 end-1]
 
     # Analyse arguments
     while {[llength $args]} {
-        switch -glob -- [lindex $args 0] {
-            -[cC] {
+        set opt [lindex $args 0]
+        switch -regexp -- $opt {
+            ^-[cC]$ {
                 set Continue true
-                set args [lrange $args 1 end]
             }
-            -[nN] {
+            ^-[nN]$ {
                 set NewLine false
-                set args [lrange $args 1 end]
             }
-            -[oO] {
+            ^-[oO]$ {
                 set OneLine true
-                set args [lrange $args 1 end]
             }
-            -[sS] {
+            ^-[sS]$ {
                 set SameInt true
-                set args [lrange $args 1 end]
             }
-            -[wW] {
+            ^-[wW]$ {
                 set Access w
-                set args [lrange $args 1 end]
             }
-            -[iI]* {
-                set Indent [string range [lindex $args 0] 2 end]
-                set args [lrange $args 1 end]
+            ^-[iI]-?\\d+$ {
+                set Indent [string range $opt 2 end]
             }
-            -[vV]* {
-                set Verbosity [string range [lindex $args 0] 2 end]
-                set args [lrange $args 1 end]
+            ^-[vV]-?\\d+$ {
+                set Verbosity [string range $opt 2 end]
             }
-            -- {
-                set args [lrange $args 1 end]
+            ^--$ {
                 break
             }
-            -* {
-                error "unknown option '[lindex $args 0]'!"
-            }
             default {
-                error "wrong # args: should be \"vputs ?-c|n|o|s|w|i|v? string\""
+                if {[string match -* $opt]} {
+                    error "unknown option '$opt'!"
+                } else {
+                    error "wrong # args: should be \"vputs ?-c|n|o|s|w|i|v?\
+                        string\""
+                }
             }
+        }
+        set args [lrange $args 1 end]
+    }
+
+    # Validate required array elements
+    foreach var {Indent1 Indent2 Tab MaxVerb FOut FLog LineLen} {
+        if {![info exists arr($var)]} {
+            error "missing required array element 'arr($var)'!"
+        }
+    }
+
+    # Validate integer values
+    foreach {var val} [list Indent1 $arr(Indent1) Indent2 $arr(Indent2)\
+        MaxVerb $arr(MaxVerb) LineLen $arr(LineLen)] {
+        if {![string is integer -strict $val]} {
+            error "invalid integer value for $var: '$val'"
         }
     }
 
     # Calculate indentation
     set Prefix ""
     set Val 0
-    set Msg "expecting an integer, but got"
     if {!$Continue} {
-        if {![string is integer -strict $Indent]} {
-            error "option '-i' $Msg '$Indent'!"
-        }
-        if {![string is integer -strict $arr(Indent1)]} {
-            error "variable 'Indent1' in array 'arr' $Msg '$arr(Indent1)'!"
-        }
-        if {![string is integer -strict $arr(Indent2)]} {
-            error "variable 'Indent2' in array 'arr' $Msg '$arr(Indent2)'!"
-        }
         set Val [expr {$arr(Indent1)+$arr(Indent2)+$Indent}]
-        set Prefix [string repeat $arr(Tab) $Val]
+        if {$Val > 0} {
+            set Prefix [string repeat $arr(Tab) $Val]
+        }
         set Len [expr {[string length $arr(Tab)]*abs($Val)}]
-        set Idx [expr {$Len-1}]
+        set Idx [expr $Len-1]
     }
 
-    # Output according to the verbosity level set by a user
-    if {![regexp {^\d+$} $Verbosity]} {
-        error "option '-v' $Msg '$Verbosity'!"
-    }
-
-    # Apply indentation (even to empty strings)
+    # Apply indentation (even to an empty string)
     # Strictly treat strings as strings
+    set Msg ""
     if {$Str ne ""} {
         if {$OneLine} {
             set Msg $Str
         } else {
             set Cnt 0
-            set Msg ""
             foreach Txt [split $Str \n] {
                 if {$Val >= 0} {
                     if {$SameInt} {
@@ -202,67 +263,39 @@ proc mfjProc::vputs args {
                     }
                 }
                 if {$Cnt} {
-                    append Msg \n $Txt
-                } else {
-                    set Msg $Txt
+                    append Msg \n
                 }
+                append Msg $Txt
                 incr Cnt
             }
         }
-    } else {
-        set Msg "${Prefix}$Str"
     }
+
+    # Output based on verbosity
     if {$Verbosity <= $arr(MaxVerb)} {
         if {$NewLine} {
             puts $Msg
         } else {
             puts -nonewline $Msg
         }
-        if {$arr(FOut) ne ""} {
-            if {$Access eq "w" && [file isfile $arr(FOut)]} {
-                file copy -force $arr(FOut) $arr(FOut).backup
-            }
-            if {[catch {set Ouf [open $arr(FOut) $Access]}]} {
-                error "can't open '$arr(FOut)' for '$Access'!"
-            }
-            if {$NewLine} {
-                puts $Ouf $Msg
-            } else {
-                puts -nonewline $Ouf $Msg
-            }
-            close $Ouf
-        }
+        safeLog $arr(FOut) $Access $Msg $NewLine
     }
 
     # Output anyway for debugging in case of an error
-    if {$arr(FLog) ne ""} {
-        if {$Access eq "w" && [file isfile $arr(FLog)]} {
-            file copy -force $arr(FLog) $arr(FLog).backup
-        }
-        if {[catch {set Ouf [open $arr(FLog) $Access]}]} {
-            error "can't open '$arr(FLog)' for '$Access'!"
-        }
-        if {$NewLine} {
-            puts $Ouf $Msg
-        } else {
-            puts -nonewline $Ouf $Msg
-        }
-        close $Ouf
-    }
+    safeLog $arr(FLog) $Access $Msg $NewLine
 }
 
 # mfjProc::wrapText
-    # Wrap a text output into multiple lines (Default margin 80 characters/line)
-    # Each line may be proceeded by an optional leading text and followed by an
-    # optional trailing text. In addition to the leading text, a hanging indent
-    # (one tab size) is applied to the rest lines by default for reading clarity.
+    # Designed to wrap text to a specified line length, handling various
+    # formatting options such as leading and trailing text, and hanging
+    # indentation (one tab size).
 # Arguments
-    # Text            A long text
-    # Lead            Optional, the leading text
-    # Trail           Optional, the trailing text
-    # HangIdt         Optional, enable/disable a hanging indent
+    # Text            The input text to be wrapped
+    # Lead            Optional leading text to be added to each line
+    # Trail           Optional trailing text to be added to each line
+    # HangIdt         Optional switch for hanging indentation
 # Result: Return a new text with delimited by \n
-proc mfjProc::wrapText {Text {Lead ""} {Trail ""} {HangIdt ""} } {
+proc mfjProc::wrapText {Text {Lead ""} {Trail ""} {HangIdt ""}} {
     variable arr
 
     # Validate arguments
@@ -399,34 +432,43 @@ proc mfjProc::wrapText {Text {Lead ""} {Trail ""} {HangIdt ""} } {
 }
 
 # mfjProc::readIdx
-    # Read and interpret the index permutation containing special symbols:
-    # '/' denotes index permutation
-    # ':' denotes all indices from index 1 to index 2
-    # ',' separates index 1 and index 2
+    # Designed to parse and expand an index string into a list of index
+    # permutations. It supports various features such as range expansion,
+    # negative index conversion, and permutation generation.
+    # The meaning of special symbols:
+        # '/' denotes index permutation
+        # ':' denotes all indices from index 1 to index 2
+        # ',' separates index 1 and index 2
     # Example: 0/1,3:5 -> (0 1) (0 3) (0 4) (0 5)
-    # Negative index is converted to positive if 'IdxLen' is present
+    # Negative indices are converted to positive if 'LenLst' is present
 # Arguments
     # IdxStr        A string of indices
-    # IdxLen        The length of indices if any
+    # LenLst        A list of the length values of lists if provided
 # Result: Return the interpreted list of indices/permutation
-proc mfjProc::readIdx {IdxStr {IdxLen ""}} {
+proc mfjProc::readIdx {IdxStr {LenLst ""}} {
 
     # Validate arguments
-    if {[regexp {^\d+$} $IdxLen]} {
+    set Lst [list]
+    foreach Len [split $LenLst /] {
+        if {[string is integer -strict $Len] && $Len > 0} {
 
-        # Format the length to remove leading zeroes
-        # and convert octal(0#) and hexadecimal(0x#) to decimal
-        set IdxLen [format %d $IdxLen]
-    } else {
-        set IdxLen 0
+            # Format the length to remove leading zeroes
+            # and convert octal(0#) and hexadecimal(0x#) to decimal
+            lappend Lst [format %d $Len]
+        } else {
+            lappend Lst ""
+        }
     }
+    set LenLst $Lst
 
     # Verify, convert or expand if necessary
+    # Tracks the total number of permutations
     set Prod 1
     set Idx1 ""
     set Idx2 ""
     set Lst [list]
     set IdxLst [list]
+    set IdxLen [lindex $LenLst 0]
     set Len [string length $IdxStr]
     set Idx 0
 
@@ -439,7 +481,7 @@ proc mfjProc::readIdx {IdxStr {IdxLen ""}} {
                 # Align with python convention (-0 is the same as 0!)
                 set Idx1 [format %d $Idx1]
 
-                # A negative index is converted to positive if IdxLen present
+                # A negative index is converted to positive if IdxLen positive
                 if {$IdxLen > 0} {
                     if {$Idx1 < 0} {
                         incr Idx1 $IdxLen
@@ -453,7 +495,15 @@ proc mfjProc::readIdx {IdxStr {IdxLen ""}} {
                         set Idx2 $Idx1
                     }
                 } else {
+
+                    # Expand ranges
                     if {[llength $Idx2]} {
+
+                        # Raise an error if the product of Idx1 and
+                        # Idx2 is negative
+                        if {[expr $Idx1*$Idx2] < 0} {
+                            error "'$Idx1' and '$Idx2' have different signs!"
+                        }
                         set Stp [expr ($Idx1-$Idx2)/abs($Idx1-$Idx2)]
 
                         # Preserve the original form of Idx1 and Idx2
@@ -473,6 +523,11 @@ proc mfjProc::readIdx {IdxStr {IdxLen ""}} {
                         lappend IdxLst $Lst
                         set Prod [expr $Prod*[llength $Lst]]
                         set Lst [list]
+
+                        # Update IdxLen if positive
+                        if {[lindex $LenLst [llength $IdxLst]] > 0} {
+                            set IdxLen [lindex $LenLst [llength $IdxLst]]
+                        }
                     }
                 }
             } else {
@@ -540,30 +595,34 @@ proc mfjProc::readIdx {IdxStr {IdxLen ""}} {
 }
 
 # mfjProc::replaceElm
-    # A variable may have more than one value to enable batch simulation. The
-    # difference between values is typically small, varying one or two elements.
-    # For values beyond the 1st one, they can be assigned quickly with a
-    # shorthand form like i/j/k,l:n&i/k/o,x:z=val1|val2|.... If the pattern is
-    # present, copy the content of value i and replace those referenced elements
-    # with the assigned element values, respectively. For each referenced
-    # element, it may also be supplied with multiple element values. Under such
-    # circumstance, the number of values should be increased. Yet, it may cause
-    # chaotic references subsequently. So those values are folded temporarily
-    # until the end of replacing and reusing elements.
+    # Designed to replace elements in a nested list structure based on specified
+    # patterns and rules. It handles various cases, including element
+    # replacement, range expansion, and permutation generation.
+    # A variable may have more than one value to enable a batch simulation. In
+    # practice, the difference between values is usually small, varying one or
+    # two elements. For values beyond the 1st one, they can be assigned quickly
+    # with a shorthand form like:
+        # i/j/k,l:n&i/k/o,x:z=val1|val2|....
+    # If the pattern is present, copy the content of value i and replace those
+    # referenced elements with the assigned element values, respectively. For
+    # each referenced element, it may also be supplied with multiple element
+    # values. Under such circumstance, the number of values should be increased.
+    # Yet, it may cause chaotic references subsequently. So those values are
+    # folded temporarily until the end of replacing and reusing elements.
     # Element replacement has two forms, where references must share the same
     # level 0 index and end with '=' and element values are separated by '|':
-    #   Easy2Read form: {i/j/k,l:n&i/k/o,x:z= ElmVal1 ElmVal2 ...}
-    #   Compact form: i/j/k,l:n&i/k/o,x:z=ElmVal1|ElmVal1|...
+        # Easy2Read form: {i/j/k,l:n&i/k/o,x:z= ElmVal1 ElmVal2 ...}
+        # Compact form: i/j/k,l:n&i/k/o,x:z=ElmVal1|ElmVal1|...
     # Multiple element values can be assigned to one element by three methods:
-    #   1. Specify steps after the assigned element value separated by '@':
-    #   i/j/k=ElmVal@#(l), where '#' refers to the number of steps and 'l' is
-    #   optional. By default, element values are generated between the inital
-    #   and assigned values with the same intervals. If an optional letter is
-    #   appended, these values become evenly-spaced logarithmically.
-    #   2. Enumerate element values separated by '~': i/j/k=ElmVal1~ElmVal2...
-    #   3. Mix steps and enumeration: i/j/k=ElmVal1@#(l)~ElmVal2...
-    #   4. The permutation of multiple elements is affected by
-    #   ::SimArr(OneChild)
+        # 1. Specify steps after the assigned element value separated by '@':
+        # i/j/k=ElmVal@#(l), where '#' refers to the number of steps and 'l' is
+        # optional. By default, element values are generated between the inital
+        # and assigned values with the same intervals. If an optional letter is
+        # appended, these values become evenly-spaced logarithmically.
+        # 2. Enumerate element values separated by '~': i/j/k=ElmVal1~ElmVal2...
+        # 3. Mix steps and enumeration: i/j/k=ElmVal1@#(l)~ElmVal2...
+        # Note: The permutation of multiple elements is affected by
+        # ::SimArr(OneChild)
 # Arguments
     # VarName     Variable name
     # VarVal      Variable value
@@ -652,7 +711,14 @@ proc mfjProc::replaceElm {VarName VarVal} {
             set ElmValLst [lrange [string map {| " "} $ElmValStr] 0 end]
             set ElmValLen [llength $ElmValLst]
             if {$ElmValLen < $IdxLen} {
-                error "value '$ElmValLst' insufficient for $Msg!"
+
+                # Repeat the last element to complement the list
+                set Lst $ElmValLst
+                while {$ElmValLen < $IdxLen} {
+                    lappend Lst [lindex $ElmValLst end]
+                    incr ElmValLen
+                }
+                set ElmValLst $Lst
             } elseif {$ElmValLen > $IdxLen} {
                 vputs -v2 "value '[lrange $ElmValLst $IdxLen end]' excess\
                     for $Msg!"
@@ -742,7 +808,7 @@ proc mfjProc::replaceElm {VarName VarVal} {
                 set Quo $Prod
                 foreach Cnt $ValCntLst {
 
-                    # Update the quotient only if it is > 1
+                    # Update the quotient only if > 1
                     if {$Quo > 1} {
                         set Quo [expr $Quo/$Cnt]
                     }
@@ -754,8 +820,9 @@ proc mfjProc::replaceElm {VarName VarVal} {
                         set Divr [lindex $DivrLst $j]
                         set Idx [lindex $IdxLst $j]
                         set Val [lindex $ValSubLst $j [expr int($i/$Divr)%$Cnt]]
-                        if {[catch {lset NewVal $Idx $Val}]} {
-                            error "index '$Idx' invalid for $Msg!"
+                        if {[catch {lset NewVal $Idx $Val} Err]} {
+                            error "failed to update index '$Idx' for $Msg:\
+                                $Err!"
                         }
                     }
                     lappend Lst $NewVal
@@ -763,8 +830,8 @@ proc mfjProc::replaceElm {VarName VarVal} {
                 lappend NewLst $Lst
             } else {
                 foreach Idx $IdxLst Val $ElmValLst {
-                    if {[catch {lset NewVal $Idx $Val}]} {
-                        error "index '$Idx' invalid for $Msg!"
+                    if {[catch {lset NewVal $Idx $Val} Err]} {
+                        error "failed to update index '$Idx' for $Msg: $Err!"
                     }
                 }
                 lappend NewLst $NewVal
@@ -781,6 +848,8 @@ proc mfjProc::replaceElm {VarName VarVal} {
         incr LvlIdx
         incr LvlLen
     }
+
+    # Returns the fold status and the new list with replaced elements
     return [list $FoldLst $NewLst]
 }
 
@@ -805,7 +874,7 @@ proc mfjProc::reuseElm {VarName VarVal SubLst {Lvl ""} {OldIdx ""} {InLvl ""}} {
 
     # Validate arguments
     # All levels should not be negative integers
-    if {[regexp {^\d+$} $Lvl]} {
+    if {[string is integer -strict $Lvl] && $Lvl > 0} {
 
         # Format the level to remove leading zeroes
         # and convert octal(0#) and hexadecimal(0x#) to decimal
@@ -821,12 +890,7 @@ proc mfjProc::reuseElm {VarName VarVal SubLst {Lvl ""} {OldIdx ""} {InLvl ""}} {
             break
         }
     }
-
-    if {[string index $InLvl 0] eq "!"} {
-        set InLvl false
-    } else {
-        set InLvl true
-    }
+    set InLvl [expr {[string index $InLvl 0] ne "!"}]
 
     set VarMsg "variable '$VarName'"
     set NewLst [list]
@@ -839,7 +903,7 @@ proc mfjProc::reuseElm {VarName VarVal SubLst {Lvl ""} {OldIdx ""} {InLvl ""}} {
             set Msg "'$Elm' of $VarMsg (index $NewIdx)"
         }
 
-        # Replace each element-reuse feature and evaluate the final expression
+        # Replace each element-reuse feature
         # Negative indexing is supported with the pattern '-?\d+'
         while {[regexp {<((-?\d+[:,/&])*-?\d+)>} $Elm -> ElmRefStr]} {
             if {[llength $Elm] > 1 || [regexp {^\{.+\}$} $Elm]} {
@@ -913,32 +977,18 @@ proc mfjProc::reuseElm {VarName VarVal SubLst {Lvl ""} {OldIdx ""} {InLvl ""}} {
                     }
                 }
 
-                # Eval is required if element-reuse is not coming alone
-                if {[regexp {^<(-?\d+[:,/&])*-?\d+>$} $Elm]} {
-                    set Eval false
-                } else {
-                    set Eval true
-                }
-
                 # Substitute the first pattern in the element
                 regsub {<(-?\d+[:,/&])*-?\d+>} $Elm $NewElm Elm
 
-                # Evaluate the experession if no reuse pattern left
-                # Operators + - * / % and Tcl math functions are supported
-                if {$Eval && ![regexp {<(-?\d+[:,/&])*-?\d+>} $Elm]
-                    && [catch {set Elm [format %g [expr 1.*$Elm]]}]} {
-                    error "unable to eval '$Elm' in $Msg!"
-                }
-
                 # Need to break loop after activating reuse-only feature
                 # in level 1+
-                if {!$InLvl && !$Eval && $Lvl} break
+                if {!$InLvl && $Lvl} break
             }
         }
 
         # Need to assign value after activating reuse-only feature
         # in level 1+
-        if {!$InLvl && !$Eval && $Lvl} {
+        if {!$InLvl && $Lvl} {
             set NewLst $Elm
         } else {
             lappend NewLst $Elm
@@ -986,8 +1036,9 @@ proc mfjProc::iFileExists {VarName args} {
         set ElmVal [lindex $VarVal $IdxLst]
 
         # Verify the list index by setting the value back
-        if {[catch {lset VarVal $IdxLst $ElmVal}]} {
-            error "index '$IdxLst' out of range for variable '$VarName'!"
+        if {[catch {lset VarVal $IdxLst $ElmVal} Err]} {
+            error "failed to update index '$IdxLst' for variable '$VarName':\
+                $Err!"
         }
         set Msg "element '$ElmVal' of variable '$VarName' (index $IdxLst)\
             should be an existing file!"
@@ -1425,11 +1476,7 @@ proc mfjProc::lPolation {XList YList X {LinX ""} {LinY ""}} {
 
         # Make an alias of 'LinX' and 'LinY'
         upvar 0 $Elm Alias
-        if {[string index $Alias 0] eq "!"} {
-            set Alias false
-        } else {
-            set Alias true
-        }
+        set Alias [expr {[string index $Alias 0] ne "!"}]
     }
 
     set X1 [lindex $XList 0]
@@ -1546,11 +1593,7 @@ proc mfjProc::str2List {StrList {VarInfo ""} {Level 0}} {
 proc mfjProc::iSwitch {Dflt Str Ptn args} {
 
     # Validate arguments
-    if {[string index $Dflt 0] eq "!"} {
-        set Dflt false
-    } else {
-        set Dflt true
-    }
+    set Dflt [expr {[string index $Dflt 0] ne "!"}]
     set Lst [string map {\{ "" \} ""} [concat $Ptn $args]]
     if {![llength $Lst]} {
         error "no pattern specified for function 'iSwitch'!"
@@ -1664,9 +1707,9 @@ proc mfjProc::groupValues {VarName VarVal GrpID LvlIdx LvlLen} {
     }
     if {[regexp {v} $GStr]} {
         if {[string length $Txt]} {
-            append Txt " or ref to a varying variable"
+            append Txt " 'Precision' or a ref to a varying variable"
         } else {
-            set Txt "a ref to a varying variable"
+            set Txt "'Precision' or a ref to a varying variable"
         }
         set VarLen $::SimArr(VarLen)
     }
@@ -1726,6 +1769,7 @@ proc mfjProc::groupValues {VarName VarVal GrpID LvlIdx LvlLen} {
     # Extract boundaries of simulation domain for GID 'p', 'r'
     # Get values from global array 'SimArr'.
     # Skip to-be-removed and to-be-merged regions from 'RegInfo'
+    set DimLst [list]
     if {[regexp {[pr]} $GStr]} {
         set RegInfo [list]
         foreach Reg [lindex $::SimArr(RegInfo) $::SimArr(RegLvl)] {
@@ -1930,9 +1974,8 @@ proc mfjProc::groupValues {VarName VarVal GrpID LvlIdx LvlLen} {
             } elseif {$GID eq "m"} {
 
                 # Group ID 'm' is used in variable 'RegDim' only for groupValues
-                if {[regexp -nocase ^$RE_n$ $Val]
-                    || [regexp {^[pP]([^_]*\d+[^_]*_){1,2}[^_]*\d+[^_]*$} $Val]
-                    || [regexp {//} $Val]} {
+                if {[regexp {^[pP]([^_]*\d+[^_]*_){1,2}[^_]*\d+[^_]*$} $Val]
+                    || ![catch {evalNum $Val $DimLst}]} {
                     set Bool false
                 } else {
                     if {[catch {iSwitch !Dflt $Val E<llipse> V<ertex>\
@@ -1987,8 +2030,8 @@ proc mfjProc::groupValues {VarName VarVal GrpID LvlIdx LvlLen} {
                         if {$VarLen == 0} {
                             error "no varying variable in 'VarVary'!"
                         }
-                        if {[catch {set IdxLst [readIdx $VStr $VarLen]}]} {
-                            error "'$Val' index out of range!"
+                        if {[catch {set IdxLst [readIdx $VStr $VarLen]} Err]} {
+                            error "failed to eval '$Val': $Err!"
                         }
                     } else {
 
@@ -2000,8 +2043,8 @@ proc mfjProc::groupValues {VarName VarVal GrpID LvlIdx LvlLen} {
                                     of 'VarVary'!"
                             }
                             if {[catch {set IdxLst [readIdx $VStr\
-                                [lindex $VarLen $LvlIdx]]}]} {
-                                error "'$Val' index out of range!"
+                                [lindex $VarLen $LvlIdx]]} Err]} {
+                                error "failed to eval '$Val': $Err!"
                             }
                         } else {
                             set Idx 0
@@ -2010,8 +2053,9 @@ proc mfjProc::groupValues {VarName VarVal GrpID LvlIdx LvlLen} {
                                     error "no varying variable in level '$Idx'\
                                         of 'VarVary'!"
                                 }
-                                if {[catch {set IdxLst [readIdx $VStr $Elm]}]} {
-                                    error "'$Val' index out of range!"
+                                if {[catch {set IdxLst [readIdx $VStr $Elm]}\
+                                    Err]} {
+                                    error "failed to eval '$Val': $Err!"
                                 }
                                 incr Idx
                             }
@@ -2024,6 +2068,9 @@ proc mfjProc::groupValues {VarName VarVal GrpID LvlIdx LvlLen} {
 
                     # Keep the last found duplicate
                     set Val [lsort -unique $NewVal]
+                } elseif {[string equal -nocase $Val Precision]} {
+                    set Bool true
+                    set Val Precision
                 }
             }
 
@@ -2039,8 +2086,8 @@ proc mfjProc::groupValues {VarName VarVal GrpID LvlIdx LvlLen} {
                 foreach Str [split [string range $Val 1 end] &] {
 
                     # Read an index string and verify region indices
-                    if {[catch {set IdxLst [readIdx $Str $RegLen]}]} {
-                        error "element 'r$Str' index out of range!"
+                    if {[catch {set IdxLst [readIdx $Str $RegLen]} Err]} {
+                        error "failed to eval 'r$Str': $Err!"
                     }
                     foreach Lst $IdxLst {
                         set Idx [lindex $Lst 0]
@@ -2175,7 +2222,7 @@ proc mfjProc::verifyPos {PosStr GStr DimLst Context} {
         set NewPosLst [list]
         foreach Pos $PosLst {
             if {$DimLen == 0} {
-                
+
                 # Update 'DimLen' if it is not set
                 set DimLen [llength $Pos]
             } else {
@@ -2215,27 +2262,33 @@ proc mfjProc::verifyPos {PosStr GStr DimLst Context} {
                 if {![string is double $Elm]} {
 
                     # Replace x#, y#, z# if present
-                    while {[regexp {([xyz])(-?\d+)} $Elm -> Char Idx]} {
-                        set Lst $Arr(${Char}Lst)
-                        set Len $Arr(${Char}Len)
+                    while {[regexp {([xyz])(-?\d+)} $Elm -> Coord Idx]} {
+                        set Lst $Arr(${Coord}Lst)
+                        set Len $Arr(${Coord}Len)
+
+                        # Deal with negative index
+                        set OldIdx $Idx
                         if {$Idx < 0} {
                             incr Idx $Len
                         }
                         if {$Idx < 0 || $Idx >= $Len} {
-                            error "index '${Char}$Idx' out of range '$Len'\
-                                for $Context!"
+                            error "index '${Coord}$OldIdx' out of range '$Len'\
+                                in $Context!"
                         }
-                        regsub {[xyz]-?\d+} $Elm [lindex $Lst $Idx] Elm
+
+                        # Replace all occurances
+                        regsub -all "${Coord}$OldIdx" $Elm [lindex $Lst $Idx]\
+                            Elm
                     }
 
                     # Evaluate the expression
-                    if {[catch {set Elm [expr 1.*$Elm]}]} {
-                        error "unable to eval '$Elm' for $Context!"
+                    if {[catch {set Elm [expr 1.*$Elm]} Err]} {
+                        error "failed to eval '$Elm' in $Context: $Err!"
                     }
                 }
 
                 if {![string is double $Elm]} {
-                    error "coordinate '$Elm' not a number for $Context!"
+                    error "coordinate '$Elm' not a number in $Context!"
                 }
 
                 # Each coordinate must be within the simulation domain
@@ -2304,6 +2357,72 @@ proc mfjProc::verifyPos {PosStr GStr DimLst Context} {
 
     # Keep the last found duplicate
     return [lsort -unique $NewStrLst]
+}
+
+# mfjProc::evalNum
+    # Evaluate a number string: ###, x#, x#+5
+# Arguments:
+    # NumStr        A string of number for evaluation
+    # DimLst        Coordinates at X, Y Z axes
+    # Context       A context message
+# Result: Return the evaluated number
+proc mfjProc::evalNum {NumStr {DimLst ""} {Context ""}} {
+
+    # Create an array for intepreting x#, y#, and z#
+    set DimLen 0
+    if {[llength $DimLst]} {
+        set Arr(xLst) [lindex $DimLst 0]
+        set Arr(xLen) [llength $Arr(xLst)]
+        incr DimLen [expr $Arr(xLen) > 0]
+        set Arr(yLst) [lindex $DimLst 1]
+        set Arr(yLen) [llength $Arr(yLst)]
+        incr DimLen [expr $Arr(yLen) > 0]
+        set Arr(zLst) [lindex $DimLst 2]
+        set Arr(zLen) [llength $Arr(zLst)]
+        incr DimLen [expr $Arr(zLen) > 0]
+    }
+
+    # Tcl functions are lower cases so change the string to lower cases
+    set NumStr [string tolower $NumStr]
+
+    # Recursively rplace x#, y#, z# if present
+    while {[regexp {([xyz])(-?\d+)} $NumStr -> Coord Idx]} {
+
+        # Avoid invalid coordinate
+        if {$Coord eq "x" && $DimLen < 1} {
+            error "no x coordinate in 'RegGen'!"
+        }
+        if {$Coord eq "y" && $DimLen < 2} {
+            error "no y coordinate for 1D!"
+        }
+        if {$Coord eq "z" && $DimLen < 3} {
+            error "no z coordinate for 1D/2D!"
+        }
+        set CoordList $Arr(${Coord}Lst)
+        set CoordLen $Arr(${Coord}Len)
+
+        # Deal with negative index
+        set OldIdx $Idx
+        if {$Idx < 0} {
+            incr Idx $CoordLen
+        }
+
+        # Index validity check
+        if {$Idx < 0 || $Idx >= $CoordLen} {
+            error "index '${Coord}$OldIdx' out of range '$CoordLen' in $Context"
+        }
+
+        # Replace all occurances
+        regsub -all "${Coord}$OldIdx" $NumStr [lindex $CoordList $Idx] NumStr
+    }
+
+    # Evaluate the expression
+    if {[catch {set Res [expr 1.*$NumStr]} Err]} {
+        error "failed to eval '$NumStr' in $Context: $Err"
+    }
+
+    # Return the value, can't put in catch
+    return $Res
 }
 
 # mfjProc::intfVn
@@ -2644,7 +2763,7 @@ proc mfjProc::rr2pp {RegInfo Idx1 Idx2} {
 #     VarName       List of variable names
 #     Suffix        Calculate after removing the suffix string
 # Result: Return the max length or 0 for a empty VarName
-proc mfjProc::calMaxVarLen {VarName {Suffix ""} } {
+proc mfjProc::calMaxVarLen {VarName {Suffix ""}} {
     set MaxLen 0
     set SufLen [string length $Suffix]
     foreach Elm $VarName {
@@ -2752,11 +2871,7 @@ proc mfjProc::buildTree {VarName VarVal STIdxLst {OneChild ""} {NodeTree ""}} {
 
         # Make an alias of 'OneChild' and 'NodeTree'
         upvar 0 $Elm Alias
-        if {[string index $Alias 0] eq "!"} {
-            set Alias false
-        } else {
-            set Alias true
-        }
+        set Alias [expr {[string index $Alias 0] ne "!"}]
     }
 
     vputs -v2 "Building a SWB node list..."
@@ -3062,8 +3177,8 @@ proc mfjProc::customSpec {FSpec WBegin WEnd WStep {Shading 0} {FSave ""}} {
 
     # Save the custom spectrum if required
     if {$FSave ne ""} {
-        if {[catch {set Ouf [open $FSave w]}]} {
-            error "unable to open '$FSave' for write!"
+        if {[catch {set Ouf [open $FSave w]} Err]} {
+            error "failed to open '$FSave': $Err!"
         }
         puts $Ouf "# Original spectrum: '$FSpec' begins from [format %.12g\
             [lindex $OldSpecWl 0]] nm, ends to [format %.12g [lindex\
@@ -3361,11 +3476,7 @@ proc mfjProc::plx2CSV {FPlx {FCSV ""} {Remove ""}} {
     if {$FCSV eq ""} {
         set FCSV [file rootname $FPlx].csv
     }
-    if {[string index $Remove 0] eq "!"} {
-        set Remove false
-    } else {
-        set Remove true
-    }
+    set Remove [expr {[string index $Remove 0] ne "!"}]
 
     # Read the .plx file
     set Inf [open $FPlx r]
