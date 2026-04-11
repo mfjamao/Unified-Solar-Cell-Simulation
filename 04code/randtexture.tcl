@@ -44,7 +44,7 @@ if {[file isfile $Dir/11ctrlsim.tcl]} {
 source $Dir/$SimArr(CodeDir)/$SimArr(FProc)
 namespace import [file rootname $SimArr(FProc)]::*
 
-set NPyr 150
+set NPyr 100
 
 # Square area side
 set Side 5
@@ -53,20 +53,18 @@ set Side 5
 set LBase 5
 set ASlant 54.74
 
-# Silicon thickness
-set SiThx 140
-
 set H [expr 0.5*$LBase*tan(asin(1)*$ASlant/90.)]
 set Str "\{"
-while {$NPyr > 0} {
+set Var $NPyr
+while {$Var > 0} {
     set X2 [expr $H*(1.-rand())]
     set Y [expr -$LBase+($Side+2*$LBase)*rand()]
     set Z [expr -$LBase+($Side+2*$LBase)*rand()]
     append Str "\{Gas P R p${H}_${Y}_${Z} p${X2}_${Y}_${Z} $ASlant\} "
-    incr NPyr -1
+    incr Var -1
 }
 append Str "\{Gas B K p0_0_0 p${H}_${Side}_${Side}\} "
-append Str "\{Silicon $SiThx $Side $Side\} "
+append Str "\{Silicon 180 $Side $Side\} "
 append Str "\{Aluminum 1 $Side $Side\}\}"
 
 set Brf $Dir/[file rootname $SimArr(FVarRaw)]-brief.txt
@@ -74,7 +72,7 @@ set Inf [open $Brf r]
 set Buff [read $Inf]
 close $Inf
 regsub {RegGen.+FldAttr} $Buff\
-    [wrapText "RegGen      $Str\n\nFldAttr"] Buff
+    [wrapText "RegGen      $Str\n# NPyr = $NPyr, LBase = 5\n\nFldAttr"] Buff
 set Ouf [open $Brf w]
 puts $Ouf $Buff
 close $Ouf

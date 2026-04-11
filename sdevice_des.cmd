@@ -1209,6 +1209,7 @@ if {[lindex $SimEnv 3] ne "Optical"} {
                         *[lindex $elm 4]]]
                 }
                 if {[lindex $arr(TrapDist) $idx] eq "Level"} {
+                    lappend lst "[lindex $arr(TrapDist) $idx] Conc= $tmp"
                     lappend lst "EnergyMid= [lindex $arr(EnergyMid) $idx]"
                 } elseif {[lindex $arr(TrapDist) $idx] eq "Table"} {
                     lappend lst "Table= ([lindex $arr(Table) $idx])"
@@ -1474,7 +1475,7 @@ if {[lindex $SimEnv 3] ne "Optical"} {
     # In case trap interfaces are not visited previously
     foreach elm $IntfTrap {
         regsub {r(\d+)/(\d+)} [lindex $elm 0] {r\2/\1} str
-        if {[regexp \\\{([lindex $elm 0]|$str)\\s $IntfSRV} continue
+        if {[regexp \\\{([lindex $elm 0]|$str)\\s $IntfSRV]} continue
         set lst [string map {r "" / " "} [lindex $elm 0]]
         set var [lindex $RegGen [lindex $lst 0] 0 1]
         set val [lindex $RegGen [lindex $lst 1] 0 1]

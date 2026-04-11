@@ -1,14 +1,59 @@
 #!/usr/bin/tclsh
 
 ################################################################################
-# This script is designed to load a saved template to overwrite files in the
-# project directory where the script resides. If the target files are the same
-# or newer, they are not replaced. Nevertheless, 10variables-brief.txt is always
-# overwritten. Additionally, Special treatment is applied to 11ctrlsim.tcl so
-# that values of ST|Hosts, ST|Paths, ST|Licns, Email|Sufx, Email, OneChild,
-# SameDev, and HideVar in 'SimArr' are still preserved in the target file.
-#
+# This script is designed to load a saved template (.tgz archive) to overwrite
+# files in the project directory where the script resides. If intelligently
+# handles file versioning, preserves specific configuration settings, and
+# maintains a log of all operations.
+
 # Maintained by Dr. Fa-Jun MA (mfjamao@yahoo.com)
+
+# Key Features
+#     Intelligent File Overwrite: Skips replacement if target files are
+#         identical or newer
+#     Configuration Preservation: Maintains specific settings in 11ctrlsim.tcl
+#     Template Management: Automatically organizes templates in 07tpl/ directory
+#     Comprehensive Logging: Creates detailed .out log file with timestamps
+#     Cross-Platform Support: Works on both Unix and Windows platforms
+#     Auto Template Discovery: Searches multiple locations for template files
+
+# Processing Flow
+# 1. Start script
+#     - ./13loadtpl.tcl xxx[.tgz]
+# 2. Initialization
+#     - Set working directory to script location
+#     - Create log file with timestamp and user info
+#     - Backup existing log file if exists
+# 3. Template file resolution
+#     - If no argument, search for *.tgz in current directory
+#     - Search for xxx.tgz in `pwd` and 07tpl (depth-first directory traversal)
+#     - Case-insensitive search for absolute paths
+# 4. Template organization
+#     - Move/copy to 07tpl/ (create if not exists) if not already there
+#     - Update path references to 07tpl/ for subsequent operations
+# 5. Extract template
+#     - Extract to a temporary directory using tar -xzf
+#     - List files in the archive for reference
+#     - Determine root directory from the archive structure
+# 6. Load key files
+# Phase 1: Minimum load
+#     - Always copy 10variables-brief.txt, backup if exists
+#     - Update modification time to now
+# Phase 2: Special handling for 11ctrlsim.tcl
+#     - Check file timestamps to decide on copying
+#     - If copying, preserve specific settings (ST|Hosts, ST|Paths, ST|Licns,
+#         Email|Sufx, Email, IndexWise, SameDev, HideVar) in the target file
+#     - Only copy if source is newer than target, otherwise skip
+#     - Make executable on Unix if not already
+# Phase 3: Optional load
+#     - Depth-first directory traversal to copy all regular files
+#     - Skip 10variables-brief.txt and 11ctrlsim.tcl
+#     - Skip if target is same or newer, backup if copying
+#     - Create necessary subdirectories for target files
+# 7. Cleanup
+#     - Remove temporary directory
+#     - Log completion message
+#     - Exit with status 0
 ################################################################################
 
 # define mputs to output to multiple channels
@@ -220,14 +265,14 @@ if {[file isfile $FStr]} {
         mputs $Ouf ": Target newer, skipped!"
     } else {
         file copy -force $FStr $FStr.backup
-        foreach Elm [list $FSrc $FStr] Tmp {Src Tgt} {
+        foreach Elm [list $FSrc $FStr] FTmp {Src Tgt} {
             set Inf [open $Elm r]
-            set $Tmp [read $Inf]
+            set $FTmp [read $Inf]
             close $Inf
         }
 
         # Preserve the following settings in the target 11ctrlsim.tcl
-        #   ST|Hosts ST|Paths ST|Licns Email|Sufx Email OneChild SameDev HideVar
+        # ST|Hosts ST|Paths ST|Licns Email|Sufx Email IndexWise SameDev HideVar
         foreach Elm {ST\\|Hosts ST\\|Paths ST\\|Licns Email\\|Sufx} {
 
             # Both REs work, yet the 2nd RE is more generetic than the 1st
@@ -241,19 +286,13 @@ if {[file isfile $FStr]} {
                 regsub $Elm\\s+\\\{\[^\\\}\]+\\\} $Src $TgtArr($Elm) Src
             }
         }
-        regexp {(OneChild\s+\S+\s+SameDev)} $Tgt -> Val
-        regsub {OneChild\s+\S+\s+SameDev} $Src $Val Src
-        regexp {(SameDev\s+\S+\s+HideVar)} $Tgt -> Val
-        regsub {SameDev\s+\S+\s+HideVar} $Src $Val Src
-        regexp {(HideVar\s+\S+\s+FullSchenk)} $Tgt -> Val
-        regsub {HideVar\s+\S+\s+FullSchenk} $Src $Val Src
-        regexp {(FullSchenk\s+\S+\s+Email)} $Tgt -> Val
-        regsub {FullSchenk\s+\S+\s+Email} $Src $Val Src
-        regexp {(Email\s+\S+\s+Time)} $Tgt -> Val
-        regsub {Email\s+\S+\s+Time} $Src $Val Src
-        set Tmp [open $FStr w]
-        puts -nonewline $Tmp $Src
-        close $Tmp
+        foreach Elm {Email IndexWise SameDev HideVar FullSchenk} {
+            regexp ($Elm\\s+\\S+) $Tgt -> Val
+            regsub $Elm\\s+\\S+ $Src $Val Src
+        }
+        set FTmp [open $FStr w]
+        puts -nonewline $FTmp $Src
+        close $FTmp
         mputs $Ouf ": Copied!"
     }
 } else {

@@ -250,7 +250,7 @@ if {[llength $ProcSeq]} {
 
     # Convert .plx files from process simulaton to .CSV files
     if {[llength $lst]} {
-        puts $ouf "source $SimArr(CodeDir)/$SimArr(FProc)"
+        puts $ouf "source $SimArr(ModDir)/$SimArr(FProc)"
     }
     foreach elm $lst {
         puts $ouf "[file rootname $SimArr(FProc)]::plx2CSV $elm"

@@ -124,7 +124,12 @@ Materials {
         group= Insulator
         color= #eeee00, #d9b64c
     }
-    Glass {
+    GlassARC {
+        label= "GlassARC"
+        group= Insulator
+        color= #eeee00, #d9b64b
+    }    
+	Glass {
         label= "Glass"
         group= Insulator
         color= #eeee00, #d9b64b
@@ -140,6 +145,16 @@ Materials {
         color= #555500, #ffc619
     }
     AlOx {
+        label= "AlOx"
+        group= Insulator
+        color= #555500, #ffc619
+    }
+    SiNx1 {
+        label= "SiNx"
+        group= Insulator
+        color= #555500, #ffc619
+    }
+    AlOx1 {
         label= "AlOx"
         group= Insulator
         color= #555500, #ffc619

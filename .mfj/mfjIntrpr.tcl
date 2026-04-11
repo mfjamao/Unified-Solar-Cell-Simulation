@@ -636,7 +636,7 @@ proc mfjIntrpr::activateRR {} {
 
         # Only check variables with multiple levels
         if {$arr(RawLvl|$Var) == 1} continue
-        set Cnt [regexp -all {(\s|\{)(-?\d+[:,/&])*-?\d+=} $arr(RawVal|$Var)]
+        set Cnt [regexp -all {(\s|\{)(-?\d+[,:/&])*-?\d+=} $arr(RawVal|$Var)]
         if {$Cnt} {
             incr Sum $Cnt
             vputs -v2 -i1 "$Var: $Cnt element-replacement features detected!"
@@ -660,33 +660,28 @@ proc mfjIntrpr::activateRR {} {
     }
     vputs
 
-    vputs "Activate element-reuse features from 2nd value onwards if any..."
+    vputs "Activate element-reuse features for cross-level references if any..."
     set Sum 0
     foreach Var $arr(Raw|VarLst) {
 
         # Only check variables with multiple levels
         if {$arr(RawLvl|$Var) == 1} continue
-        set NewVal [list [lindex $arr(RawVal|$Var) 0]]
+        set OldVal $arr(RawVal|$Var)
         set Cnt 0
-        set Lvl 1
-        foreach LvlVal [lrange $arr(RawVal|$Var) 1 end] {
+        for {set Lvl 1} {$Lvl < $arr(RawLvl|$Var)} {incr Lvl} {
 
-            # Activate reuse only featurse in level 1+:
+            # Activate reuse only features for cross-level paths
             # Set reference to the previous levels
-            if {[regexp {^<(-?\d+[:,/&])*-?\d+>$} $LvlVal]} {
-                lappend NewVal [reuseElm $Var $arr(RawVal|$Var)\
-                    $LvlVal $Lvl $Lvl !InLvl]
+            set LvlVal [lindex $arr(RawVal|$Var) $Lvl]
+            if {[regexp {^<(-?\d+[,:/&])*-?\d+>$} $LvlVal]} {
+                reuseElm $Var arr(RawVal|$Var) XLvl $Lvl
                 incr Cnt
-            } else {
-                lappend NewVal $LvlVal
             }
-            incr Lvl
         }
         if {$Cnt} {
             incr Sum $Cnt
             vputs -v2 -i1 "$Var: $Cnt element-reuse features detected!"
-            vputs -v2 -c "Before: \{\{[join $arr(RawVal|$Var) \}\n\{]\}\}"
-            set arr(RawVal|$Var) $NewVal
+            vputs -v2 -c "Before: \{\{[join $OldVal \}\n\{]\}\}"
             vputs -v2 -c "After: \{\{[join $arr(RawVal|$Var) \}\n\{]\}\}\n"
         }
     }
@@ -704,12 +699,14 @@ proc mfjIntrpr::activateRR {} {
         # Only check variables with multiple levels
         if {$arr(RawLvl|$Var) == 1} continue
         set Cnt [expr [join $arr(RawFold|$Var) +]]
+        
         if {$Cnt > 0} {
             incr Cnt $arr(RawLvl|$Var)
             vputs -v2 -i1 "$Var: $arr(RawLvl|$Var) values expand to $Cnt!"
             vputs -v2 -c "Before: \{\{[join $arr(RawVal|$Var) \}\n\{]\}\}"
             set NewVal [list [lindex $arr(RawVal|$Var) 0]]
             set LvlIdx 1
+            # Each level has a value: 0 -> no folding; positive -> folding
             foreach Lst [lrange $arr(RawVal|$Var) 1 end] {
 
                 # Extend to the full list now
@@ -739,36 +736,30 @@ proc mfjIntrpr::activateRR {} {
     set Sum 0
     foreach Var $arr(Raw|VarLst) {
         set NewLst [list]
-        set Cnt [regexp -all {<(-?\d+[:,/&])*-?\d+>} $arr(RawGLst|$Var)]
+        set Cnt [regexp -all {<(-?\d+[,:/&])*-?\d+>} $arr(RawGLst|$Var)]
         if {$Cnt} {
             incr Sum $Cnt
             vputs -v2 -i1 "$Var grammar: $Cnt element-reuse features detected!"
             vputs -v2 -c "Before: \{$arr(RawGLst|$Var)\}"
-            set arr(RawGLst|$Var) [reuseElm $Var $arr(RawGLst|$Var)\
-                $arr(RawGLst|$Var)]
+            reuseElm $Var arr(RawGLst|$Var) !XLvl
             vputs -v2 -c "After: \{$arr(RawGLst|$Var)\}\n"
         }
-        set Cnt [regexp -all {<(-?\d+[:,/&])*-?\d+>} $arr(RawVal|$Var)]
+        set Cnt [regexp -all {<(-?\d+[,:/&])*-?\d+>} $arr(RawVal|$Var)]
         if {$Cnt} {
             incr Sum $Cnt
             vputs -v2 -i1 "$Var: $Cnt element-reuse features detected!"
             if {$arr(RawLvl|$Var) > 1} {
                 vputs -v2 -c "Before: \{\{[join $arr(RawVal|$Var) \}\n\{]\}\}"
-                set NewVal [list]
-                set Lvl 0
-                foreach LvlVal $arr(RawVal|$Var) {
+                for {set Lvl 0} {$Lvl < $arr(RawLvl|$Var)} {incr Lvl} {
 
                     # Activate element-reuse feature within each level:
                     # Set reference within the current level
-                    lappend NewVal [reuseElm $Var $LvlVal $LvlVal $Lvl]
-                    incr Lvl
+                    reuseElm $Var arr(RawVal|$Var) !XLvl $Lvl
                 }
-                set arr(RawVal|$Var) $NewVal
                 vputs -v2 -c "After: \{\{[join $arr(RawVal|$Var) \}\n\{]\}\}\n"
             } else {
                 vputs -v2 -c "Before: \{$arr(RawVal|$Var)\}"
-                set arr(RawVal|$Var) [reuseElm $Var $arr(RawVal|$Var)\
-                    $arr(RawVal|$Var)]
+                reuseElm $Var arr(RawVal|$Var) !XLvl
                 vputs -v2 -c "After: \{$arr(RawVal|$Var)\}\n"
             }
         }
@@ -1080,9 +1071,9 @@ proc mfjIntrpr::validateVar {} {
             set OldLvl [string map {\"\" \{\}} $OldLvl]
             for {set j 0} {$j < $RGLvlLen} {incr j} {
 
-                # For the OneChild mode, skip other permutations for region
+                # For the IndexWise mode, skip other permutations for region
                 # related variables
-                if {[string index $::SimArr(OneChild) 0] ne "!"
+                if {[string index $::SimArr(IndexWise) 0] ne "!"
                     && $LvlLen == $RGLvlLen && $i != $j} {
                     continue
                 }
@@ -1216,7 +1207,7 @@ proc mfjIntrpr::validateVar {} {
 
     # Include key Tcl files, datexcodes.txt, Molefraction.txt and PMI files
     foreach Elm [concat 11ctrlsim.tcl datexcodes.txt Molefraction.txt\
-        [glob -nocomplain $::SimArr(CodeDir)/mfj*.tcl\
+        [glob -nocomplain $::SimArr(ModDir)/mfj*.tcl\
         $::SimArr(PMIDir)/*.\[cC\]]] {
         lappend ::SimArr(ModTime) [list $Elm [file mtime $Elm]]
     }
@@ -1770,7 +1761,7 @@ proc mfjIntrpr::fmtvsRaw {} {
         set arr(RawLvl|$Var) 1
     }
     set DfltSet [list $::SimArr(DfltYMax) $::SimArr(LatFac) $::SimArr(GasThx)]
-    foreach Elm {HideVar OneChild FullSchenk} {
+    foreach Elm {HideVar IndexWise FullSchenk} {
         if {[string equal -nocase $::SimArr($Elm) $Elm]} {
             lappend DfltSet $Elm
         } else {
@@ -2420,7 +2411,7 @@ proc mfjIntrpr::raw2Fmt {} {
 
     # Skip grammar check if FVarBrf and FVarRaw are the same and FVarRaw
     # is not modified
-    set FInfo $::SimArr(CodeDir)/$::SimArr(FInfo)
+    set FInfo $::SimArr(ModDir)/$::SimArr(FInfo)
     if {[file isfile $FInfo]} {
         set Inf [open $FInfo r]
         gets $Inf Line
@@ -2445,10 +2436,19 @@ proc mfjIntrpr::raw2Fmt {} {
         }
     } else {
         vputs "Skip grammar check as variable files are not modified :)\n"
-        foreach Elm {readFmt updateModTime updateFmt} {
-            if {[catch $Elm Err]} {
-                vputs -c "\nError in proc '$Elm':\n$Err\n"
-                exit 1
+        if {[file isfile $::SimArr(FVarFmt)]} {
+            foreach Elm {readFmt updateModTime updateFmt} {
+                if {[catch $Elm Err]} {
+                    vputs -c "\nError in proc '$Elm':\n$Err\n"
+                    exit 1
+                }
+            }
+        } else {
+            foreach Elm {readFmt fmtvsRaw updateFmt} {
+                if {[catch $Elm Err]} {
+                    vputs -c "\nError in proc '$Elm':\n$Err\n"
+                    exit 1
+                }
             }
         }
     }

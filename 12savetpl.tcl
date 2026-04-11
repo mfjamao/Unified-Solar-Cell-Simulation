@@ -1,12 +1,62 @@
 #!/usr/bin/tclsh
 
 ################################################################################
-# This script is designed to save the relevant simulation files in its project
-# directory as a template to incubate new simulations later. It first loads
-# array 'SimArr' from 11ctrlsim.tcl and then saves relevant files to a Tar/GZip
-# achieve.
-#
+# This script is designed to save relevant simulation files from its project
+# directory as a template archive (.tgz) to incubate new simulations later. It
+# reads configuration in array 'SimArr' from 11ctrlsim.tcl and uses file lists
+# defined in 'mfjModTime' to conprehensive and timestamped backups.
+
 # Maintained by Dr. Fa-Jun MA (mfjamao@yahoo.com)
+
+# Key Features
+#     Configuration-Driven: Reads SimArr array from 11ctrlsim.tcl for project
+#         settings
+#     Timestamped Archives: Creates uniquely named archives with timestamps
+#     Intelligent File Collection: Gathers files from multiple directories
+#     Case-Insensitive Path Handling: Cross-platform path resolution
+#     Duplicate Removal: Uses lsort -unique to avoid duplicate files
+#     Error Recovery: Cleans up partial archives on tar failure
+
+# Processing Flow
+# 1. Start script and define mputs for multi-channel output
+#     - ./12savetpl.tcl [optional path to save template]
+# 2. Initialization
+#     - Set working directory to script location
+#     - Define output file and backup if it exists
+# 3. Configuration loading
+#     - Load SimArr from 11ctrlsim.tcl using regexp
+#     - Source SimArr(FVarEnv) for mfjModTime
+#     - Get file list from mfjModTime and error if not found
+# 4. Template name resolution
+#     - If no argument, use SimArr(TplDir) with timestamp
+#     - Remove .tgz extension if present
+#     - Normalize path by removing . and .. and resolving case-insensitive paths
+#     - Create: [path]/[name]_[timestamp].tgz
+# 5. Temporary directory creation
+#     - Create temp directory for saving files
+#     - Structure mirrors project directory
+# 6. File collection and copying
+# Source 1: mfjModTime files
+#     - First elements from each list entry
+# Source 2: Core project files
+#     - 10variables[-brief].txt, 11ctrlsim.tcl, 11ctrlsim.mfj
+#     - FSave, FLoad, README.md, gtooldb.tcl
+# Source 3: Directory globs
+#     - OutDir: *.csv, *.plx
+#     - PMIDir: *.[cC], *.so.*
+#     - ModDir: *.tcl, *.sh
+# Source 4: Project root directory files
+#     - *.out, n*_OG1D.plx, v*.plt, pbs.*
+# Final processing
+#     - Use lsort -unique to avoid duplicates
+#     - Copy files to temp directory, creating subdirectories as needed
+# 7. Archive creation
+#     - Change to parent directory of temp directory
+#     - Create Tar/GZip archive with tar -czf
+#     - On success, delete temp directory
+#     - On failure, delete partial archive and report error
+# 8. Completion
+#     - Output success message and exit
 ################################################################################
 
 # define mputs to output to multiple channels (stdout and file)
@@ -161,7 +211,7 @@ set FLst [concat $FLst $SimArr(FVarRaw) $FBrf 11ctrlsim.tcl 11ctrlsim.mfj\
     $SimArr(FSave) $SimArr(FLoad) README.md gtooldb.tcl\
     [glob -nocomplain -directory $::SimArr(OutDir) *.csv *.plx]\
     [glob -nocomplain -directory $::SimArr(PMIDir) {*.[cC]} *.so.*]\
-    [glob -nocomplain -directory $::SimArr(CodeDir) *.tcl *.sh]\
+    [glob -nocomplain -directory $::SimArr(ModDir) *.tcl *.sh]\
     [glob -nocomplain *.out n*_OG1D.plx v*.plt pbs.*]]
 
 set Cnt 0

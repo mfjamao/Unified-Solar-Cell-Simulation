@@ -1,30 +1,120 @@
 #!/usr/bin/tclsh
 
 ################################################################################
-# This script is designed to start/stop simulation. Once the script is executed,
-# it checks whether a previous instance is still running. If so, wait till it
-# ends. If a batch is running (locally or by a job scheduler), kill the job.
-# If no batch job is running, carry out the following four steps:
-#   1. Convert the raw variable file (case insensitive) to a formatted file
-#   2. Convert the formatted file to simulator-compatible files
-#   3. Start preprocessing to generate command files for the simulator
-#   4. Run the batch job locally or submit it to a job scheduler
-#
-# Maintained by Dr. Fa-Jun MA (mfjamao@yahoo.com). Only Sentaurus is supported
-# now. Other simulators will be supported in future.
-#
-# Other notes:
-#   HideVar: Hide variables from Sentaurus Workbench unless they have multiple
-#       levels.
-#   OneChild: If adjacent variables have the same multiple levels, one parent
-#       node has only one child node. Disable it to enable full permutation.
-#   FullSchenk: Select whether to calculate BGN using full Schenk model or not,
-#       which is still experimenting
-#   TrapDLN: Default # of levels in Sentaurus is 13
-#   Add or modify an element in ST|Hosts, ST|Paths, ST|Licns, and Email|Sufx to
-#       suit your settings. Set Email to override Email|Sufx. For ST|Hosts, Only
-#       the first letter of a host name matters
-#   In Tcl, use braces to suppress string substitution so '\' is literally '\'
+# This script is designed to manage the complete workflow for device simulation.
+# It handles job scheduling, file conversion, preprocessing and batch execution
+# while preventing multiple instances from running simultaneously
+
+# Maintained by Dr. Fa-Jun MA (mfjamao@yahoo.com)
+
+# Processing Flow
+# 1. Check for running instance
+#     Check lock file and PID existence
+#     Wait if running/clean up if not
+# 2. Create lock file with current PID to prevent multiple instances
+# 3. Load key files and import procedures to the current namespace
+#     Source files in ModDir: FProc, FIntrpr, FST and FGrm
+#     Create directories if not present: MDBDir, OptDir, ExpDir, PMIDir, EtcDir,
+#         OutDir and TplDir
+#     Set log files: FOut and FLog
+# 4. Process command-line arguments if any
+#     -a        Set append mode instead of clearing output files
+#     -f file   Read another variable file
+#     -i        Inverse mode, SWB to variable file
+#     -v #      Alter the default verbocity value
+#     -r #      Run the # step in Steps
+#     -t #      Run to the # step in Steps (Including the # step)
+# 5. Inverse mode?
+#     Yes, SWB → Tcl → Raw variable file → Exit
+# 6. Check and stop the previous batch
+#     Check status file .status
+#     Kill processes (local) or cancel jobs (PBS/SLURM) if running or queuing
+#     Update status to 'aborted' if the previous batch is stopped
+# 7. Step 0: Convert raw to formatted variable file (0Raw2Fmt)
+#     Read the raw variable file (case insensitive)
+#     Convert to variables.txt
+#     Update simulator info file if necessary
+# 8. Step 1: Convert formatted to simulator-compatible files (1Fmt2Sim)
+#     Read variables.txt
+#     Create simulator-specific variable files (varSim.tcl, varEnv.tcl)
+#     Create SWB-compatible files
+# 9. Step 2: Preprocess to generate command files (2PreProc)
+#     Run preproc.sh to generate command files for the simulator
+#     Remove DOESummary.lock if it exists
+# 10. Step 3: Run the batch job (3Batch)
+#     Run batch.sh locally or submit it to a job scheduler (PBS/SLURM)
+
+# Configuration Parameters (SimArr Array)
+# Core Settings
+#     Parameter   Description                     Default
+#     Email       Email address override          ""
+#     Time        Timestamp for logging           ""
+#     Append      Append to output files          false
+#     Inverse     SWB to variable conversion mode false
+# Step Control Flags
+#     Flag        Description
+#     0Raw2Fmt    Convert raw variable file to formatted
+#     1Fmt2Sim    Convert formatted to simulator files
+#     2PreProc    Run preprocessing
+#     3Batch      Execute batch jobs
+# File Names
+#     Parameter   Description
+#     FVarRaw     Raw variable file (e.g. 10variables.txt, case-insensitive)
+#     FVarFmt     Formatted variable file (variables.txt, case-sensitive)
+#     FIntrpr     Interpreter module
+#     FProc       Procedures module
+#     FGrm        Grammar module
+#     FST         Sentaurus module
+#     FVarSim     Simulator variables file
+#     FVarEnv     Environment variables file
+#     FSTPP       Preprocess script (preproc.sh)
+#     FSTBatch    Batch script (batch.sh)
+#     FSTStat     Status file (.status)
+#     FInfo       Simulator info file (siminfo)
+#     FLock       Script file lock (lock)
+#     FDOESum     DOE summary file (DOESummary.csv)
+# Directory Structure
+#     Parameter   Description
+#     ModDir      Module directory (.mfj)
+#     MDBDir      Material database directory (01mdb)
+#     OptDir      Optics directory (02opt)
+#     ExpDir      Experiments directory (03exp)
+#     PMIDir      Physical Model Interface/code directory (04code)
+#     EtcDir      Miscellaneous directory (05etc)
+#     OutDir      Output directory (06out)
+#     TplDir      Templates directory (07tpl)
+# Simulation Parameters
+#     Parameter   Description
+#     NThread     Number of threads (4)
+#     BitSize     Bit sizes list
+#     Digits      Digits for each bit size
+#     RhsMin      RHS minimum values
+#     Iter        Iteration counts
+#     TrapDLN     Trap levels (default 13)
+#     FullSchenk  Full Schenk BGN model flag
+#     HideVar     Hide variables from SWB if they have only one level
+#     IndexWise   Combine values index-wise if adjacent variables have the same
+#                 multiple levels, otherwise product mode
+# System Configuration
+#     Parameter   Description
+#     ST|Hosts    Supported hosts (katana, ...)
+#     ST|Paths    Sentaurus installation paths
+#     ST|Licns    License server port and address
+#     ST|Tools    Sentaurus tools list
+# Output Files
+#     11simctrl.out - Main output log
+#     11simctrl.mfj - Detailed processing log
+#     SimArr(ModDir)/preproc.out - Preprocessing output
+#     SimArr(ModDir)/batch.out - Batch execution output
+#     SimArr(ModDir)/siminfo - simulator|scheduler|FVarRaw mtime|FScript mtime
+#     .status - timestamp|hostname|user|status|pid
+
+# Miscellaneous notes:
+#     Add or modify an element in ST|Hosts, ST|Paths, ST|Licns, and Email|Sufx
+#         to suit your settings. Set Email to override Email|Sufx. For ST|Hosts,
+#         Only the first letter of a host name matters
+#     In Tcl, use braces to suppress string substitution so '\' is literally '\'
+#     Only Sentaurus is supported. Other simulators will be supported in future.
 ################################################################################
 array set SimArr {
     Email "" Time "" Append false Inverse false
@@ -34,9 +124,9 @@ array set SimArr {
     FVarSim varSim.tcl FVarEnv varEnv.tcl FSave 12savetpl.tcl
     FLoad 13loadtpl.tcl FSTPP preproc.sh FSTBatch batch.sh
     FInfo siminfo FLock lock FSTStat .status FDOESum DOESummary.csv
-    CodeDir .mfj MDBDir 01mdb OptDir 02opt ExpDir 03exp PMIDir 04code
+    ModDir .mfj MDBDir 01mdb OptDir 02opt ExpDir 03exp PMIDir 04code
     EtcDir 05etc OutDir 06out TplDir 07tpl
-    SameDev SameDev HideVar HideVar OneChild OneChild DfltYMax 2.0 LatFac 0.8
+    SameDev SameDev HideVar HideVar IndexWise IndexWise DfltYMax 2.0 LatFac 0.8
     GasThx 0.1 TrapDLN 100 EdgeEx 10 IntfEx 0.001 FullSchenk !FullSchenk
     NThread 4 BitSize {64 80 128 256} Digits {5 5 6 10}
     RhsMin {1e-10 1e-12 1e-15 1e-25} Iter {10 12 15 20}
@@ -75,7 +165,7 @@ if {$tcl_platform(platform) eq "unix" && ![file executable $FScript]} {
 }
 
 # Keep waiting in case the previous script is still running
-set FLock $SimArr(CodeDir)/$SimArr(FLock)
+set FLock $SimArr(ModDir)/$SimArr(FLock)
 if {[file isfile $FLock]} {
     set Inf [open $FLock r]
     gets $Inf PID
@@ -108,9 +198,9 @@ set Ouf [open $FLock w]
 puts $Ouf [pid]
 close $Ouf
 
-# Load key files
+# Load key files and import the procedure in 'FProc' to the current namespace
 foreach Elm [list $SimArr(FProc) $SimArr(FIntrpr) $SimArr(FST) $SimArr(FGrm)] {
-    set Elm $SimArr(CodeDir)/$Elm
+    set Elm $SimArr(ModDir)/$Elm
     if {![file isfile $Elm]} {
         error "Key file '$Elm' missing in directory '[file tail $WD]'!"
     } else {
@@ -231,7 +321,7 @@ if {$SimArr(Inverse)} {
 }
 
 # Determine simulator and job scheduler. Default: Sentaurus Local
-set FInfo $SimArr(CodeDir)/$SimArr(FInfo)
+set FInfo $SimArr(ModDir)/$SimArr(FInfo)
 if {[file isfile $FInfo]} {
     set Inf [open $FInfo r]
     gets $Inf Line
@@ -263,7 +353,7 @@ vputs -c '[lindex $StatLst 3]'\n
 # queue time before a scheduler completes arrangement of desired resources.
 set Queue false
 set BatOut ""
-set FSTBatch $SimArr(CodeDir)/$SimArr(FSTBatch)
+set FSTBatch $SimArr(ModDir)/$SimArr(FSTBatch)
 set FSTBatchOut [file rootname $FSTBatch].out
 if {[file isfile $FSTBatchOut]} {
     set Inf [open $FSTBatchOut r]
@@ -388,13 +478,17 @@ if {$SimArr(1Fmt2Sim)} {
 # Perform preprocess
 if {$SimArr(2PreProc) && [lindex $InfoLst 0] eq "Sentaurus"} {
     vputs "Preprocessing with 'Sentaurus Workbench spp'...\n"
-    set FSTPP $SimArr(CodeDir)/$SimArr(FSTPP)
+    set FSTPP $SimArr(ModDir)/$SimArr(FSTPP)
     set FSTPPOut [file rootname $FSTPP].out
     close [open $FSTPPOut w]
     if {[catch {exec $FSTPP >$FSO | tee -a $FSTPPOut\
         $mfjProc::arr(FOut) $mfjProc::arr(FLog)} Err]} {
         vputs -c "\nfailed in preprocessing: $Err\n"
         exit 1
+    }
+    # Remove *.lock in $SimArr(OutDir)
+    foreach Elm [glob -nocomplain -directory $SimArr(OutDir) *.lock] {
+         file delete $Elm
     }
 }
 

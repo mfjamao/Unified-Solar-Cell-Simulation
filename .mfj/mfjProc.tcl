@@ -49,15 +49,59 @@ namespace eval mfjProc {
 # Performance hints: http://wiki.tcl.tk/348
 
 # mfjProc::safeLog
-    # Designed to log a message to files with directory creation and symbolic
-    # link checks
-# Arguments:
-    # FName       A log file name
-    # Access      File access mode, 'w' or 'a'
-    # Msg         A message to be logged
-    # NewLine     New line flag
-# Result: Return 1 as success or run into an error
-proc mfjProc::safeLog {FName Access Msg {NewLine true}} {
+#     Safely logs a message to a file, automatically creating directories and
+#     handling symbolic links.
+# Purpose
+# Provides robust file logging functionality that:
+#     Automatically creates parent directories if they don't exist
+#     Handles symbolic links appropriately
+#     Ensures file write operations are safe and reliab
+# Arguments
+#     Argument  Type    Description
+#     FName     String  Path to the log file
+#     Access    String  File access mode: 'w' (write/overwrite) or 'a' (append)
+#     Msg       String  The message content to log
+#     NewLine   Boolean Flag indicating whether to append a newline character
+# Return Value
+#     Success: Returns 1
+#     Failure: Triggers an error (function does not return)
+
+# Processing Flow
+# 1. Argument Validation
+#     Check if filename (FName) is empty
+#     If empty: Return 1 (success) immediately
+#     Convert access mode to lowercase
+#     Verify access mode is either "w" (write) or "a" (append)
+#     If invalid: Throw error "invalid access mode: must be 'w' or 'a'"
+# 2. Directory Preparation
+#     Check if file already exists
+#     If file does not exist:
+#         Extract directory path from filename
+#         Check if directory exists
+#         If directory does not exist: Create parent directories recursively
+#             using file mkdir
+#     If file exists:
+#         Check if running on Unix platform
+#         If on Unix: Verify file is not a symbolic link
+#         If symbolic link detected: "a symbolic link not allowed: '$FName'"
+# 3. Backup Creation (Write Mode Only)
+#     If access mode is "w":
+#         Set backup filename to ${FName}.backup
+#         Check if original file exists
+#         If original file exists: Create backup copy using file copy -force
+# 4. File Opening
+#     Attempt to open file with specified access mode
+#     Use catch to handle potential errors
+#     If open fails: Throw error with details "failed to open '$FName': $Err"
+# 5. Message Writing
+#     Check NewLine flag:
+#         If true: Write message with newline
+#         If false: Write message without newline
+# 6. Cleanup and Return
+#     Close the file handle
+#     Return 1 indicating success
+proc mfjProc::safeLog {FName Access Msg
+    {NewLine true}} {
 
     # Validate arguments. Return if no file name specified
     if {![llength $FName]} {
@@ -107,38 +151,120 @@ proc mfjProc::safeLog {FName Access Msg {NewLine true}} {
 }
 
 # mfjProc::vputs
-    # Designed to handle formatted output with various options for verbosity,
-    # indentation, and file logging by adding additional controls to 'puts'
-    # to achieve versatile output styles. It handles a wide range of formatting
-    # scenarios and ensures that messages are output correctly based on the
-    # specified options.
-    # 1. Terminal output is determined by a global verbosity level. A string
-        # with a higher verbosity is not sent to a terminal.
-    # 2. Output is typically indented and indentation is controlled by 'Tab',
-        # 'Indent1', 'Indent2' from array 'arr' and variable 'Indent'.
-        # Indentation may be disabled by specifying '-c'.
-    # 3. Line splitting is the default behaviour for better reading pleasure
-        # using a terminal output. Each line is no more than 80 characters.
-    # 4. After line splitting. Except the first line, the rest lines are
-        # neatly indented with an additional indentation (one tab), which is
-        # so called hanging indents. The same indentation can be re-enforced
-        # by specifying '-s'.
-    # 5. Line splitting can be suppressed by specifying '-o'. A string is
-        # output as it is.
-    # 6. Terminal output is copied to 'FOut' for reference later. For the
-        # diagnostic purpose, all strings are copied to 'FLog' despite
-        # the verbosity setting.
-# Arguments:
-    # -c          Write right after the current position, indentation ignored
-    # -n          No new line
-    # -o          Output a string as it is
-    # -s          Same indentation
-    # -w          Write instead of default appending output to FOut and FLog
-    # -i#         Specify tabs for string indentation
-    # -v#         Specify a verbosity level and check against the global
-                    # verbosity setting to determine whether a string should
-                    # appear on a terminal
-# Result: No return value
+#     Enhanced output formatting procedure that extends standard puts with
+#     advanced controls for verbosity, indentation, and file logging.
+# Purpose
+# Provides versatile output formatting with:
+#     Verbosity-based terminal filtering
+#     Configurable indentation levels
+#     Automatic line wrapping (80-character limit)
+#     Simultaneous file logging for diagnostics
+#     Support for hanging indents and formatting preservation
+# Features
+# 1. Verbosity Control
+#     Terminal output is filtered based on a global verbosity level
+#     Messages with verbosity higher than the global setting are suppressed
+#     from terminal
+#     All messages are still written to log files regardless of verbosity
+# 2. Indentation Management
+#     Default behavior includes proper indentation
+#     Indentation controlled by:
+#         Tab setting
+#         Indent1 and Indent2 from array arr
+#         Variable Indent
+#     Can be disabled with -c flag
+# 3. Line Formatting
+#     Default: Automatic line splitting at 80 characters for readability
+#     Hanging Indents: Subsequent lines receive additional tab indentation
+#     Same Indent: -s flag enforces identical indentation for all lines
+#     Raw Output: -o flag suppresses all line splitting, outputting text
+#     exactly as provided
+# 4. File Logging
+#     Terminal output is copied to FOut for reference
+#     All messages (regardless of verbosity) are written to FLog for
+#     diagnostics
+#     Default behavior appends to files; -w flag enables write/overwrite
+#     mode
+# Arguments
+#     Flag  Description
+#     -c    Write at current position (no indentation)
+#     -n    Suppress newline at end of output
+#     -o    Output raw string without line splitting
+#     -s    Use same indentation for all lines (no hanging indent)
+#     -w    Write/overwrite files instead of appending
+#     -i#   Specify number of tabs for indentation
+#     -v#   Set verbosity level (compared against global setting)
+# Return Value
+#     No return value. Output is written to terminal and/or files as
+#     configured.
+
+# Processing Flow
+# 1. Argument Parsing and Separation
+#     Extract the last argument as the message string (Str)
+#     Remove the last argument from args, leaving only options
+#     Initialize default settings:
+#         Access: "a" (append mode for file logging)
+#         Continue: false (disable continuous output without indentation)
+#         NewLine: true (add newline after message)
+#         OneLine: false (disable raw output without line wrapping)
+#         SameInt: false (disable same indentation for all lines)
+#         Indent: 0 (no additional indentation tabs)
+#         Verbosity: 1 (default verbosity level)
+# 2. Option Processing Loop
+#     Iterate through remaining arguments and process each option:
+#         Option    Effect
+#         -c        Set Continue = true (ignore indentation)
+#         -n        Set NewLine = false (suppress newline)
+#         -o        Set OneLine = true (output raw string, no line splitting)
+#         -s        Set SameInt = true (use same indentation for all lines)
+#         -w        Set Access = "w" (write/overwrite mode for files)
+#         -i#       Set Indent to numeric value (additional tabs)
+#         -v#       Set Verbosity to numeric value
+#         --        Stop option processing
+#         -*        Unknown option → throw error
+#         other     Invalid argument format → throw error
+#     After processing each option, remove it from args list.
+# 3. Validation
+#     Verify required array elements exist in arr:
+#         Indent1, Indent2, Tab, MaxVerb, FOut, FLog, LineLen
+#         Missing any → throw error
+#         Validate that Indent1, Indent2, MaxVerb, LineLen are integers
+#         Invalid → throw error
+# 4. Indentation Calculation
+#     If Continue is false:
+#         Calculate total indentation value: Val = arr(Indent1) + arr(Indent2)
+#         + Indent
+#     If Val > 0: Create Prefix by repeating arr(Tab) Val times
+#     Calculate prefix length: Len = string length of arr(Tab) * abs(Val)
+#     Set index: Idx = Len - 1
+# 5. Message Formatting
+#     Skip if Str is empty:
+#     Case A: Raw Output (OneLine = true)
+#         Use Str as-is without any processing
+#     Case B: Formatted Output (OneLine = false)
+#         Split Str by newlines
+#         Process each line based on indentation:
+#             Condition Processing
+#             Val >= 0 (indent)
+#                 - If SameInt = true: wrapText with same indentation for all
+#                     lines
+#                 - If SameInt = false: wrapText with hanging indent
+#                     (additional tab for wrapped lines)
+#             Val < 0 (outdent)
+#                 - If line starts with non-space at position ≤ Idx: Trim left,
+#                     then wrap
+#                 - If line starts with spaces: Remove first Len characters,
+#                     preserve leading spaces, then wrap
+#         Join processed lines with newlines
+# 6. Output Based on Verbosity
+#     Compare Verbosity against arr(MaxVerb) (global verbosity level)
+#     If Verbosity ≤ arr(MaxVerb):
+#         Terminal output:
+#             NewLine = true: puts $Msg
+#             NewLine = false: puts -nonewline $Msg
+#         Copy to FOut file using safeLog with current output settings
+#     Regardless of verbosity (for debugging):
+#         Always copy to FLog file using safeLog with current ouput settings
 proc mfjProc::vputs args {
     variable arr
 
@@ -286,16 +412,85 @@ proc mfjProc::vputs args {
 }
 
 # mfjProc::wrapText
-    # Designed to wrap text to a specified line length, handling various
-    # formatting options such as leading and trailing text, and hanging
-    # indentation (one tab size).
+#     Wraps text to a specified line length with support for leading/trailing
+#     text and hanging indentation.
+# Purpose
+#     Formats text by breaking long lines at word boundaries while preserving
+#     paragraph structure. Provides flexible options for adding prefixes,
+#     suffixes, and special indentation for wrapped lines.
 # Arguments
-    # Text            The input text to be wrapped
-    # Lead            Optional leading text to be added to each line
-    # Trail           Optional trailing text to be added to each line
-    # HangIdt         Optional switch for hanging indentation
-# Result: Return a new text with delimited by \n
-proc mfjProc::wrapText {Text {Lead ""} {Trail ""} {HangIdt ""}} {
+#     Argument  Type    Description                         Default
+#     Text      String  The input text to be wrapped        Required
+#     Lead      String  Optional leading text               "" (empty)
+#     Trail     String  Optional trailing text              "" (empty)
+#     HangIdt   String  Optional hanging indentation        "" (empty)
+#     Note: Setting HangIdt to "!" disables hanging indentation (no tab added
+#     to wrapped lines)
+# Return Value
+#     Returns the wrapped text as a string with lines delimited by \n.
+
+# Processing Flow
+# 1. Initial Validation and Setup
+#     Check HangIdt parameter:
+#         If first character is "!": Disable hanging indentation (Tab = "")
+#         Otherwise: Use arr(Tab) for hanging indentation
+#     Calculate lengths:
+#         LeadLen: Length of leading text
+#         TrailLen: Length of trailing text
+#         TabLen: Length of tab string (for hanging indent)
+#     Initialize NewText as empty string
+#     Set paragraph counter ParaCnt = 0
+# 2. Paragraph Processing Loop
+#     Split input Text by newlines and process each paragraph independently:
+#     For each paragraph (Para):
+#         Calculate maximum line length: MaxLen
+#         Set maximum index: MaxIdx = MaxLen - 1
+#         Get paragraph length: ParaLen = string length $Para
+#         Initialize line counter LineCnt = 0 and NewPara = ""
+# 3. Line Wrapping Loop (while paragraph has content)
+#     Process the paragraph line by line:
+#     Step A: Check if paragraph fits within margin
+#         If ParaLen ≤ MaxLen:
+#         Use entire paragraph as current line
+#         Clear Para (all content processed)
+#     Step B: Paragraph exceeds margin - find split point
+#         Take the character at MaxIdx as potential line: Line
+#         Case 1: Character at position MaxLen is a space
+#             Split cleanly at space
+#             Set Para to remaining text starting after the space
+#         Case 2: No space at position MaxLen
+#             Search backwards from MaxLen to find the last space within margin
+#             If space found: Split at that space position
+#             If no space found within margin:
+#                 Set "LongStr = true" flag
+#                 Try extended search up to arr(LineLen)
+#                 If still no space found:
+#                     Finding next space beyond margin
+#                     Splitting at that position
+#                     Or if no spaces exist, split at maximum length
+# 4. Line Assembly and Formatting
+#     First line of paragraph (LineCnt = 0):
+#         If LongStr is true: NewPara = $Line (no Lead/Trail)
+#         Otherwise: NewPara = $Lead$Line$Trail
+#         Adjust for hanging indentation: MaxLen -= TabLen, update MaxIdx
+#     Subsequent lines (LineCnt > 0):
+#         Insert newline before each line
+#         If LongStr is true: Append just the line
+#         Otherwise: Append with hanging indentation: \n$Lead$Tab$Line$Trail
+# 5. Continue Loop
+#     Update ParaLen with remaining text length
+#     Increment line counter LineCnt
+#     Repeat until all text in paragraph is processed
+# 6. Paragraph Assembly
+#     After completing a paragraph:
+#         If first paragraph (ParaCnt = 0): Set NewText = $NewPara
+#         Otherwise: Append with newline: NewText += \n$NewPara
+#     Increment paragraph counter ParaCnt
+#     Process next paragraph
+# 7. Return Result
+#     Return the fully wrapped and formatted text as NewText
+proc mfjProc::wrapText {Text
+    {Lead ""} {Trail ""} {HangIdt ""}} {
     variable arr
 
     # Validate arguments
@@ -312,7 +507,7 @@ proc mfjProc::wrapText {Text {Lead ""} {Trail ""} {HangIdt ""}} {
 
     # Split text to multiple paragraphs if any
     set NewText ""
-    set Cnt1 0
+    set ParaCnt 0
     foreach Para [split $Text \n] {
 
         # Substitute multiple spaces with one space
@@ -324,7 +519,7 @@ proc mfjProc::wrapText {Text {Lead ""} {Trail ""} {HangIdt ""}} {
         # Only treat each paragraph as a string
         # It may cause issues if treated as a list
         set ParaLen [string length $Para]
-        set Cnt2 0
+        set LineCnt 0
         set NewPara ""
         while {$ParaLen > 0} {
             set LongStr false
@@ -393,7 +588,7 @@ proc mfjProc::wrapText {Text {Lead ""} {Trail ""} {HangIdt ""}} {
                     }
                 }
             }
-            if {$Cnt2} {
+            if {$LineCnt} {
 
                 # Insert a newline before the subsequent lines and add hanging
                 if {$LongStr} {
@@ -415,9 +610,9 @@ proc mfjProc::wrapText {Text {Lead ""} {Trail ""} {HangIdt ""}} {
                 set MaxIdx [expr $MaxLen-1]
             }
             set ParaLen [string length $Para]
-            incr Cnt2
+            incr LineCnt
         }
-        if {$Cnt1} {
+        if {$ParaCnt} {
 
             # Insert a newline between each paragraph
             append NewText \n $NewPara
@@ -426,32 +621,84 @@ proc mfjProc::wrapText {Text {Lead ""} {Trail ""} {HangIdt ""}} {
             # Update the first paragraph
             set NewText $NewPara
         }
-        incr Cnt1
+        incr ParaCnt
     }
     return $NewText
 }
 
 # mfjProc::readIdx
-    # Designed to parse and expand an index string into a list of index
-    # permutations. It supports various features such as range expansion,
-    # negative index conversion, and permutation generation.
-    # The meaning of special symbols:
-        # '/' denotes index permutation
-        # ':' denotes all indices from index 1 to index 2
-        # ',' separates index 1 and index 2
-    # Example: 0/1,3:5 -> (0 1) (0 3) (0 4) (0 5)
-    # Negative indices are converted to positive if 'LenLst' is present
+#     Parses and expands an index string into a list of index permutations,
+#     supporting range expansion, negative index conversion, and permutation
+#     generation.
+# Purpose
+#     Converts a compact index notation into explicit index permutations for
+#     nested list access, with flexible range specifications and automatic
+#     handling of negative indices.
+# Special Symbols
+#     Symbol    Meaning
+#       /       Separates indices for different nested list levels
+#       ,       Separates multiple index specifications within the same level
+#       :       First occurrence: Defines a range from start index to end index
+#       :       Second occurrence: Specifies the step size for range traversal
+#       @       Specifies steps for range traversal
+#     Syntax Examples
+#     Basic syntax: level0/level1,rangeStart:rangeEnd:step
+#     0/1,3:7:2 expands to: (0 1) (0 3) (0 5) (0 7)
 # Arguments
-    # IdxStr        A string of indices
-    # LenLst        A list of the length values of lists if provided
-# Result: Return the interpreted list of indices/permutation
-proc mfjProc::readIdx {IdxStr {LenLst ""}} {
+#     Argument  Type    Description
+#     IdxStr    String  Index string to parse and expand (e.g., "0/1,3:7:2")
+#     LenLst    List    (Optional) List of length values for each nested
+#                       level, separated by /. Used to convert negative
+#                       indices to positive equivalents and validate range
+#                       bounds.
+# Return Value
+#     Returns a list of index permutations, where each permutation is a list
+#     of indices for each nested level.
 
+# Processing Flow
+# 1. Argument Validation
+#     Parses LenLst by splitting on /
+#     Validates each length as a positive integer
+#     Formats numbers to remove leading zeros and convert octal/hex to
+#         decimal
+#     Empty values are preserved for unspecified levels
+# 2. Index String Parsing
+#     Appends trailing , to ensure last index is processed
+#     Iterates through each character, building index strings
+#     Validates characters (must be integers or special symbols : / ,)
+#     Validates index strings as integers
+# 3. Negative Index Conversion (when LenLst provided)
+#     Converts negative indices to positive by adding the level length
+#     Validates converted index is within range [0, length-1]
+#     Triggers error if index remains out of bounds
+# 4. Range Processing
+#     Detects patterns like start:end or start:end:step
+#     Sets default step to 1 or -1 based on direction
+#     Validates:
+#         Start and end have same sign
+#         Step direction matches range direction
+#         Step size evenly divides the range
+#     Expands range into a list of indices
+# 5. Level Processing
+#     On encountering / or end of string:
+#         Saves current level's index list to NewLst
+#         Tracks count of indices per level in CntLst
+#         Calculates total permutations (Prod)
+#         Updates IdxLen for next level if length information available
+# 6. Permutation Generation (when multiple indices exist)
+#     If Prod > 1:
+#         Builds divisor list for generating all combinations
+#         Supports two permutation modes based on ::SimArr(IndexWise):
+#             Index-wise: Permutations combine levels independently
+#             Product mode: Generates all possible combinations
+#         Generates all index permutations by iterating through combinations
+#     If Prod == 1: Returns single permutation
+proc mfjProc::readIdx {IdxStr
+    {LenLst ""}} {
     # Validate arguments
     set Lst [list]
     foreach Len [split $LenLst /] {
         if {[string is integer -strict $Len] && $Len > 0} {
-
             # Format the length to remove leading zeroes
             # and convert octal(0#) and hexadecimal(0x#) to decimal
             lappend Lst [format %d $Len]
@@ -464,169 +711,321 @@ proc mfjProc::readIdx {IdxStr {LenLst ""}} {
     # Verify, convert or expand if necessary
     # Tracks the total number of permutations
     set Prod 1
-    set Idx1 ""
-    set Idx2 ""
+    set Str ""
+    set IdxBgn ""
+    set IdxEnd ""
+    set IdxStp 0
     set Lst [list]
-    set IdxLst [list]
+    set NewLst [list]
+    set CntLst [list]
     set IdxLen [lindex $LenLst 0]
     set Len [string length $IdxStr]
     set Idx 0
+    set Stps false
+    set IndexWise [expr {[string index $::SimArr(IndexWise) 0] ne "!"}]
 
-    # Append "," to the indices string
-    # Split the string to its constituent characters
+    # Append "," to the indices string so that the last index can be processed
+    # in the same way as the rest indices
     foreach Char [split $IdxStr, ""] {
-        if {$Char eq "/" || $Char eq ":" || $Char eq ","} {
-            if {[string is integer -strict $Idx1]} {
-
-                # Align with python convention (-0 is the same as 0!)
-                set Idx1 [format %d $Idx1]
-
-                # A negative index is converted to positive if IdxLen positive
-                if {$IdxLen > 0} {
-                    if {$Idx1 < 0} {
-                        incr Idx1 $IdxLen
+        if {[regexp {\d} $Char] || $Char eq "-"} {
+            append Str $Char
+            incr Idx
+            continue
+        }
+        # Raise an error if Char is not one of the special symbols
+        if {![regexp {:|/|,|@} $Char]} {
+             error "invalid character '$Char' in index string '$IdxStr'!"
+        }
+        # Raise an error if Str is not an integer
+        if {![string is integer -strict $Str]} {
+            error "invalid index '$Str' in index string '$IdxStr'!"
+        }
+        
+        if {$Char eq ":"} {
+            if {$IdxBgn eq ""} {
+                set IdxBgn $Str
+            } elseif {$IdxEnd eq ""} {
+                set IdxEnd $Str
+                set Stps false
+            } else {
+                error "more than two ':' in index string '$IdxStr'!"
+            }
+        } elseif {$Char eq "@"} {
+            if {$IdxEnd eq ""} {
+                set IdxEnd $Str
+                set Stps true
+            } else {
+                error "wrong index string '$IdxStr'!"
+            }
+        } else {
+            if {[llength $IdxBgn]} {
+                if {[llength $IdxEnd]} {
+                    if {$Stps} {
+                        # #:#@#
+                        set IdxStps $Str
+                        if {$IdxStps <= 0} {
+                            error "steps <= 0 in '$IdxStr'!"
+                        }
+                    } else {
+                        # #:#:#
+                        set IdxStp $Str
                     }
-                    if {$Idx1 < 0 || $Idx1 >= $IdxLen} {
+                } else {
+                    # #:# with step size default to 1 or -1
+                    set IdxEnd $Str
+                }
+                # A negative index is converted to positive if IdxLen is present
+                if {$IdxLen > 0} {
+                    if {$IdxBgn < 0} {
+                        incr IdxBgn $IdxLen
+                    }
+                    if {$IdxBgn < 0 || $IdxBgn >= $IdxLen} {
+                        error "'$IdxStr' index out of range '$IdxLen'!"
+                    }
+                    if {$IdxEnd < 0} {
+                        incr IdxEnd $IdxLen
+                    }
+                    if {$IdxEnd < 0 || $IdxEnd >= $IdxLen} {
                         error "'$IdxStr' index out of range '$IdxLen'!"
                     }
                 }
-                if {$Char eq ":"} {
-                    if {$Idx2 eq ""} {
-                        set Idx2 $Idx1
-                    }
-                } else {
 
-                    # Expand ranges
-                    if {[llength $Idx2]} {
+                # Raise an error if the product of IdxEnd and
+                # IdxBgn is negative
+                if {[expr $IdxEnd*$IdxBgn] < 0} {
+                    error "'$IdxEnd' and '$IdxBgn' have different signs!"
+                }
+                if {$IdxStp == 0} {
+                    set IdxStp [expr ($IdxEnd-$IdxBgn)/abs($IdxEnd-$IdxBgn)]
+                }
+                if {$Stps} {
+                    set IdxStp [expr ($IdxEnd-$IdxBgn)/$IdxStps]
+                }
+                if {![string is integer $IdxStp]} {
+                    error "index step size must be integer in '$IdxStr'!"
+                }
+                # If the step size is not consistent with the direction
+                if {($IdxStp > 0 && $IdxBgn > $IdxEnd)
+                    || ($IdxStp < 0 && $IdxBgn < $IdxEnd)} {
+                    error "wrong step setting '$IdxStp' in '$IdxStr'!"
+                }
+                if {[expr ($IdxEnd-$IdxBgn) % $IdxStp] != 0} {
+                    error "the step size '$IdxStp' does not fit the range from\
+                        '$IdxBgn' to '$IdxEnd'!"
+                }
 
-                        # Raise an error if the product of Idx1 and
-                        # Idx2 is negative
-                        if {[expr $Idx1*$Idx2] < 0} {
-                            error "'$Idx1' and '$Idx2' have different signs!"
-                        }
-                        set Stp [expr ($Idx1-$Idx2)/abs($Idx1-$Idx2)]
-
-                        # Preserve the original form of Idx1 and Idx2
-                        lappend Lst $Idx2
-                        if {$Idx2 != $Idx1} {
-                            set Tmp [expr $Idx1-$Stp]
-                            while {$Idx2 != $Tmp} {
-                                lappend Lst [incr Idx2 $Stp]
-                            }
-                            lappend Lst $Idx1
-                        }
-                        set Idx2 ""
-                    } else {
-                        lappend Lst $Idx1
-                    }
-                    if {$Char eq "/" || $Idx == $Len} {
-                        lappend IdxLst $Lst
-                        set Prod [expr $Prod*[llength $Lst]]
-                        set Lst [list]
-
-                        # Update IdxLen if positive
-                        if {[lindex $LenLst [llength $IdxLst]] > 0} {
-                            set IdxLen [lindex $LenLst [llength $IdxLst]]
-                        }
+                # Preserve the original form of Str and IdxBgn
+                lappend Lst $IdxBgn
+                if {$IdxBgn != $IdxEnd} {
+                    while {$IdxBgn != $IdxEnd} {
+                        lappend Lst [incr IdxBgn $IdxStp]
                     }
                 }
+                set IdxBgn ""
+                set IdxEnd ""
+                set IdxStp 0
             } else {
-                set RegMat [lindex $::SimArr(RegMat) $::SimArr(RegLvl)]
+                # A negative index is converted to positive if IdxLen is present
+                # A negative index is out of range if it is greater than or
+                # equal to IdxLen or still negative after conversion
+                if {$IdxLen > 0} {
+                    if {$Str < 0} {
+                        incr Str $IdxLen
+                    }
+                    if {$Str < 0 || $Str >= $IdxLen} {
+                        error "'$IdxStr' index out of range '$IdxLen'!"
+                    }
+                }
+                # Append Str to Lst if it is a single index
+                lappend Lst $Str
+            }
+            if {$Char eq "/" || $Idx == $Len} {
+                lappend NewLst $Lst
 
-                # Material name can be brief as the database is small
-                # Only one match allowed. Otherwise multiple matches are shown
-                set MLst [lsearch -all -regexp $RegMat (?i)^$Idx1]
-                if {$MLst eq ""} {
-                    error "material '$Idx1' in '$IdxStr' NOT found in\
-                        variable 'RegGen'!"
-                } elseif {[llength $MLst] > 1} {
-                    set Tmp [list]
-                    foreach Elm $MLst {
-                        lappend Tmp [lindex $RegMat $Elm]
-                    }
-                    error "material '$Idx1' in '$IdxStr' matches materials\
-                        '$Tmp'!"
-                } else {
-                    set Tmp [lindex $::SimArr(RegIdx) $::SimArr(RegLvl) $MLst]
-                    set Lst [concat $Lst $Tmp]
-                    if {$Char eq "/" || $Idx == $Len} {
-                        lappend IdxLst $Lst
-                        set Prod [expr $Prod*[llength $Lst]]
-                        set Lst [list]
-                    }
+                # The number of permutations is updated only when the
+                # number of values is higher than one and different
+                # from the previous one
+                # or ::SimArr(IndexWise) is !IndexWise
+                set Cnt [llength $Lst]
+                if {$Cnt != [lindex $CntLst end] || !$IndexWise} {
+                    set Prod [expr $Prod*$Cnt]
+                }
+                lappend CntLst $Cnt
+                set Lst [list]
+
+                # Update IdxLen if positive
+                set LstLen [llength $NewLst]
+                if {[lindex $LenLst $LstLen] > 0} {
+                    set IdxLen [lindex $LenLst $LstLen]
                 }
             }
-            set Idx1 ""
-        } else {
-            append Idx1 $Char
         }
+
+        # Reset for the next index and move to the next character
+        set Str ""
         incr Idx
     }
 
-    # Expand to a full list of indices permutation (1 to n dimensions)
-    set OutLen 1
-    set TmpLst [list]
-    foreach SubLst $IdxLst {
-        set IdxLen [llength $SubLst]
-        set InnLen [expr $Prod/$IdxLen/$OutLen]
-        set Lst [list]
-        for {set i 0} {$i < $OutLen} {incr i} {
-            foreach Idx $SubLst {
-                for {set j 0} {$j < $InnLen} {incr j} {
-                    lappend Lst $Idx
-                }
-            }
-        }
-        set OutLen [expr $IdxLen*$OutLen]
-        lappend TmpLst $Lst
-    }
+    if {$Prod > 1} {
+        set IdxLst [list]
+        set LstLen [llength $NewLst]
 
-    # Rearrange the full list
-    set IdxLst [list]
-    set IdxLen [llength $TmpLst]
-    for {set i 0} {$i < $Prod} {incr i} {
-        set Lst [list]
-        for {set j 0} {$j < $IdxLen} {incr j} {
-            lappend Lst [lindex $TmpLst $j $i]
+        # Dividend / Divisor = Quotient, Dividend % Divisor = Remainder
+        # Determine the denominator/divisor list
+        set DivrLst [list]
+        set Quo $Prod
+        set Cnt 0
+        # The quotient is updated only when the number of values is higher
+        # than one and different from the previous one
+        # or ::SimArr(IndexWise) is !IndexWise
+        for {set i 0} {$i < $LstLen} {incr i} {
+            if {$Quo > 1 && ($Cnt != [lindex $CntLst $i] || !$IndexWise)} {
+                set Quo [expr $Quo/[lindex $CntLst $i]]
+            }
+            lappend DivrLst $Quo
+            set Cnt [lindex $CntLst $i]
         }
-        lappend IdxLst $Lst
+
+        # Generate all the permutations of indices
+        # based on the denominator/divisor list
+        for {set i 0} {$i < $Prod} {incr i} {
+            set Lst [list]
+            for {set j 0} {$j < $LstLen} {incr j} {
+                set Cnt [lindex $CntLst $j]
+                set Divr [lindex $DivrLst $j]
+                lappend Lst [lindex $NewLst $j [expr int($i/$Divr)%$Cnt]]
+            }
+            lappend IdxLst $Lst
+        }
+    } else {
+        set IdxLst [list $NewLst]
     }
     return $IdxLst
 }
 
 # mfjProc::replaceElm
-    # Designed to replace elements in a nested list structure based on specified
-    # patterns and rules. It handles various cases, including element
-    # replacement, range expansion, and permutation generation.
-    # A variable may have more than one value to enable a batch simulation. In
-    # practice, the difference between values is usually small, varying one or
-    # two elements. For values beyond the 1st one, they can be assigned quickly
-    # with a shorthand form like:
-        # i/j/k,l:n&i/k/o,x:z=val1|val2|....
-    # If the pattern is present, copy the content of value i and replace those
-    # referenced elements with the assigned element values, respectively. For
-    # each referenced element, it may also be supplied with multiple element
-    # values. Under such circumstance, the number of values should be increased.
-    # Yet, it may cause chaotic references subsequently. So those values are
-    # folded temporarily until the end of replacing and reusing elements.
-    # Element replacement has two forms, where references must share the same
-    # level 0 index and end with '=' and element values are separated by '|':
-        # Easy2Read form: {i/j/k,l:n&i/k/o,x:z= ElmVal1 ElmVal2 ...}
-        # Compact form: i/j/k,l:n&i/k/o,x:z=ElmVal1|ElmVal1|...
-    # Multiple element values can be assigned to one element by three methods:
-        # 1. Specify steps after the assigned element value separated by '@':
-        # i/j/k=ElmVal@#(l), where '#' refers to the number of steps and 'l' is
-        # optional. By default, element values are generated between the inital
-        # and assigned values with the same intervals. If an optional letter is
-        # appended, these values become evenly-spaced logarithmically.
-        # 2. Enumerate element values separated by '~': i/j/k=ElmVal1~ElmVal2...
-        # 3. Mix steps and enumeration: i/j/k=ElmVal1@#(l)~ElmVal2...
-        # Note: The permutation of multiple elements is affected by
-        # ::SimArr(OneChild)
+#     This procedure replaces elements within a nested list structure based on
+#     defined patterns and rules, supporting multiple value replacement, range
+#     expansion (linear/logarithmic), and permutation generation across
+#     multiple elements.
+# Purpose
+#     Enable batch simulations by allowing variables to have multiple values
+#     through element-level substitution. This is particular useful for
+#     systematic exploration of parameter spaces (parameter sweep or pairing)
+#     where variables need to take multiple values typically with small
+#     variations (e.g., changing one or two elements only).
+# Shorthand Syntax
+#     Basic pattern (without braces):
+#         i/j/k,l:n&i/k/o,x:z=val1&val2&....
+#     Note:
+#         i/j/k: Index path targeting specific element(s)
+#         /: Separator for multiple levels of indices
+#         ,: Separator for multiple indices at same level
+#         :: Range separator for indices at same level
+#         &: Separator for multiple index paths
+#         =: Assignment operator
+#         val1&val2&...: Values assigned to targeted elements, respectively
+#     Easy-to-Read form (with braces):
+#         {i/j/k,l:n&i/k/o,x:z=val1 val2 ...}
+#     Note:
+#         Values are separated by a space instead of '&' in Easy-to-Read form
+# Element Value Assignment
+#     Multiple element values using the '|' symbol: (Can NOT use ',')
+#         i/j/k=ElmVal1|ElmVal2|...
+# Sequnence Generation Syntax
+#     Four syntax forms are available for generating value sequnences
+#         (linear or logarithmic progression):
+#         i/j/k=[ElmBgn:]ElmVal:Step - Linear progression with step
+#         i/j/k=[ElmBgn:]ElmVal:Step: - Logarithmic progression with step
+#         i/j/k=[ElmBgn:]ElmVal@Steps - Linear progression with steps
+#         i/j/k=[ElmBgn:]ElmVal@Steps@ - Logarithmic progression with steps
+#     Note:
+#         ElmBgn is optional and defaults to the element's current value
+#         Using : indicates step-based progression (last value determined by
+#             step)
+#         Using @ indicates step-count-based progression (last value equals End)
+#         Appending an extra `:` or `@` indicates logarithmic spacing
+# Permutation Generation Logic
+#     When multiple elements have multiple values:
+#         Case 1 - Same number of values per element:
+#             IndexWise: Permutations are generated element-wise or pairwise
+#             Otherwise: falls back as the product of all element values
+#         Case 2 - Different numbers of values per element:
+#             Always full combinatorial/Cartesian/cross product
+#     Note:
+#         This design choice ensures that no data is silently dropped, which
+#             is important for simulation integrity.
+# Handling Multiple Element Values
+#     When an element receives multiple values:
+#         1. Values are temporarily "folded" (stored separately) to prevent
+#             chaotic references
+#         2. The number of variable values increases accordingly
+#         3. Folding values are only visible for element substitution, not for
+#             variable value substitution
 # Arguments
-    # VarName     Variable name
-    # VarVal      Variable value
-# Result: Return the # of folded values and the list after substitution
+#     Argument    Type    Description
+#     VarName     String  Name of the variable to process
+#     VarVal      List    List of variable values, where the first value is the
+#                         original value and the rest are replacement patterns
+# Return Values
+# The procedure returns a two-element list:
+#     LvlFoldLst: List tracking which levels contain folded (multiple) values
+#         Value > 0 indicates number of additional permutations at that level
+#     NewLst: Processed list with elements replaced and permutations expanded
+
+# Processing Flow
+# 1. Initialization
+#     Preserve first value as baseline (level 0)
+#     Initialize NewLst with the first value and LvlFoldLst with 0 (no folding)
+#     Set level counter (LvlIdx) to 1 for processing replacement patterns
+# 2. Process each subsequent value in VarVal from level 1 to end
+# 3. Pattern detection and parsing
+#     Step 1: Check for element-replacement pattern (with or without braces)
+#         Pattern: ^((-?\d+[,:/&])*-?\d+)=(.+)$
+#             • Left side: Index reference string
+#             • Right side: Value assignment string
+#     Step 2: Parse index references
+#         • Split by '&' for multiple reference paths
+#         • Process each reference with `readIdx`
+#         • Validate first index (level 0) is consistent across all references
+#         • Convert negative indices to positive
+#         • Verify all indices are within range
+#     Step 3: Parse value assignments
+#         • Split value string into list
+#         • Handle length mismatch:
+#             - If too short: repeat last value
+#             - If too long: truncate with warning
+# 4. Value generation processing
+#     Process each value in ElmValLst for each index path
+#     Check for multiple values for the same element
+#         Pattern 1: (ElmBgn:)ElmVal:Step - Linear with Step
+#         Pattern 2: (ElmBgn:)ElmVal:Step: - Logarithmic with Step
+#         Pattern 3: (ElmBgn:)ElmVal@Steps - Linear with Steps
+#         Pattern 4: (ElmBgn:)ElmVal@Steps@ - Logarithmic with Steps
+#         Pattern 5: ElmVal1|ElmVal2... - Multiple values separated by '|'
+#     For each generated/assigned value:
+#         Append to temporary list (Lst) for the current level
+#         Track count (Cnt) of values for the current element
+#         Update Begin value for subsequent value generation if necessary
+# 5. Permutation calculation
+#     Calculate total permutations (Prod):
+#         • Base case: Product of all value counts (Cnt for each index)
+#         • IndexWise mode: Only multiply when counts differ
+#             (::SimArr(IndexWise) controls behavior)
+#     If Prod > 2: Generate all permutations of values
+#         • Calculate divisor list for nested loop generation
+#         • Use depth-first approach to create all combinations
+#         • For each permutation i from 1 to Prod-1:
+#             - Select value index using integer division and modulo
+#             - Update NewVal at target indices
+#             - Append to permutation list
+#     Otherwise: Single value assignment, no permutation needed
+#         • Update NewVal directly with values
+# 6. Result acumulation
+#     Append processed NewVal to NewLst for the current level
+#     Update LvlFoldLst with (Prod-1) to track folding values for each level
+#     Increment level counters (LvlIdx, LvlLen) for next iteration
+# 7. Return [list $LvlFoldLst $NewLst]
 proc mfjProc::replaceElm {VarName VarVal} {
     set VarMsg "variable '$VarName'"
 
@@ -634,247 +1033,453 @@ proc mfjProc::replaceElm {VarName VarVal} {
     set LvlIdx 1
     set LvlLen 2
     set NewLst [list [lindex $VarVal 0]]
-    set FoldLst 0   ;# 0 -> false, no folding values
+    # Each level has a value: 0 -> no folding; positive -> folding
+    set LvlFoldLst 0
     foreach OldVal [lrange $VarVal 1 end] {
         set LvlMsg "level '$LvlIdx'"
         set Msg "$LvlMsg of $VarMsg"
 
         # For the Easy2Read form, remove the enclosing braces if any
-        if {[regexp {\{(-?\d+[:,/&])*-?\d+=} $OldVal]} {
+        if {[regexp {\{(-?\d+[,:/&])*-?\d+=} $OldVal]} {
+            # Find the position of the first digit or minus sign
             regexp -indices {(-|\d)} $OldVal Loc
+            # `Loc` is a list of two elements: {startIndex endIndex}
             set Idx [lindex $Loc 0]
             set OldVal [string range $Idx end-$Idx]
         }
 
-        # Check the string for element-replacement pattern and treat the list in
-        # the Easy2Read form also as a string! Negative indexing is supported by
-        # changing regular expression pattern from '\d+' to '-?\d+'
-        if {[regexp {^((-?\d+[:,/&])*-?\d+)=(.+)$} $OldVal\
-            -> ElmRefStr Tmp ElmValStr]} {
-
-            # Interpret the index string and check validity of each reference.
-            # Make sure the level 0 index is equal (same original value) and
-            # within range and the rest indices are within range.
-            # If any index is negative, convert it to positive
-            set IdxLst [list]
-            set Idx0 ""
-            foreach RefStr [split $ElmRefStr &] {
-                foreach Elm [readIdx $RefStr] {
-
-                    # Check the first index
-                    if {$Idx0 eq ""} {
-                        set Idx0 [lindex $Elm 0]
-                        if {$Idx0 < 0} {
-                            incr Idx0 $LvlLen
-                        }
-                        if {$Idx0 < 0 || $Idx0 >= $LvlIdx} {
-                            error "level 0 index '$Idx0' of reference\
-                                '$ElmRefStr' out of range for $Msg!"
-                        }
-                        set NewVal [lindex $NewLst $Idx0]
-                    } else {
-                        set Idx [lindex $Elm 0]
-                        if {$Idx < 0} {
-                            incr Idx $LvlLen
-                        }
-                        if {$Idx != $Idx0} {
-                            error "invalid reference '$ElmRefStr' for $Msg,\
-                                referring to multiple values!"
-                        }
-                    }
-
-                    # Check the rest indices
-                    set Lst [list]
-                    set Val $NewVal
-                    set Len [llength $Val]
-                    set Cnt 1
-                    foreach Idx [lrange $Elm 1 end] {
-                        if {$Idx < 0} {
-                            incr Idx $Len
-                        }
-                        if {$Idx < 0 || $Idx >= $Len} {
-                            error "level $Cnt index '$Idx' of reference\
-                                '$ElmRefStr' out of range for $Msg!"
-                        }
-                        lappend Lst $Idx
-                        set Val [lindex $Val $Idx]
-                        set Len [llength $Val]
-                        incr Cnt
-                    }
-                    lappend IdxLst $Lst
-                }
-            }
-            set IdxLen [llength $IdxLst]
-
-            # Convert the '|'-seperated elemeent value string to a value list
-            # and check whether 'ElmValLst' tallies with 'IdxLst'
-            set ElmValLst [lrange [string map {| " "} $ElmValStr] 0 end]
-            set ElmValLen [llength $ElmValLst]
-            if {$ElmValLen < $IdxLen} {
-
-                # Repeat the last element to complement the list
-                set Lst $ElmValLst
-                while {$ElmValLen < $IdxLen} {
-                    lappend Lst [lindex $ElmValLst end]
-                    incr ElmValLen
-                }
-                set ElmValLst $Lst
-            } elseif {$ElmValLen > $IdxLen} {
-                vputs -v2 "value '[lrange $ElmValLst $IdxLen end]' excess\
-                    for $Msg!"
-                set ElmValLst [lrange $ElmValLst 0 [incr IdxLen -1]]
-            }
-
-            # Search 'ElmValLst' for '@' and '~'. If found, one element has
-            # multiple element values. If more than one elements have multiple
-            # element values, the number of permutations is the number of values
-            # for any element in case all elements have the same number of
-            # values and ::SimArr(OneChild) is the column mode; Otherwise, it is
-            # the product of the number of element values:
-            #   1. Generate all values including the initial for each element
-            #   2. Determine the number of permutations
-            #   3. Generate all the permutations of element values
-            set Prod 1
-            set ValSubLst [list]
-            set ValCntLst [list]
-            foreach Idx $IdxLst ElmVal $ElmValLst {
-                set Cnt 1
-                set Begin [lindex $NewVal $Idx]
-                set Lst $Begin
-                foreach Val [split $ElmVal ~] {
-                    if {[regexp {^([^@]+)@(\d+)([^\d]+)?$} $Val\
-                        -> End Steps Str]} {
-                        if {![string is double -strict $Begin]} {
-                            error "'$Begin' of index '$Idx' not a number\
-                                for $Msg!"
-                        }
-                        if {![string is double -strict $End]} {
-                            error "'$End' in '$Val' not a number for $Msg!"
-                        }
-                        if {![string is integer -strict $Steps] || $Steps < 1} {
-                            error "'$Steps' not a postive integer for $Msg!"
-                        }
-
-                        # Even distribution logarithmically
-                        set Sign 1.
-                        if {$Str ne ""} {
-                            if {[expr $Begin*$End] <= 0} {
-                                error "either '$Begin' or '$End' not positive\
-                                    for $Msg!"
-                            }
-                            if {$Begin < 0} {
-                                set Sign -1.
-                                set Begin [expr $Sign*$Begin]
-                                set End [expr $Sign*$End]
-                            }
-                            for {set i 1} {$i <= $Steps} {incr i} {
-                                lappend Lst [expr {$Sign*exp(log($Begin)\
-                                    +1.*(log($End)-log($Begin))*$i/$Steps)}]
-                            }
-                        } else {
-                            for {set i 1} {$i <= $Steps} {incr i} {
-                                lappend Lst [expr {$Begin\
-                                    +1.*($End-$Begin)*$i/$Steps}]
-                            }
-                        }
-                        set Begin [expr $Sign*$End]
-                        incr Cnt $Steps
-                    } else {
-                        lappend Lst $Val
-                        set Begin $Val
-                        incr Cnt
-                    }
-                }
-
-                # The number of permutations is updated only when the number
-                # of values is higher than one and different from the previous
-                # or ::SimArr(OneChild) is !OneChild
-                if {$Cnt != [lindex $ValCntLst end]
-                    || [string index $::SimArr(OneChild) 0] eq "!"} {
-                    set Prod [expr $Prod*$Cnt]
-                }
-                lappend ValSubLst $Lst
-                lappend ValCntLst $Cnt
-            }
-
-            # No expanding to the full list yet so the indexing afterwards is ok
-            # These permutations are generated similar to the depth-first search
-            if {$Prod > 2} {
-                set Lst [list]
-
-                # Dividend ÷ Divisor = Quotient, Dividend % Divisor = Remainder
-                # Determine the denominator/divisor list
-                set DivrLst [list]
-                set Quo $Prod
-                foreach Cnt $ValCntLst {
-
-                    # Update the quotient only if > 1
-                    if {$Quo > 1} {
-                        set Quo [expr $Quo/$Cnt]
-                    }
-                    lappend DivrLst $Quo
-                }
-                for {set i 1} {$i < $Prod} {incr i} {
-                    for {set j 0} {$j < $IdxLen} {incr j} {
-                        set Cnt [lindex $ValCntLst $j]
-                        set Divr [lindex $DivrLst $j]
-                        set Idx [lindex $IdxLst $j]
-                        set Val [lindex $ValSubLst $j [expr int($i/$Divr)%$Cnt]]
-                        if {[catch {lset NewVal $Idx $Val} Err]} {
-                            error "failed to update index '$Idx' for $Msg:\
-                                $Err!"
-                        }
-                    }
-                    lappend Lst $NewVal
-                }
-                lappend NewLst $Lst
-            } else {
-                foreach Idx $IdxLst Val $ElmValLst {
-                    if {[catch {lset NewVal $Idx $Val} Err]} {
-                        error "failed to update index '$Idx' for $Msg: $Err!"
-                    }
-                }
-                lappend NewLst $NewVal
-            }
-
-            # One level already has a value without folding
-            lappend FoldLst [incr Prod -2]
-        } else {
-
+        # Check the string for element-replacement pattern. Negative indexing
+        # is supported by changing regular expression pattern from '\d+' to
+        # '-?\d+'
+        if {![regexp {^((-?\d+[,:/&])*-?\d+)=(.+)$} $OldVal\
+            -> IdxPathStr -> ElmValStr]} {
             # This level has no element-replacement pattern
             lappend NewLst $OldVal
-            lappend FoldLst 0
+            lappend LvlFoldLst 0
+            incr LvlIdx
+            incr LvlLen
+            continue
         }
+
+        # Pattern detected! Treat the list in the Easy2Read form also as a
+        # string! Interpret the index string and check validity of each
+        # reference. Make sure the level 0 index is equal (same original value)
+        # and within range and the rest indices are within range.
+        set IdxLst [list]
+        set Lvl0Idx ""
+        foreach IdxPath [split $IdxPathStr &] {
+            foreach Elm [readIdx $IdxPath] {
+
+                # Check level 0 index of each reference and make sure
+                # they are the same if there are multiple references
+                if {$Lvl0Idx eq ""} {
+                    set Lvl0Idx [lindex $Elm 0]
+                    # If any index is negative, convert it to positive
+                    if {$Lvl0Idx < 0} {
+                        incr Lvl0Idx $LvlLen
+                    }
+                    if {$Lvl0Idx < 0 || $Lvl0Idx >= $LvlIdx} {
+                        error "level 0 index '$Lvl0Idx' of reference\
+                            '$IdxPathStr' out of range for $Msg!"
+                    }
+                    # Initialise reference value
+                    set NewVal [lindex $NewLst $Lvl0Idx]
+                } else {
+                    set Idx [lindex $Elm 0]
+                    if {$Idx < 0} {
+                        incr Idx $LvlLen
+                    }
+                    if {$Idx != $Lvl0Idx} {
+                        error "invalid reference '$IdxPathStr' for $Msg,\
+                            referring to multiple values!"
+                    }
+                }
+
+                # Check the rest indices
+                set Lst [list]
+                set Val $NewVal
+                set Len [llength $Val]
+                set Cnt 1
+                foreach Idx [lrange $Elm 1 end] {
+                    if {$Idx < 0} {
+                        incr Idx $Len
+                    }
+                    if {$Idx < 0 || $Idx >= $Len} {
+                        error "level $Cnt index '$Idx' of reference\
+                            '$IdxPathStr' out of range for $Msg!"
+                    }
+                    lappend Lst $Idx
+                    set Val [lindex $Val $Idx]
+                    set Len [llength $Val]
+                    incr Cnt
+                }
+                lappend IdxLst $Lst
+            }
+        }
+        set LstLen [llength $IdxLst]
+
+        # Convert the '&'-seperated element value string to a value list
+        # and check whether 'ElmValLst' tallies with 'IdxLst'
+        set ElmValLst [lrange [string map {& " "} $ElmValStr] 0 end]
+        set ElmValLen [llength $ElmValLst]
+        if {$ElmValLen < $LstLen} {
+
+            # Repeat the last element to complement the list
+            set Lst $ElmValLst
+            while {$ElmValLen < $LstLen} {
+                lappend Lst [lindex $ElmValLst end]
+                incr ElmValLen
+            }
+            set ElmValLst $Lst
+        } elseif {$ElmValLen > $LstLen} {
+            vputs -v2 "value '[lrange $ElmValLst $LstLen end]' excess\
+                for $Msg!"
+            set ElmValLst [lrange $ElmValLst 0 [incr LstLen -1]]
+        }
+
+        # Search 'ElmValLst' for value sequence generation patterns
+        set Prod 1
+        set ValSubLst [list] ;# List of sublists for values
+        set ValCntLst [list] ;# List of counts of element values
+        set IndexWise [expr {[string index $::SimArr(IndexWise) 0] ne "!"}]
+        foreach ElmIdx $IdxLst ElmVal $ElmValLst {
+            # Count of values for the current element
+            set Cnt 0
+            # Set the default begin value to the current element
+            set DfltBgn [lindex $NewVal $ElmIdx]
+            set SubLst [list]
+            # Parse the element value string for each index and generate the
+            # value list for the current index path
+            foreach ValStr [split $ElmVal |] {
+                set Begin ""
+                set End ""
+                set Step ""
+                set Steps ""
+                set Log ""
+                # Pattern 5: Simple value (no generation)
+                if {![regexp {^(([^:]+):)?([^:]+):([^:@]+)(:|@)?$}\
+                    $ValStr -> -> Begin End Step Log]
+                    && ![regexp {^(([^:]+):)?([^@]+)@(\d+)([^\d])?$}\
+                    $ValStr -> -> Begin End Steps Log]} {
+                    # ValStr not necessaryly a number, so no validation here
+                    lappend SubLst $ValStr
+                    set DfltBgn $ValStr
+                    incr Cnt
+                    continue
+                }
+
+                # Pattern 1&2: [Begin:]End:Step[:] (specifies step)
+                # Pattern 3&4: [Begin:]End@Steps[@] (specifies steps)
+                # Validate Begin and End values
+                if {$Begin ne ""} {
+                    foreach Var {Begin End} Val [list $Begin $End] {
+                        if {[catch {set $Var [expr 1.*$Val]}]} {
+                            error "invalid range in '$ValStr' for $Msg!"
+                        }
+                    }
+                    # Append the Begin value to the list
+                    if {$Begin != $DfltBgn} {
+                        lappend SubLst [format %g $Begin]
+                        incr Cnt
+                    }
+                } else {
+                    if {[catch {set Begin [expr 1.*$DfltBgn]}]} {
+                        error "invalid default begin value '$DfltBgn' for $Msg!"
+                    }
+                    if {[catch {set End [expr 1.*$End]}]} {
+                        error "invalid range in '$ValStr' for $Msg!"
+                    }
+                }
+                if {$Begin == $End} {
+                    error "begin and end values are the same in\
+                        $ValStr for $Msg!"
+                }
+                if {$Log ne ""} {
+                    if {$Begin <= 0 || $End <= 0} {
+                        error "begin and end values must be positive\
+                            for logarithmic progression for $Msg!"
+                    }
+                }
+                if {$Steps ne ""} {
+                    # Validate Steps value
+                    if {$Steps == 0} {
+                        error "number of steps cannot be zero in '$ValStr'\
+                            for $Msg!"
+                    }
+                    # Calculate step size based on the number of steps
+                    if {$Log ne ""} {
+                        set Step [expr exp(log($End/$Begin)/$Steps)]
+                    } else {
+                        set Step [expr 1.*($End-$Begin)/$Steps]
+                    }
+                } else {
+                    # Validate Step value
+                    if {[catch {set Step [expr 1.*$Step]}]} {
+                        error "invalid step size in '$ValStr' for $Msg!"
+                    }
+                    # Check direction consistency and step size
+                    if {$Log ne ""} {
+                        if {($Step > 1 && $Begin > $End)
+                            || ($Step < 1 && $Begin < $End)} {
+                            error "step factor direction inconsistent\
+                                with range from $Begin to $End for $Msg!"
+                        }
+                        if {($Step > 1 && $End < $Begin*$Step)
+                            || ($Step < 1 && $End > $Begin*$Step)} {
+                            error "step factor too large for the range\
+                                from $Begin to $End for $Msg!"
+                        }
+                    } else {
+                        if {($Step > 0 && $Begin > $End)
+                            || ($Step < 0 && $Begin < $End)} {
+                            error "step direction inconsistent with\
+                                range from $Begin to $End for $Msg!"
+                        }
+                        if {($Step > 0 && $End < $Begin + $Step)
+                            || ($Step < 0 && $End > $Begin + $Step)} {
+                            error "step size too large for the range\
+                                from $Begin to $End for $Msg!"
+                        }
+                    }
+                }
+
+                # Generate the value list for four patterns
+                if {$Log ne ""} {
+                    # Generate logarithmic progression with step factor
+                    set Val $Begin
+                    while {($Step > 1 && $Val < $End - 0.5*$Step*$Val)
+                        || ($Step < 1 && $Val > $End - 0.5*$Step*$Val)} {
+                        set Val [expr {$Val * $Step}]
+                        lappend SubLst [format %g $Val]
+                        incr Cnt
+                    }
+                } else {
+                    # Generate linear progression with step
+                    # Buffer zone of 0.5*Step avoid precision issue
+                    set Val $Begin
+                    while {($Step > 0 && $Val < $End - 0.5*$Step)
+                        || ($Step < 0 && $Val > $End - 0.5*$Step)} {
+                        set Val [expr {$Val + $Step}]
+                        lappend SubLst [format %g $Val]
+                        incr Cnt
+                    }
+                }
+                # Update DfltBgn for the next value generation
+                set DfltBgn [format %g $Val]
+            }
+
+            # The number of permutations is updated only when the number
+            # of values is higher than one and different from the previous
+            # one or ::SimArr(IndexWise) is !IndexWise
+            if {$Cnt == 0} {
+                error "no valid value from '$ValStr' for $Msg!"
+            }
+            if {$Cnt != [lindex $ValCntLst end] || !$IndexWise} {
+                set Prod [expr $Prod*$Cnt]
+            }
+            lappend ValSubLst $SubLst
+            lappend ValCntLst $Cnt
+        }
+
+        # No expanding to the full list yet so the indexing afterwards is ok
+        # These permutations are generated similar to the depth-first search
+        if {$Prod > 1} {
+            set Lst [list]
+
+            # Dividend / Divisor = Quotient, Dividend % Divisor = Remainder
+            # Determine the denominator/divisor list
+            set DivrLst [list]
+            set Quo $Prod
+            set Cnt 0
+            for {set i 0} {$i < $LstLen} {incr i} {
+                if {$Quo > 1
+                    && ($Cnt != [lindex $ValCntLst $i] || !$IndexWise)} {
+                    set Quo [expr $Quo/[lindex $ValCntLst $i]]
+                }
+                lappend DivrLst $Quo
+                set Cnt [lindex $ValCntLst $i]
+            }
+            for {set i 0} {$i < $Prod} {incr i} {
+                for {set j 0} {$j < $LstLen} {incr j} {
+                    set Cnt [lindex $ValCntLst $j]
+                    set Divr [lindex $DivrLst $j]
+                    set ElmIdx [lindex $IdxLst $j]
+                    set Val [lindex $ValSubLst $j [expr int($i/$Divr)%$Cnt]]
+                    if {[catch {lset NewVal $ElmIdx $Val} Err]} {
+                        error "failed to update index '$ElmIdx' for $Msg:\
+                            $Err!"
+                    }
+                }
+                lappend Lst $NewVal
+            }
+            lappend NewLst $Lst
+        } else {
+            foreach ElmIdx $IdxLst Val $ElmValLst {
+                if {[catch {lset NewVal $ElmIdx $Val} Err]} {
+                    error "failed to update index '$ElmIdx' for $Msg: $Err!"
+                }
+            }
+            lappend NewLst $NewVal
+        }
+
+        # One level already has a value without folding
+        lappend LvlFoldLst [incr Prod -1]
         incr LvlIdx
         incr LvlLen
     }
 
     # Returns the fold status and the new list with replaced elements
-    return [list $FoldLst $NewLst]
+    return [list $LvlFoldLst $NewLst]
 }
 
 # mfjProc::reuseElm
-    # To save input, the values entered previously can be reused. Element-reuse
-    # feature can be applied anywhere, between values or within a value. This
-    # function recursively searches for the element-reuse features
-    # (<i,j:k/i,j:k&l,m:n/l,m:n>) and substitutes them with referenced elements.
-    # '&' is used to seperate references.
-    # Note:
-    #   Reference within the current value: Level index is omitted
-    #   Reference to one previous value: Level index must be present
+#     Recursively substitutes element-reuse references within variable values,
+#     supporting cross-level references, repetition, and arithmetic expression
+#     evaluation.
+# Purpose
+#     Enables input economy by allowing previously entered values to be
+#     referenced and reused. References can appear anywhere (between values or
+#     within a value) and are substituted in place with the corresponding
+#     referenced elements.
+# Reference Syntax
+#     References follow the pattern: <i,j:k/i,j:k&l,m:n/l,m:n*#>
+#     Symbol  Meaning
+#     < >     Delimiters for reuse reference
+#     /       Separates nested list levels
+#     ,       Separates multiple indices within same level
+#     :       Defines index range
+#     &       Combines multiple reference paths
+#     *#      Optional repetition count (repeats referenced elements # times)
+# Reference Rules
+#     Within current value: Level index must be omitted
+#     To previous value: Level index must be included
 # Arguments
-    # VarName     Variable name
-    # VarVal      Variable value
-    # SubLst      Sublist value
-    # Lvl         Optional, level sequence (default: "")
-    # OldIdx      Optional, trace the index of the SubLst (default: "")
-    # InLvl       Optional, restrict reference within a level (default: true)
-# Result: Return the updated list.
-proc mfjProc::reuseElm {VarName VarVal SubLst {Lvl ""} {OldIdx ""} {InLvl ""}} {
+    # Argument    Description                                     Default
+    # VarName     Variable name (for error messages)              Required
+    # ValName     Name of variable value (passed by reference)    Required
+    # XLvl        Cross-level reference flag                      true
+    # Lvl         Level index for current processing level        ""
+    # SubIdx      Index path to current sublist                   ""
+# Result
+    # No return value. References are updated in place within the variable value
+
+# Processing Flow
+# 1. Initialization and Argument Validation
+#     Step 1A: Process XLvl Flag
+#         If first character is "!" or value is 0: Set XLvl = 0 (disable
+#         cross-level); Otherwise: Set XLvl = 1 (enable cross-level)
+#     Step 1B: Validate Lvl
+#         Check if Lvl is non-negative integer. If valid: Format to remove
+#         leading zeros and convert octal/hex to decimal; If invalid:
+#         Set Lvl = "" (empty)
+#     Step 1C: Validate SubIdx
+#         Verify each element is a positive integer or zero. If any element
+#         fails validation: Set SubIdx = ""
+# 2. Set Up Variable Reference
+#     Use upvar 1 $ValName VarVal to create reference to calling scope variable
+#     Initialize SubLst (sublist to process):
+#         If SubIdx empty and Lvl empty: SubLst = $VarVal (full variable)
+#         If SubIdx empty and Lvl present: SubLst = [lindex $VarVal $Lvl]
+#         If SubIdx present: SubLst = [lindex $VarVal $SubIdx] (nested sublist)
+# 3. Iterate Through Sublist Elements
+#     For each element (Elm) in SubLst:
+#     Step 3A: Build Context Message
+#         Construct error message with level information (if available)
+#         and index path
+#     Step 3B: Find and Process Reuse References
+#         While element contains reference pattern <...>:
+#         Check for Nested References: Call isLstDec to detect if element
+#         contains list structure
+#             If nested: Recursively call reuseElm (adaptive function name
+#             using [info level 0])
+#                 Pass same parameters with current index path
+#                 Break while loop after recursion
+#             If not nested: Process current reference
+# 4. Reference Processing (Non-Nested)
+#     Step 4A: Parse Reference
+#         Split reference by * to extract:
+#             StrLst: Reference path string (may contain & for multiple paths)
+#             Cnt: Repetition count (defaults to empty if not specified)
+#         Format repetition count to remove leading zeros and convert octal/hex
+#     Step 4B: Split Multiple Paths
+#         Split path string by & into individual reference strings (StrLst)
+#         For each reference string:
+#             Call readIdx to expand index string into index lists
+#             Process each index list
+#     Step 4C: Build Referenced Value Path (Lst)
+#         Add omitted level: If cross-level disabled (XLvl = 0) and Lvl present:
+#         Prepend Lvl to index list
+#         Trace nested list: Navigate from outermost to innermost:
+#             Start with Val = $VarVal
+#             Track current position using EndLst (indices to reach target)
+#             For each index in Lst:
+#                 Convert negative indices to positive using current length
+#                 Validate index within bounds
+#                 Store positive index in PIdxLst
+#                 Update Val to nested element
+#                 Update tracking variables for subsequent indices
+#     Step 4D: Validate References
+#         Circular Reference Detection: Compare PIdxLst with NewIdx (current
+#         position)
+#             If identical: Throw error "circular reference: '<...>'!"
+#         Boundary Validation: Ensure indices are within range
+#     Step 4E: Collect Referenced Values
+#         If single reference (llength StrLst * llength IdxLst == 1):
+#             Concatenate value to NewElm (flattened)
+#         Otherwise:
+#             Append value as list element to NewElm
+# 5. Repetition and Substitution
+#     Step 5A: Apply Repetition
+#         Set Tmp = $NewElm (store original result)
+#         For i = 1 to Cnt-1:
+#             Concatenate Tmp to NewElm
+#             Use regsub to replace <...> pattern with NewElm in current element
+#     Step 5B: Cross-Level Update
+#         If cross-level enabled (XLvl = 1) and level present (Lvl):
+#             Update variable value at current index path
+#             Break while loop (reference processed)
+# 6. Element Update (Within Current Level)
+#     Step 6A: Apply In-Place Updates
+#         If Reuse flag is true and cross-level disabled (XLvl = 0):
+#             Expression Evaluation: If element is single value:
+#                 Convert to lowercase
+#                 Attempt to evaluate as arithmetic expression using
+#                 expr 1.*$NewElm
+#                 Format result with %g to remove unnecessary decimal places
+#         If evaluation fails: Log warning "not an arithmetic expression"
+#             Update variable value at current index path
+#     Step 6B: Continue Iteration
+#         Increment LstIdx to process next element
+# 7. Processing Complete
+#     Function returns; modifications are in place
+
+# Key Features
+# Feature                 Description
+# In-Place Substitution   References replaced directly in the variable value
+# Recursive Processing    Handles nested references through self-calls
+# Cross-Level References  Optional referencing to previous variable values
+# Negative Index Support  Converted negative indices using current list length
+# Repetition              *# syntax repeats referenced elements specified times
+# Arithmetic Evaluation   Numeric expressions evaluated after substitution
+# Circular Ref Detection  Break loop by detecting self-references
+# Multi-Path References   & separator combines multiple reference paths
+# Range Expansion         : syntax for index ranges (via readIdx)
+proc mfjProc::reuseElm {VarName ValName
+    {XLvl ""} {Lvl ""} {SubIdx ""}} {
+
+    # Initialise XLvl as 0/1.
+    # In regression 0 is still 0, 1 is still 1
+    if {[string index $XLvl 0] eq "!"} {
+        set XLvl 0
+    } elseif {$XLvl == 0} {
+        set XLvl 0
+    } else {
+        set XLvl 1
+    }
 
     # Validate arguments
     # All levels should not be negative integers
-    if {[string is integer -strict $Lvl] && $Lvl > 0} {
+    if {[string is integer -strict $Lvl] && $Lvl >= 0} {
 
         # Format the level to remove leading zeroes
         # and convert octal(0#) and hexadecimal(0x#) to decimal
@@ -884,19 +1489,38 @@ proc mfjProc::reuseElm {VarName VarVal SubLst {Lvl ""} {OldIdx ""} {InLvl ""}} {
     }
 
     # All indices should be either positive integer or zero
-    foreach Elm $OldIdx {
+    foreach Elm $SubIdx {
         if {![regexp {^\d+$} $Elm]} {
-            set OldIdx ""
+            set SubIdx ""
             break
         }
     }
-    set InLvl [expr {[string index $InLvl 0] ne "!"}]
+
+    # Set VarVal pointing to ValName
+    upvar 1 $ValName VarVal
+
+    # Initialise SubLst
+    if {$SubIdx eq ""} {
+        if {$Lvl eq ""} {
+
+            # Single value
+            set SubLst $VarVal
+        } else {
+            set SubIdx $Lvl
+            set SubLst [lindex $VarVal $SubIdx]
+        }
+    } else {
+
+        # In case of regression
+        set SubLst [lindex $VarVal $SubIdx]
+    }
 
     set VarMsg "variable '$VarName'"
-    set NewLst [list]
     set LstIdx 0
+    set Reuse false
     foreach Elm $SubLst {
-        set NewIdx [concat $OldIdx $LstIdx]
+        set NewIdx [concat $SubIdx $LstIdx]
+        set Reuse false
         if {$Lvl ne ""} {
             set Msg "'$Elm' of level '$Lvl' (index $NewIdx) of $VarMsg"
         } else {
@@ -905,97 +1529,139 @@ proc mfjProc::reuseElm {VarName VarVal SubLst {Lvl ""} {OldIdx ""} {InLvl ""}} {
 
         # Replace each element-reuse feature
         # Negative indexing is supported with the pattern '-?\d+'
-        while {[regexp {<((-?\d+[:,/&])*-?\d+)>} $Elm -> ElmRefStr]} {
-            if {[llength $Elm] > 1 || [regexp {^\{.+\}$} $Elm]} {
+        while {[regexp {<((-?\d+[,:/&])*-?\d+(\*\d+)?)>} $Elm -> IdxPathStr]} {
+            if {[isLstDec $Elm]} {
 
-                # Visit all the elements by regression
+                # Visit all the nested elements by regression
                 # The function name is adaptive: '[lindex [info level 0] 0]'
-                set Elm [[lindex [info level 0] 0] $VarName $VarVal\
-                    $Elm $Lvl $NewIdx]
-            } else {
-                set NewElm [list]
-                set StrLst [split $ElmRefStr &]
-                foreach Str $StrLst {
-                    set IdxLst [readIdx $Str]
-                    foreach Lst $IdxLst {
-                        set Val $VarVal
+                # VarVal: pass by reference; $ValName fails
+                [lindex [info level 0] 0] $VarName VarVal\
+                    $XLvl $Lvl $NewIdx
 
-                        # Start from the outmost level
-                        set Ref $NewIdx
-                        set End [lindex $Ref 0]
-                        set Len [expr 1+$End]
+                # Either update Elm or simply break the while loop
+                break
+            }
+            set NewElm [list]
+            set Lst [split $IdxPathStr *]
+            set Cnt [lindex $Lst 1]
 
-                        # #: forwards from the first index
-                        # -#: backwards from the current index (-1)
-                        foreach Idx $Lst {
-                            set Idx1 $Idx
-                            if {$Idx < 0} {
-                                incr Idx1 $Len
-                            }
-                            if {$Idx1 < 0 || $Idx1 > $End} {
-                                error "index '$Idx' out of range\
-                                    '$End' for element $Msg!"
-                            }
+            # Format repeat times
+            if {[string is integer -strict $Cnt]} {
+                set Cnt [format %d $Cnt]
+            }
+            set StrLst [split [lindex $Lst 0] &]
+            foreach Str $StrLst {
+                set IdxLst [readIdx $Str]
+                foreach Lst $IdxLst {
 
-                            # Update value to the element
-                            set Val [lindex $Val $Idx1]
-                            if {$Ref ne "" && $Idx1 == $End} {
+                    # Multiple values and reuse elements within a level
+                    # Prepend the omitted level
+                    if {!$XLvl && $Lvl ne ""} {
+                        set Lst [concat $Lvl $Lst]
+                    }
 
-                                # Next inner level of the current index
-                                set Ref [lrange $Ref 1 end]
-                                set End [lindex $Ref 0]
-                                set Len [expr 1+$End]
-                            } else {
+                    # Trace a nested list from the outmost to innermost
+                    set Val $VarVal
 
-                                # Not the current index anymore so discard 'Ref'
-                                set Ref ""
-                                set Len [llength $Val]
-                                set End [expr $Len-1]
-                            }
+                    # Initially get EndIdx from the current indices
+                    set EndLst $NewIdx
+
+                    # Only refer to a previous element
+                    set EndIdx [lindex $EndLst 0]
+                    set Len [expr 1+$EndIdx]
+
+                    # #: forwards from the first index
+                    # -#: backwards from the current index (-1)
+                    # Store postive indices in PIdxLst
+                    set PIdxLst [list]
+                    foreach Idx $Lst {
+                        set PIdx $Idx
+                        if {$Idx < 0} {
+                            incr PIdx $Len
                         }
-
-                        # Detect and raise a circular reference error
-                        set MatLst [regexp -inline -all {<(-?\d+[:,/&])*-?\d+>}\
-                            $Val]
-                        foreach RefStr $MatLst {
-                            if {[string index $RefStr 0] ne "<"} continue
-                            set RefStr [string range $RefStr 1 end-1]
-                            foreach RefLst [split $RefStr &] {
-                                foreach RefIdx [readIdx $RefLst] {
-                                    if {$RefIdx eq $Lst} {
-                                        error "circular reference: '<$ElmRefStr>'\
-                                            -> '$Val'"
-                                    }
-                                }
-                            }
+                        if {$PIdx < 0 || $PIdx > $EndIdx} {
+                            error "index '$Idx' out of range\
+                                '$EndIdx' for element $Msg!"
                         }
-                        if {[llength $StrLst]*[llength $IdxLst] == 1} {
-                            set NewElm [concat $NewElm $Val]
+                        lappend PIdxLst $PIdx
+
+                        # Update the value for next round index check
+                        set Val [lindex $Val $PIdx]
+                        if {$EndLst ne "" && $PIdx == $EndIdx} {
+
+                            # Continue to extract next EndIdx from EndLst
+                            set EndLst [lrange $EndLst 1 end]
+                            set EndIdx [lindex $EndLst 0]
+                            set Len [expr 1+$EndIdx]
                         } else {
-                            lappend NewElm $Val
+
+                            # The current index is not EndIdx anymore
+                            # Clear EndLst
+                            set EndLst ""
+
+                            # Extract EndIdx from the list directly
+                            set Len [llength $Val]
+                            set EndIdx [expr $Len-1]
                         }
                     }
+
+                    # Detect and raise a circular reference error
+                    # NewIdx is a list of postive indices by default
+                    if {$PIdxLst eq $NewIdx} {
+                        error "circular reference: '<$IdxPathStr>'!"
+                    }
+                    if {[llength $StrLst]*[llength $IdxLst] == 1} {
+                        set NewElm [concat $NewElm $Val]
+                    } else {
+                        lappend NewElm $Val
+                    }
                 }
+            }
 
-                # Substitute the first pattern in the element
-                regsub {<(-?\d+[:,/&])*-?\d+>} $Elm $NewElm Elm
+            # Substitute only the 1st pattern in the element in each loop
+            set Reuse true
+            set Tmp $NewElm
 
-                # Need to break loop after activating reuse-only feature
-                # in level 1+
-                if {!$InLvl && $Lvl} break
+            # If Cnt exceeds 1, repeat Cnt times
+            for {set i 1} {$i < $Cnt} {incr i} {
+                set NewElm [concat $NewElm $Tmp]
+            }
+            regsub {<(-?\d+[:,/&])*-?\d+(\*\d+)?>} $Elm $NewElm Elm
+
+            # Need to break loop after activating reuse-only feature
+            # in level 1+
+            if {$XLvl && $Lvl} {
+                lset VarVal $NewIdx $Elm
+                break
             }
         }
 
-        # Need to assign value after activating reuse-only feature
-        # in level 1+
-        if {!$InLvl && $Lvl} {
-            set NewLst $Elm
-        } else {
-            lappend NewLst $Elm
+        # Update elements for references within a level
+        if {$Reuse && !$XLvl} {
+            if {[llength $Elm] == 1} {
+
+                # Try to evaluate an arithmetic expression if it is
+                set NewElm [string tolower $Elm]
+                if {[catch {set Elm [format %g [expr 1.*$NewElm]]}]} {
+                    vputs -v2 "'$Elm' not an arithmetic expression!"
+                }
+            }
+            lset VarVal $NewIdx $Elm
         }
         incr LstIdx
     }
-    return $NewLst
+}
+
+# mfjProc::isLstDec
+    # Designed to judge whether a list can be further decomposed or not
+# Arguments
+    # Lst         A list to be evaluated
+# Result: Return true for further decomposition or false
+proc mfjProc::isLstDec {Lst} {
+
+    # For further decomposition, a list shall either have multiple elements
+    # or be a braced list (i.e. a nested list)
+    return [expr [llength $Lst] > 1 || [regexp {^\{.*\}$} $Lst]]
 }
 
 # mfjProc::iFileExists (The first argument: Pass by reference)
@@ -1184,7 +1850,8 @@ proc mfjProc::getRegIdx {RegDim Intf} {
 #     TTFile      Trap/tunnel setting file
 #     TTRatio     Optional field density ratio
 # Result: Return ID, field depth, optional trap settings and trap profile file
-proc mfjProc::readTT {TTArr TTFile {TTRatio 1}} {
+proc mfjProc::readTT {TTArr TTFile
+    {TTRatio 1}} {
     if {![file isfile $TTFile]} {
         error "'$TTFile' should be a file!"
     }
@@ -1461,7 +2128,8 @@ proc mfjProc::readTT {TTArr TTFile {TTRatio 1}} {
     # LinX        Optional, linear (default) or logarithmic
     # LinY        Optional, linear (default) or logarithmic
 # Result: Return the interpolation/extrapolation result
-proc mfjProc::lPolation {XList YList X {LinX ""} {LinY ""}} {
+proc mfjProc::lPolation {XList YList X
+    {LinX ""} {LinY ""}} {
 
     # Validate arguments
     if {[llength $XList] != 2 || [llength $YList] != 2} {
@@ -1533,7 +2201,8 @@ proc mfjProc::lPolation {XList YList X {LinX ""} {LinY ""}} {
     # VarInfo     Optional variable info, default null string
     # Level       Optional, default list level starts from 0
 # Result: Return the formatted list
-proc mfjProc::str2List {StrList {VarInfo ""} {Level 0}} {
+proc mfjProc::str2List {StrList
+    {VarInfo ""} {Level 0}} {
 
     # Validate arguments
     # A level should not be a negative integer
@@ -1551,7 +2220,7 @@ proc mfjProc::str2List {StrList {VarInfo ""} {Level 0}} {
 
             # In Tcl, a string of spaces are treated as an empty list
             lappend FmtLst [list]
-        } elseif {$SubLen > 1 || [regexp {^\{.*\}$} $SubLst]} {
+        } elseif {[isLstDec $SubLst]} {
 
             # To correctly identify a list: 1. there are multiple elements;
             # 2. there is only one single element, yet this element is not
@@ -1656,17 +2325,169 @@ proc mfjProc::iSwitch {Dflt Str Ptn args} {
 }
 
 # mfjProc::groupValues
-    # Some variables contain values for multiple materials, regions,
-    # interfaces, positions, etc. It is necessary to split the values into
-    # multiple sublists based on the predefined group ID
-# Arguments:
-    # VarName     Variable name
-    # VarVal      Variable value
-    # GrpID       Permutations of 'm', 'p', 'pp', 'r', 'rr'
-                  # 'b', 'd', 'o', 'q', 'v'
-    # LvlIdx      The current level index
-    # LvlLen      The total levels
-# Results: Return the grouped list
+#     Splits variable values into multiple sublists based on predefined
+#     group IDs, supporting materials, positions, regions, interfaces, and
+#     various simulation identifiers
+# Purpose
+#     Organizes variable values that contain data for multiple entities
+#     (materials, regions, interfaces, positions, etc.) by grouping them
+#     according to specified group IDs. Each value is validated against
+#     its expected group type and transformed into a standardized format.
+# Supported Group IDs
+#     ID  Description                     Validation Source
+#     b   Boundary/contact identifiers    SimArr(BIDLst)
+#     d   Default attr identifiers        SimArr(DIDLst)
+#     m   Material names                  Material database (SimArr(MatDB))
+#     o   Optical identifiers             SimArr(OIDLst)
+#     p   Single position                 Coordinate validation
+#     pp  Box (two positions)             Coordinate validation
+#     q   Process/operation identifiers   SimArr(QIDLst)
+#     r   Region index                    Region information
+#     rr  Interface (two regions)         Region information
+#     v   Varying variable reference      SimArr(VarLen)
+# Arguments
+#     Argument    Description
+#     VarName     Variable name (for error messages)
+#     VarVal      Variable values to group
+#     GrpID       Permutations of group IDs (e.g., {m p r})
+#     LvlIdx      Current level index
+#     LvlLen      Total number of levels
+# Return Value
+#     Returns a grouped list where each group's first element is the group
+#     identifier followed by its associated values.
+
+# Processing Flow
+# 1. Argument Validation and Context Setup
+#     Step 1A: Build Grammar String
+#         • Join GrpID into GStr (e.g., {m p r} → mpr)
+#         • Initialize error context message Txt
+#     Step 1B: Process Each Group ID Type
+#         ID  Action                              Source Array
+#         b   Load BIDLst, build context          SimArr(BIDLst)
+#         d   Load DIDLst, build context          SimArr(DIDLst)
+#         o   Load OIDLst, build context          SimArr(OIDLst)
+#         q   Load QIDLst, build context          SimArr(QIDLst)
+#         v   Load VarLen, build context          SimArr(VarLen)
+#         m   Validate material database exists   SimArr(MatDB)
+#     Step 1C: Position/Region Grammar Context
+#         Pattern Context Text
+#         ppp     "a position or box"
+#         pp      "a box"
+#         p       "a position"
+#         rrr     "a region or interface"
+#         rr      "an interface"
+#         r       "a region"
+# 2. Extract Simulation Domain Boundaries
+# Only if GStr contains p or r:
+#     • Filter region information (RegInfo) to exclude:
+#         - Regions marked with M (to be removed)
+#         - Regions with negative indices
+#     • Extract coordinate lists (XLst, YLst, ZLst) from SimArr
+#     • Store in DimLst as [list $XLst $YLst $ZLst]
+# 3. Regular Expression Definitions
+#     Variable    Pattern Purpose
+#     RE_m        [\w.]+                      Material names
+#     RE_r        (-?\d+[:@,])*-?\d+          Region/interface indices
+#     RE_v        (-?\d+[:@,])*-?\d+          Varying variable indices
+#     RE_n        Scientific notation pattern Numeric values
+# 4. Main Processing Loop
+# For each value (Val) in VarVal:
+# Initialize per value:
+#     • Bool = false (group ID not yet matched)
+#     • Track value index (ValIdx) and total count (ValEnd)
+# For each group ID (GID) in GrpID:
+# Case b - Boundary/Contact IDs
+#     • Search BIDLst for case-insensitive match:
+#         o Index 0: Contact name - validate against IntfAttr
+#         o Index 1: Always matches
+#         o Index 2+: Special keywords:
+#             - M → MonoScaling
+#             - S → SpecScaling
+#             - W → Wavelength
+#     • Convert matched value to lowercase
+#     • Throw error if contact not found in IntfAttr
+# Case d - Data Type IDs
+#     • Search DIDLst for match:
+#         o M → Mesh
+#         o N → Numeric
+#         o O → Other
+# Case o - Optical IDs
+#     • Search OIDLst for match:
+#         o I → Incidence
+#         o M → Monochromatic
+#         o S → Spectrum
+# Case q - Process/Operation IDs
+#     • Search QIDLst for match (using first 3 characters):
+#         o Cal → calibrate
+#         o Dep → deposit
+#         o Dif → diffuse
+#         o Etc → etch
+#         o Imp → implant
+#         o Ini → init
+#         o Mas → mask
+#         o Sel → select
+#         o Tra → transform
+#         o Wri → write
+# Case m - Material Names
+#     • Skip if value is a position or numeric expression
+#     • Skip if value matches shape keywords (Ellipse, Vertex, etc.)
+#     • Search material database for exact match (case-insensitive)
+#     • If found:
+#         o For GStr = "m": Create material record
+#             [list material region_id group region_seq]
+#         o Otherwise: Return material name
+
+# Case p / pp - Positions
+#     • Call verifyPos with DimLst and context
+#     • If valid positions returned: Set Bool = true, update Val
+# Case r - Regions
+#     • Match pattern: ^r$RE_r$ (e.g., r5, r1:3)
+# Case rr - Interfaces
+#     • Match pattern: ^r($RE_r/$RE_r&)*$RE_r/$RE_r$ (e.g., r0/1, r1:3/5:7)
+# Case v - Varying Variables
+#     • Extract index string after v or V
+#     • Read indices using readIdx with VarLen:
+#         o Single level: Use VarLen directly
+#         o Multiple levels with IndexWise: Use level-specific length
+#         o Multiple levels without IndexWise: Check all levels
+#     • Generate v<index> strings for each valid index
+#     • Special case: Precision → return as-is
+# 5. Region/Interface Expansion
+# When value matches region/interface pattern:
+#     • Split by & (remove leading r)
+#     • For each reference string:
+#         o Call readIdx with RegLen
+#         o For each index list:
+#             - If interface (2+ indices): Call rr2pp to verify interface
+#                 between block regions
+#             - Add to result as r<joined_indices>
+#     • Sort and deduplicate results
+# 6. Group Assembly
+#     Step 6A: Group Boundary Detection
+#         • If not first element and group ID found:
+#             o Complete current group: prepend identifier to
+#                 all subgroup values
+#             o Add to NewLst
+#             o Reset SubLst
+#     Step 6B: First Element Validation
+#         • First element must match a group ID
+#         • Throw error if not: "the first element 'Val' should refer to Txt"
+#     Step 6C: Accumulate Values
+#         • Add current value to SubLst
+#     Step 6D: Final Group Completion
+#         • If last element: Finalize the last group
+# 7. Return Result
+#     Return NewLst containing grouped lists.
+# Key Features
+# Feature                 Description
+# Multi-Type Support      Handles materials, positions, and other identifiers
+# Range Expansion         Expands region/interface index ranges
+# Case Insensitivity      All identifier matching is case-insensitive
+# Hierarchical Validation Validates against simulation data structures
+# Interface Verification  Calls rr2pp to verify interface validity
+# Duplicate Removal       Sorts and deduplicates expanded values
+# Contextual Errors       Provides detailed error messages with context
+# Multi-Level Support     Handles nested simulation levels with IndexWise mode
 proc mfjProc::groupValues {VarName VarVal GrpID LvlIdx LvlLen} {
 
     # Validate arguments
@@ -1793,8 +2614,8 @@ proc mfjProc::groupValues {VarName VarVal GrpID LvlIdx LvlLen} {
     # Set regular exppression strings for a material or regions
     # Use {} here to preserve a string as it is
     set RE_m {[\w.]+}
-    set RE_r {(-?\d+[:,])*-?\d+}
-    set RE_v {(-?\d+[:,])*-?\d+}
+    set RE_r {(-?\d+[:@,])*-?\d+}
+    set RE_v {(-?\d+[:@,])*-?\d+}
 
     # RE for integers and real numbers (including scientific notation)
     set RE_n {[+-]?(\.\d+|\d+(\.\d*)?)([eE][+-]?\d+)?}
@@ -1840,7 +2661,7 @@ proc mfjProc::groupValues {VarName VarVal GrpID LvlIdx LvlLen} {
                         } else {
 
                             # Check against multiple-level 'IntfAttr'
-                            if {[string index $::SimArr(OneChild) 0] ne "!"
+                            if {[string index $::SimArr(IndexWise) 0] ne "!"
                                 && [llength $::SimArr(ConLen)] == $LvlLen} {
                                 if {[regexp -nocase $Val\
                                     [lindex $::SimArr(ConLst) $LvlIdx]]} {
@@ -2037,7 +2858,7 @@ proc mfjProc::groupValues {VarName VarVal GrpID LvlIdx LvlLen} {
 
                         # Check against multiple-level 'VarVary'
                         if {[llength $VarLen] == $LvlLen
-                            && [string index $::SimArr(OneChild) 0] ne "!"} {
+                            && [string index $::SimArr(IndexWise) 0] ne "!"} {
                             if {[lindex $VarLen $LvlIdx] == 0} {
                                 error "no varying variable in level '$LvlIdx\
                                     of 'VarVary'!"
@@ -2143,16 +2964,116 @@ proc mfjProc::groupValues {VarName VarVal GrpID LvlIdx LvlLen} {
 }
 
 # mfjProc::verifyPos
-    # Verify a position string: p###_###_###, px#_y#_z#, px#+5_y#_###,
-    # p###_###_###//x#_y#_z#, p###_###_###&x#_y#_z#&x#+5_y#_###
-    # Evaluate coordinates and make sure they are within the simulation
-    # domain. Sort the coordinates if 'GStr' is 'pp'.
-# Arguments:
-    # PosStr        A string of positions for evaluation
-    # GStr          Total grammar string: 'p', 'pp', 'pprr', 'ppprrr', and ...
-    # DimLst        Coordinates at X, Y Z axes
-    # Context       A context message
-# Result: Return the verified/evaluated position string list
+#     Validates and evaluates position strings, ensuring coordinates are within
+#     simulation domain bounds, with support for expressions, coordinate
+#     variables, and region specifications.
+# Purpose
+#     Parses position strings containing coordinate specifications (e.g.,
+#     p###_###_###), evaluates any embedded expressions or coordinate references
+#     (e.g., x#, y#, z#), validates bounds against simulation domain, and
+#     optionally sorts coordinates for region definitions.
+# Supported Position Formats
+#     Format              Description
+#     p#_#_#              Single position with 1-3 coordinates
+#     p#_#_#//x#_y#_z#    Region defined by two positions
+#     p#_#_#&x#_y#_z#     Multiple positions separated by &
+#     p#+5_#_#            Expressions in coordinates
+#     px#_y#_z#           Variable references using x#, y#, z#
+# Arguments
+#     Argument    Type    Description
+#     PosStr      String  Position string to validate and evaluate
+#     GStr        String  Grammar string (e.g., p, pp, pprr, ppprrr)
+#     DimLst      List    List of coordinate lists [xLst yLst zLst]
+#                             defining simulation domain
+#     Context     String  Context message for error reporting
+# Return Value
+#     Returns a list of verified/evaluated position strings
+#     (sorted with duplicates removed).
+
+# Processing Flow
+# 1. Initialization and Setup
+#     Step 1A: Parse Dimension Lists
+#         • Extract xLst, yLst, zLst from DimLst
+#         • Calculate lengths (xLen, yLen, zLen)
+#         • Determine DimLen (number of active dimensions: 1, 2, or 3)
+#         • Initialize NewStrLst = [] (empty result list)
+#     Step 1B: Preprocess Input
+#         • Convert PosStr to lowercase (Tcl functions are lowercase)
+#         • Early exit: If first character is not p, return empty list
+#             (not a position string)
+# 2. Parse Position String
+#     Step 2A: Split by & Separator
+#         • Remove leading p character
+#         • Split remainder by & into StrLst
+#     Step 2B: Classify Each Segment
+#     Pattern Type                                Description
+#     ^([^_]+_){0,2}[^_]+//([^_]+_){0,2}[^_]+$    Two positions separated by //
+#     ^([^_]*\d+[^_]*_){0,2}[^_]*\d+[^_]*$        One position with coordinates
+#     Other                                       Not a valid position format
+#     Validation Rules:
+#         • Cannot mix single positions and regions in same PosStr
+#         • Region positions must have same number of coordinates
+#         • Track PosLen: 1 for single position, 2 for region
+# 3. Coordinate Verification Loop
+# For each position list (PosLst) in PPLst:
+#     Step 3A: Dimension Consistency Check
+#         • If DimLen == 0: Set DimLen from first position's coordinate count
+#         • Otherwise: Verify all positions have same coordinate count
+#         • Special case for 1D interfaces with pprr grammar:
+#             Allow + or - as valid coordinate
+#     Step 3B: Process Each Coordinate
+#     For each coordinate (Elm) with axis (x, y, z):
+#     Expression Evaluation:
+#         a. Replace variable references (x#, y#, z#):
+#             • Extract coordinate letter and index (e.g., x2 → x, 2)
+#             • Convert negative indices to positive using axis length
+#             • Validate index within bounds [0, Len-1]
+#             • Replace all occurrences with actual value from xLst/yLst/zLst
+#         b. Evaluate arithmetic expression:
+#             • Use expr 1.*$Elm to evaluate
+#             • Catch and report evaluation errors
+#     Boundary Validation:
+#         • Check coordinate is a valid number
+#         • Verify coordinate within simulation domain [Min, Max] for that axis
+#         • Format number to remove trailing zeros (using format %.12g)
+# 4. Position Assembly
+# Single Position (PosLen == 1):
+#     • Join coordinates with _
+#     • Prefix with p
+#     • Add to NewStrLst
+# Region (PosLen == 2):
+#     • Format as p<coord1>//<coord2>
+#     • Add to NewStrLst
+# 5. Region Coordinate Sorting (for pp grammar)
+#     Step 5A: Count Matching Coordinates
+#         • Compare coordinates between the two positions
+#         • Count how many axes have equal values (Cnt)
+#     Step 5B: Sorting Rules by Grammar
+#     Grammar         Required Match Count    Action
+#     pprr or opprr   Exactly 1               Interface
+#                                             (perpendicular to one axis)
+#     Other (pp)      Exactly 0               Region (box)
+#                                             sort coordinates ascending
+#     Any             Cnt == DimLen           Error: positions are identical
+#     Step 5C: Apply Sorting (for regions)
+#         • Sort coordinate pairs in ascending order using lsort -real
+#         • Update both positions with sorted values
+#         • Update NewStrLst entry with sorted coordinates
+# 6. Return Results
+#     • Remove duplicates using lsort -unique
+#     • Return final list of verified position strings
+# Key Features
+# Feature                     Description
+# Multi-Dimensional Support   Handles 1D, 2D, and 3D coordinates
+# Variable References         x#, y#, z# with negative index support
+# Arithmetic Expressions      Any valid Tcl expression (e.g., px2+5)
+# Region Definition           Two positions separated by //
+# Multiple Positions          & separator for multiple entries
+# Automatic Sorting           Sorts region coordinates for consistent
+#                             representation
+# Domain Validation           Ensures coordinates within simulation bounds
+# Interface Detection         Special handling for pprr grammar (1D interfaces)
+# Duplicate Removal           Returns unique sorted results
 proc mfjProc::verifyPos {PosStr GStr DimLst Context} {
 
     # Create an array for intepreting x#, y#, and z#
@@ -2292,7 +3213,7 @@ proc mfjProc::verifyPos {PosStr GStr DimLst Context} {
                 }
 
                 # Each coordinate must be within the simulation domain
-                if {$Arr(xLen) > 0} {
+                if {$Arr(${Axis}Len) > 0} {
                     set Min [lindex $Arr(${Axis}Lst) 0]
                     set Max [lindex $Arr(${Axis}Lst) end]
                     if {$Elm < $Min || $Elm > $Max} {
@@ -2360,13 +3281,113 @@ proc mfjProc::verifyPos {PosStr GStr DimLst Context} {
 }
 
 # mfjProc::evalNum
-    # Evaluate a number string: ###, x#, x#+5
-# Arguments:
-    # NumStr        A string of number for evaluation
-    # DimLst        Coordinates at X, Y Z axes
-    # Context       A context message
-# Result: Return the evaluated number
-proc mfjProc::evalNum {NumStr {DimLst ""} {Context ""}} {
+#     Evaluates a numeric string that may contain arithmetic expressions or
+#     variable references (e.g., x#, x#+5), replacing coordinate variables
+#     with their actual values before evaluation
+# Purpose
+# Converts a numeric expression string into a numeric value by:
+#     • Evaluating arithmetic expressions (e.g., 10+20, (5+3)*2)
+#     • Resolving coordinate variable references (e.g., x2, y-1, z0)
+#     • Validating indices against dimension bounds
+#     • Handling negative indices (converting to positive positions)
+# Supported Input Formats
+#     Format  Description                 Example
+#     ###     Plain number                10, 3.14, -5
+#     x#      Coordinate variable         x2, y0, z-1
+#     x#+5    Expression with variable    x2+5, y3*2, (z0+z1)/2
+#     ###+### Arithmetic expression       10+20, 100/4, 2**3
+# Arguments
+#     Argument    Description                                 Default
+#     NumStr      Numeric string to evaluate                  Required
+#     DimLst      List of coordinate lists [xLst yLst zLst]   "" (empty)
+#     Context     Context message for error reporting         "" (empty)
+# Return Value
+#     Returns the evaluated number as a floating-point value
+
+# Processing Flow
+# 1. Initial Preprocessing
+#     Step 1A: Normalize Case
+#         • Convert NumStr to lowercase (Tcl functions require lowercase)
+#         • Example: "LOG(3)" → "log(3)"
+#     Step 1B: Check if Already Numeric
+#         • Attempt to evaluate NumStr directly using expr 1.*$NumStr
+#         • If successful: Return the evaluated number immediately
+#             - 1.* ensures floating-point arithmetic
+#             - catch handles evaluation errors gracefully
+#         • If evaluation fails: Continue to variable reference processing
+# 2. Dimension List Setup
+# Only if DimLst is provided and evaluation failed:
+#     Step 2A: Parse Dimension Lists
+#         • Extract xLst, yLst, zLst from DimLst
+#         • Calculate lengths (xLen, yLen, zLen)
+#         • Determine DimLen (number of active dimensions):
+#             - Count dimensions where length > 0
+#             - Valid values: 0, 1, 2, or 3
+#     Step 2B: Store in Array
+#         • Arr(xLst), Arr(xLen) - X-axis coordinate list and length
+#         • Arr(yLst), Arr(yLen) - Y-axis coordinate list and length
+#         • Arr(zLst), Arr(zLen) - Z-axis coordinate list and length
+# 3. Variable Reference Replacement (Recursive Loop)
+# Loop continues while pattern ([xyz])(-?\d+) is found in NumStr:
+#     Step 3A: Extract Variable Information
+#         • Coord: Axis letter (x, y, or z)
+#         • Idx: Index number (may be negative)
+#         • Example: x-2 → Coord="x", Idx="-2"
+#     Step 3B: Validate Dimension Availability
+#         Coordinate  Required DimLen Error Message
+#         x           ≥ 1             "no x coordinate in 'RegGen'!"
+#         y           ≥ 2             "no y coordinate for 1D!"
+#         z           ≥ 3             "no z coordinate for 1D/2D!"
+#     Step 3C: Convert Negative Index to Positive
+#         • Store original index for error messages (OldIdx)
+#         • If Idx < 0: Idx += CoordLen (wrap to positive position)
+#         • Example: x-1 with xLen=5 → Idx = -1 + 5 = 4
+#     Step 3D: Validate Index Bounds
+#         • Check 0 <= Idx < CoordLen
+#         • If out of bounds: Throw error with context
+#     Step 3E: Replace All Occurrences
+#         • Get actual coordinate value: [lindex $CoordList $Idx]
+#         • Use regsub -all to replace all occurrences of the pattern
+#         • Example: "x2+x2" with xLst=[10,20,30] and Idx=2
+#             - Replace x2 with 30 → "30+30"
+# 4. Final Expression Evaluation
+#     Step 4A: Evaluate the Expression
+#         • After all variable references are replaced:
+#             - Attempt expr 1.*$NumStr
+#             - 1.* ensures floating-point arithmetic (not integer division)
+#     Step 4B: Error Handling
+#         • If evaluation fails: Throw detailed error
+# 5. Return Result
+#     • Return the evaluated numeric value
+#     • Note: Cannot wrap return in catch (return value is needed)
+# Key Features
+#     Feature                         Description
+#     Immediate Numeric Detection     Returns if input is already a valid number
+#     Arithmetic Expression Support   Any valid Tcl expression
+#     Variable References             x#, y#, z# coordinate substitution
+#     Negative Index Support          x-1 refers to last element
+#     Multiple Replacements           -all flag replaces all occurrences
+#     Dimension Validation            No referencing unavailable dimensions
+#     Bounds Checking Ensures         indices within coordinate list range
+#     Context-Aware Errors            Includes user-provided context
+#     Floating-Point Arithmetic       Always returns floating-point
+# Usage Notes
+# • Case Insensitive: Converts input to lowercase automatically
+# • Early Return Optimization: Skips variable processing if already numeric
+# • Floating-Point Always: Uses 1.* to ensure floating-point arithmetic
+# • Negative Index Semantics: -1 = last element, -2 = second-to-last, etc.
+# • Recursive Replacement: Loop continues until all variable references resolved
+# • Expression Complexity: Supports any Tcl-compatible arithmetic expression
+proc mfjProc::evalNum {NumStr
+    {DimLst ""} {Context ""}} {
+
+    # Tcl functions are lower cases so change the string to lower cases
+    set NumStr [string tolower $NumStr]
+
+    # Return if the string is already a number
+    if {![catch {set Res [expr 1.*$NumStr]} Err]} {
+        return $Res
+    }
 
     # Create an array for intepreting x#, y#, and z#
     set DimLen 0
@@ -2382,10 +3403,7 @@ proc mfjProc::evalNum {NumStr {DimLst ""} {Context ""}} {
         incr DimLen [expr $Arr(zLen) > 0]
     }
 
-    # Tcl functions are lower cases so change the string to lower cases
-    set NumStr [string tolower $NumStr]
-
-    # Recursively rplace x#, y#, z# if present
+    # Recursively replace x#, y#, z# if present
     while {[regexp {([xyz])(-?\d+)} $NumStr -> Coord Idx]} {
 
         # Avoid invalid coordinate
@@ -2441,7 +3459,8 @@ proc mfjProc::evalNum {NumStr {DimLst ""} {Context ""}} {
 #     Pos1          Position 1 string/list or the interface string/list
 #     Pos2          Opposite position 2 string/list
 # Result: Return the normal 3D vector.
-proc mfjProc::intfVn {Pos1 {Pos2 ""}} {
+proc mfjProc::intfVn {Pos1
+    {Pos2 ""}} {
     set Vn [list]
 
     # Validate arguments (an interface or two positions). Valide arguments:
@@ -2763,7 +3782,8 @@ proc mfjProc::rr2pp {RegInfo Idx1 Idx2} {
 #     VarName       List of variable names
 #     Suffix        Calculate after removing the suffix string
 # Result: Return the max length or 0 for a empty VarName
-proc mfjProc::calMaxVarLen {VarName {Suffix ""}} {
+proc mfjProc::calMaxVarLen {VarName
+    {Suffix ""}} {
     set MaxLen 0
     set SufLen [string length $Suffix]
     foreach Elm $VarName {
@@ -2855,21 +3875,22 @@ proc mfjProc::readMatDB {FMat args} {
 }
 
 # mfjProc::buildTree
-    # Build a SWB node tree according to the OneChild or full permutation mode
+    # Build a SWB node tree according to the IndexWise or full permutation mode
     # Key nodes are a list of the last nodes of all tools
 # Arguments:
     # VarName             Variable names
     # VarVal              Variable values
     # STIdxLst            Sentaurus tool Index list
-    # OneChild            Optional, OneChild (default) or full permutation
+    # IndexWise            Optional, IndexWise (default) or full permutation
     # NodeTree            Optional, returns node tree (default) or key nodes
 # Result: Return the node tree
-proc mfjProc::buildTree {VarName VarVal STIdxLst {OneChild ""} {NodeTree ""}} {
+proc mfjProc::buildTree {VarName VarVal STIdxLst
+    {IndexWise ""} {NodeTree ""}} {
 
     # Validate arguments
-    foreach Elm [list OneChild NodeTree] {
+    foreach Elm [list IndexWise NodeTree] {
 
-        # Make an alias of 'OneChild' and 'NodeTree'
+        # Make an alias of 'IndexWise' and 'NodeTree'
         upvar 0 $Elm Alias
         set Alias [expr {[string index $Alias 0] ne "!"}]
     }
@@ -2901,7 +3922,7 @@ proc mfjProc::buildTree {VarName VarVal STIdxLst {OneChild ""} {NodeTree ""}} {
         }
         set ValLen [llength $Val]
         if {$ValLen > 1} {
-            if {$ValLen != $LastLen || !$OneChild} {
+            if {$ValLen != $LastLen || !$IndexWise} {
                 set Prod [expr $Prod*$ValLen]
             }
             set LastLen $ValLen
@@ -2975,7 +3996,8 @@ proc mfjProc::buildTree {VarName VarVal STIdxLst {OneChild ""} {NodeTree ""}} {
     # VarVal      Variable value
     # Level       Optional, default list level starts from 0
 # Result: Return the converted SCHEME value
-proc mfjProc::tcl2Scheme {VarName VarVal {Level 0}} {
+proc mfjProc::tcl2Scheme {VarName VarVal
+    {Level 0}} {
 
     # Validate arguments
     # A level should not be a negative integer
@@ -2986,7 +4008,7 @@ proc mfjProc::tcl2Scheme {VarName VarVal {Level 0}} {
     set SLst [list]
     foreach SubLst $VarVal {
         set SubLen [llength $SubLst]
-        if {$SubLen > 1 || [regexp {^\{.*\}$} $SubLst]} {
+        if {[isLstDec $SubLst]} {
 
             # The function name is adaptive using '[lindex [info level 0] 0]'
             lappend SLst [[lindex [info level 0] 0] $VarName\
@@ -3039,7 +4061,8 @@ proc mfjProc::tcl2Scheme {VarName VarVal {Level 0}} {
     # Shading     Optional shading fraction [0]
     # FSave       Optional file name for saving the custom spectrum
 # Result: Two lists of wavelengths (nm) and corresponding intensities (W*cm^-2)
-proc mfjProc::customSpec {FSpec WBegin WEnd WStep {Shading 0} {FSave ""}} {
+proc mfjProc::customSpec {FSpec WBegin WEnd WStep
+    {Shading 0} {FSave ""}} {
 
     # Validate arguments
     if {![file isfile $FSpec]} {
@@ -3239,7 +4262,8 @@ proc mfjProc::specInt {FSpec} {
     # TLyr        The number of top dummy layers
     # BLyr        The number of bottom dummy layers
 # Result: Return 1 for success
-proc mfjProc::curve2CSV {CName XTitle YTitle PName FCSV {TLyr 0} {BLyr 0}} {
+proc mfjProc::curve2CSV {CName XTitle YTitle PName FCSV
+    {TLyr 0} {BLyr 0}} {
 
     # Validate arguments
     foreach Elm {TLyr BLyr} {
@@ -3467,7 +4491,8 @@ proc mfjProc::curve2CSV {CName XTitle YTitle PName FCSV {TLyr 0} {BLyr 0}} {
     # FCSV        The file name of the converted CSV file
     # Remove      A switch determining whether to remove the .plx file or not
 # Result: Return 1 for success
-proc mfjProc::plx2CSV {FPlx {FCSV ""} {Remove ""}} {
+proc mfjProc::plx2CSV {FPlx
+    {FCSV ""} {Remove ""}} {
 
     # Verify arguments
     if {![file exists $FPlx]} {
@@ -3657,7 +4682,8 @@ proc mfjProc::cut1D {FTDR FldStruct RegDim YDflt FCSV FCnt} {
     # TrialNode   The trial node which is running to extract variables
     # FDOESum     Optional, '06out/DOESummary.csv' is default
 # Result: Return 1 for success
-proc mfjProc::gVar2DOESum {GVarArr TrialNode {FDOESum ""}} {
+proc mfjProc::gVar2DOESum {GVarArr TrialNode
+    {FDOESum ""}} {
 
     # Validate arguments
     if {$FDOESum eq ""} {

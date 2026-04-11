@@ -21,7 +21,7 @@ namespace eval mfjST {
         TclSWB|VarLst "" Tcl|STLst "" TclSWB|STLst ""
         Tcl|Title {#if "@tool_label@" eq "(\S+)"}
         Tcl|EnvHead "Tcl environment variables for Sentaurus TCAD"
-        SWB|VarLst "" SWB|STLst "" SWB|STVer "" SWB|OneChild OneChild
+        SWB|VarLst "" SWB|STLst "" SWB|STVer "" SWB|IndexWise IndexWise
         SWB|HideVar !HideVar
         SWB|Head "# Copyright (C) 1994-2016 Synopsys Inc."
         SWB|KeyID {{swbtree v(\S+)} "simulation flow" "variables"
@@ -174,7 +174,7 @@ proc mfjST::readTcl {} {
 
 # mfjST::ReadSWB
     # Read gtree.dat and update the following variables in arr:
-    # SWB|Head SWB|STVer SWB|OneChild SWB|STLst SWB|VarLst SWB|HideVar
+    # SWB|Head SWB|STVer SWB|IndexWise SWB|STLst SWB|VarLst SWB|HideVar
 proc mfjST::ReadSWB {} {
     variable arr
     vputs "Reading Sentaurus Work Bench(SWB) setting file 'gtree.dat'..."
@@ -220,7 +220,7 @@ proc mfjST::ReadSWB {} {
                     set ReadFlow false
                     set ReadVar true
                     set mfjProc::arr(Indent1) 2
-                    set GTr [buildTree $VarName $VarVal $IdxLst OneChild]
+                    set GTr [buildTree $VarName $VarVal $IdxLst IndexWise]
                     set mfjProc::arr(Indent1) 0
                     vputs -v2 -i1 "Variables visable to SWB:\
                         '$arr(SWB|HideVar)'"
@@ -310,7 +310,7 @@ proc mfjST::ReadSWB {} {
                     set Txt2 [lrange [lindex $GTr $Idx] 0 3]
                     vputs -v3 -o [format "%-39s $Txt2" $Txt1]
                     if {$Txt1 ne $Txt2} {
-                        set arr(SWB|OneChild) !OneChild
+                        set arr(SWB|IndexWise) !IndexWise
                         break
                     }
                     incr Idx
@@ -323,10 +323,10 @@ proc mfjST::ReadSWB {} {
         }
         if {!$arr(UpdateSWB)} {
             if {[llength $GTr] != $Idx} {
-                set arr(SWB|OneChild) !OneChild
+                set arr(SWB|IndexWise) !IndexWise
             }
         }
-        vputs -v2 -i1 "SWB variable permutation: $arr(SWB|OneChild)"
+        vputs -v2 -i1 "SWB variable permutation: $arr(SWB|IndexWise)"
     } else {
         vputs -i1 "The SWB setting file 'gtree.dat' not found!"
         set arr(UpdateSWB) true
@@ -340,8 +340,8 @@ proc mfjST::ReadSWB {} {
     # Bat|MaxTime Bat|MaxMem Bat|RunNode UpdateBat
 proc mfjST::readBatch {} {
     variable arr
-    set FSTPP $::SimArr(CodeDir)/$::SimArr(FSTPP)
-    set FSTBatch $::SimArr(CodeDir)/$::SimArr(FSTBatch)
+    set FSTPP $::SimArr(ModDir)/$::SimArr(FSTPP)
+    set FSTBatch $::SimArr(ModDir)/$::SimArr(FSTBatch)
     vputs "Reading batch file '$FSTBatch'..."
     if {[file isfile $FSTPP] && [file isfile $FSTBatch]} {
 
@@ -525,7 +525,7 @@ proc mfjST::tclvsFmt {} {
                         vputs -i1 $Msg
                     }
                     if {$Flg && $STIdx > 0 && $arr(StartIdx) == -1} {
-                        set arr(StartIdx) $STIdx
+                        set arr(StartIdx) [expr $STIdx-1]
                         set Flg false
                     }
                     vputs -i2 "Simulation variable '$Var' of '$Tool' removed!"
@@ -537,7 +537,7 @@ proc mfjST::tclvsFmt {} {
                         vputs -i1 $Msg
                     }
                     if {$Flg && $STIdx > 0 && $arr(StartIdx) == -1} {
-                        set arr(StartIdx) $STIdx
+                        set arr(StartIdx) [expr $STIdx-1]
                         set Flg false
                     }
                     vputs -i2 "Simulation variable '$Var' has a value of\
@@ -552,7 +552,7 @@ proc mfjST::tclvsFmt {} {
                         vputs -i1 $Msg
                     }
                     if {$Flg && $STIdx > 0 && $arr(StartIdx) == -1} {
-                        set arr(StartIdx) $STIdx
+                        set arr(StartIdx) [expr $STIdx-1]
                         set Flg false
                     }
                     vputs -i2 "Simulation variable '$Var' of '$Tool' added!"
@@ -625,13 +625,13 @@ proc mfjST::SWBvsTcl {} {
     if {!$arr(UpdateSWB)} {
         vputs "Comparing 'gtree.dat' against '$::SimArr(FVarSim)'..."
         set Msg "'gtree.dat' is different from '$::SimArr(FVarSim)'!"
-        if {$arr(SWB|OneChild) ne $::SimArr(OneChild)} {
+        if {$arr(SWB|IndexWise) ne $::SimArr(IndexWise)} {
             if {!$arr(UpdateSWB)} {
                 set arr(UpdateSWB) true
                 vputs -i1 $Msg
             }
-            vputs -v3 -i2 "SWB variable permutation '$arr(SWB|OneChild)'\
-                different from '$::SimArr(OneChild)'!"
+            vputs -v3 -i2 "SWB variable permutation '$arr(SWB|IndexWise)'\
+                different from '$::SimArr(IndexWise)'!"
         }
         if {$arr(SWB|STVer) ne [lindex $arr(TclVal|SimEnv) 1]} {
             if {!$arr(UpdateSWB)} {
@@ -711,7 +711,7 @@ proc mfjST::SWBvsTcl {} {
         # Perform an efficient update of all related variables
         set arr(SWB|STVer) [lindex $arr(TclVal|SimEnv) 1]
         set arr(SWB|HideVar) $::SimArr(HideVar)
-        set arr(SWB|OneChild) $::SimArr(OneChild)
+        set arr(SWB|IndexWise) $::SimArr(IndexWise)
         set arr(SWB|STLst) $arr(TclSWB|STLst)
         set arr(SWB|VarLst) $arr(TclSWB|VarLst)
         foreach Tool $arr(SWB|STLst) {
@@ -851,14 +851,14 @@ proc mfjST::arrvsSWB {} {
     if {!$arr(UpdateArr)} {
         vputs "Comparing '::SimArr' against 'gtree.dat'..."
         set Msg "'::SimArr' is different from 'gtree.dat'!"
-        if {$::SimArr(OneChild) ne $arr(SWB|OneChild)} {
+        if {$::SimArr(IndexWise) ne $arr(SWB|IndexWise)} {
             if {!$arr(UpdateArr)} {
                 set arr(UpdateArr) true
                 vputs -i1 $Msg
             }
-            vputs -v3 -i2 "SWB variable permutation '$::SimArr(OneChild)'\
-                different from '$arr(SWB|OneChild)'!"
-            set ::SimArr(OneChild) $arr(SWB|OneChild)
+            vputs -v3 -i2 "SWB variable permutation '$::SimArr(IndexWise)'\
+                different from '$arr(SWB|IndexWise)'!"
+            set ::SimArr(IndexWise) $arr(SWB|IndexWise)
         }
         if {$::SimArr(HideVar) ne $arr(SWB|HideVar)} {
             if {!$arr(UpdateArr)} {
@@ -927,7 +927,7 @@ proc mfjST::batchvsTcl {} {
         }
     }
     set arr(Tcl|KeyNode) [buildTree $VarName $VarVal $IdxLst\
-        $::SimArr(OneChild) !NodeTree]
+        $::SimArr(IndexWise) !NodeTree]
     if {$arr(UpdateTcl)} {
         if {$arr(StartIdx) == 0} {
             set arr(Tcl|RunNode) all
@@ -1183,12 +1183,12 @@ proc mfjST::updateTcl {} {
 }
 
 # mfjST::updateArr
-    # Update keys OneChild, HideVar, and VarName in ::SimArr if
+    # Update keys IndexWise, HideVar, and VarName in ::SimArr if
     # arr(UpdateArr) is true
 proc mfjST::updateArr {} {
     variable arr
     if {$arr(UpdateArr)} {
-        vputs "Updating keys OneChild, HideVar, and VarName in ::SimArr..."
+        vputs "Updating keys IndexWise, HideVar, and VarName in ::SimArr..."
         if {![file isfile 11ctrlsim.tcl]} {
             error "'11ctrlsim.tcl' missing in directory '[file tail [pwd]]'!"
         }
@@ -1196,8 +1196,8 @@ proc mfjST::updateArr {} {
         set Inf [open 11ctrlsim.tcl r]
         set Buff [read $Inf]
         close $Inf
-        regsub HideVar\\s+\\S+\\s+OneChild\\s+\\S+\\s+DfltYMax $Buff\
-            "HideVar $::SimArr(HideVar) OneChild $::SimArr(OneChild) DfltYMax"\
+        regsub HideVar\\s+\\S+\\s+IndexWise\\s+\\S+\\s+DfltYMax $Buff\
+            "HideVar $::SimArr(HideVar) IndexWise $::SimArr(IndexWise) DfltYMax"\
             Buff
         regsub {VarName\s+\{[^\}]+\}} $Buff [wrapText\
             "VarName \{$::SimArr(VarName)\}" $mfjProc::arr(Tab)] Buff
@@ -1211,7 +1211,7 @@ proc mfjST::updateArr {} {
 
 # mfjST::UpdateSWB
     # If arr(UpdateSWB) is true, update the SWB setting file 'gtree.dat'
-    # with arr(SWB|Head) arr(SWB|OneChild) arr(SWB|STVer) arr(SWB|HideVar)
+    # with arr(SWB|Head) arr(SWB|IndexWise) arr(SWB|STVer) arr(SWB|HideVar)
     # arr(SWB|VarLst) arr(SWB|STLst)
 proc mfjST::UpdateSWB {} {
     variable arr
@@ -1235,8 +1235,8 @@ proc mfjST::UpdateSWB {} {
         } else {
             puts $Ouf "# Only multiple-level variables are visable to SWB"
         }
-        if {[string index $arr(SWB|OneChild) 0] ne "!"} {
-            puts $Ouf "# Node tree permutation: OneChild mode"
+        if {[string index $arr(SWB|IndexWise) 0] ne "!"} {
+            puts $Ouf "# Node tree permutation: IndexWise mode"
         } else {
             puts $Ouf "# Node tree permutation: Full permutation"
         }
@@ -1295,7 +1295,7 @@ proc mfjST::UpdateSWB {} {
         vputs -v2 -i1 "Writing [lindex $arr(SWB|KeyID) 4]..."
         puts $Ouf "$::SimArr(Prefix) [lindex $arr(SWB|KeyID) 4]"
         set mfjProc::arr(Indent1) 2
-        foreach Elm [buildTree $VarName $VarVal $IdxLst $arr(SWB|OneChild)] {
+        foreach Elm [buildTree $VarName $VarVal $IdxLst $arr(SWB|IndexWise)] {
             puts $Ouf $Elm
         }
         set mfjProc::arr(Indent1) 0
@@ -1326,8 +1326,8 @@ proc mfjST::updatePP_Bat {} {
     variable arr
 
     if {$arr(UpdateBat)} {
-        set FSTPP $::SimArr(CodeDir)/$::SimArr(FSTPP)
-        set FSTBatch $::SimArr(CodeDir)/$::SimArr(FSTBatch)
+        set FSTPP $::SimArr(ModDir)/$::SimArr(FSTPP)
+        set FSTBatch $::SimArr(ModDir)/$::SimArr(FSTBatch)
         vputs "Updating '$FSTPP' and '$FSTBatch'..."
         foreach Elm [list FSTPP FSTBatch] {
             upvar 0 $Elm Alias
@@ -1541,7 +1541,7 @@ proc mfjST::updateDOESum {} {
         foreach Var $arr(TclST|VarLst) {
             if {$arr(TclLvl|$Var) > 1} {
                 set ValLen $arr(TclLvl|$Var)
-                if {[string index $::SimArr(OneChild) 0] ne "!"} {
+                if {[string index $::SimArr(IndexWise) 0] ne "!"} {
                     if {$ValLen != $OldLen} {
                         set Ply [expr {$Ply*$ValLen}]
                         set OldLen $ValLen
@@ -1602,8 +1602,8 @@ proc mfjST::fmt2swb {} {
     foreach Elm [list validatePath readTcl tclvsFmt updateTcl ReadSWB\
         SWBvsTcl UpdateSWB readBatch batchvsTcl updatePP_Bat\
         updateDOESum miscTask] {
-        if {[catch $Elm Err]} {
-            vputs -c "\nError in proc '$Elm':\n$Err\n"
+        if {[catch $Elm ErrMsg]} {
+            vputs -c "\nError in proc '$Elm':\n$ErrMsg\n"
             exit 1
         }
     }
@@ -1613,8 +1613,8 @@ proc mfjST::fmt2swb {} {
 #   Translate changes in gtree.dat to the Tcl file only
 proc mfjST::swb2tcl {} {
   foreach Elm {ReadSWB readTcl TclvsSWB arrvsSWB updateTcl updateArr} {
-        if {[catch $Elm Err]} {
-            vputs -c "\nError in proc '$Elm':\n$Err\n"
+        if {[catch $Elm ErrMsg]} {
+            vputs -c "\nError in proc '$Elm':\n$ErrMsg\n"
             exit 1
         }
     }

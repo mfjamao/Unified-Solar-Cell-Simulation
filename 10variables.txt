@@ -36,9 +36,10 @@ Specification (after semicolon):
    7 Number of CPUs (i >= 1): 4
 
 <GRAMMAR>{a = Sentaurus | s Sentaurus}
-{a = V-2023.09 | `s E-2010.12 F-2011.09 G-2012.06 H-2013.03 I-2013.12 J-2014.09
+{a = X-2025.06 | `s E-2010.12 F-2011.09 G-2012.06 H-2013.03 I-2013.12 J-2014.09
     K-2015.06 L-2016.03 M-2016.12 N-2017.09 O-2018.06 P-2019.03 Q-2019.12
-    R-2020.09 S-2021.06 T-2022.03 U-2022.12 V-2023.09}
+    R-2020.09 S-2021.06 T-2022.03 T-2022.03-SP1 T-2022.03-SP2 U-2022.12
+    V-2023.09 V-2023.12 V-2024.03 W-2024.09 W-2024.09-SP1 X-2025.06}
 {a = !Cylindrical | s C<ylindrical> !Cylindrical}
 {a = Electrical | s O<ptical> P<rocess> Electrical}
 {a = Local | s P<BS> Local}
@@ -203,7 +204,7 @@ Specification for a tunneling interface:
 {(n v1 | f v1 | == v2 {C\w+} ) & `a | == v1 {c\d} & (a | `n & `> 0) | a}
 
 <VAR>IntfAttr   {{r4/6 c0} {r5/8 c1} {r0/1 1e12 1e5} {r4,5/7 0 1e7} {r1,3/2 0
-    190}} 0/2/1,2=0|0
+    190}} 0/2/1,2=0&0
 
 <COMMENT>Optical generation attributes variable
 Specify four types of optical solver E(External), O(OBAM), T(TMM), R(Raytrace).
@@ -386,13 +387,14 @@ Specification for write 1D profile along x:
     1 Position: p0_1
 
 <GRAMMAR>{q}
-{== v0 Calibrate & (a = V-2023.09 | `s E-2010.12 F-2011.09 G-2012.06 H-2013.03
+{== v0 Calibrate & (a = X-2025.06 | `s E-2010.12 F-2011.09 G-2012.06 H-2013.03
     I-2013.12 J-2014.09 K-2015.06 L-2016.03 M-2016.12 N-2017.09 O-2018.06
-    P-2019.03 Q-2019.12 R-2020.09 S-2021.06 T-2022.03 U-2022.12 V-2023.09) | ==
-    v0 (Deposit|Etch) & (`!a & `m) | == v0 Diffuse & (`!a & `f) | == v0 Implant
-    & (`!a & `s As B P) | == v0 Init & (`!a & `m) | == v0 Mask & (`!a & `pp) |
-    == v0 Select & (`!a & `s Int Vac) | == v0 Transform & (`!a & s flip) | == v0
-    Write & (`!a & `p)}
+    P-2019.03 Q-2019.12 R-2020.09 S-2021.06 T-2022.03 T-2022.03-SP1
+    T-2022.03-SP2 U-2022.12 V-2023.09 V-2023.12 V-2024.03 W-2024.09
+    W-2024.09-SP1 X-2025.06) | == v0 (Deposit|Etch) & (`!a & `m) | == v0 Diffuse
+    & (`!a & `f) | == v0 Implant & (`!a & `s As B P) | == v0 Init & (`!a & `m) |
+    == v0 Mask & (`!a & `pp) | == v0 Select & (`!a & `s Int Vac) | == v0
+    Transform & (`!a & s flip) | == v0 Write & (`!a & `p)}
 {== v0 Write & `a | == v0 Calibrate & (a | `f) | == v0 (Deposit|Etch) & (`!a &
     `n & `> 0) | == v0 Diffuse & (a = atm | s torr Pa atm) | == v0 Implant &
     (`!a & `n & `> 0) | == v0 Init & (`!a & `pp) | == v0 Mask & (a = positive |

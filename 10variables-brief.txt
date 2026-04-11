@@ -6,7 +6,7 @@ RegGen      {{iaSi 0.006 50} {Silicon 165 <0/2>} <0> {paSi 0.02 45} {naSi
 FldAttr     {{r2 P 1.56e+15} {r4 B 1.41e+19} {r5 P 1.45e+19}}
 
 IntfAttr    {{r4/6 c0} {r5/8 c1} {r0/1 1e12 1e5} {r4,5/7 0 1e7} {r1,3/2 0 190}}
-    0/2/1,2=0|0
+    0/2/1,2=0&0
 
 GopAttr     {{r0/1 External 02opt/HJT_165um_a-Si-i_6nm_Spectral.plx} {Spectrum
     02opt/AM1.5g_IEC60904-3_2008.txt 0.3 1.2 0.01} {Monochromatic 0.3 0.001}}

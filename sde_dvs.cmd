@@ -10,14 +10,14 @@
 set inf [open 11ctrlsim.tcl r]
 set str [read $inf]
 close $inf
-if {[regexp {array set SimArr \{(.+)\};\#} $str -> tmp]} {
+if {[regexp {array\s+set\s+SimArr\s+\{(.+)\};\#} $str -> tmp]} {
     array set SimArr [regsub -all {\s+} $tmp " "]
 } else {
     error "'SimArr' not found in '11ctrlsim.tcl'!"
 }
 
 # Source general procedures to reduce lengthy embedded code
-source $SimArr(CodeDir)/$SimArr(FProc)
+source $SimArr(ModDir)/$SimArr(FProc)
 namespace import [file rootname $SimArr(FProc)]::*
 array set TabArr [array get [file rootname $SimArr(FProc)]::TabArr]
 set Tab [set [file rootname $SimArr(FProc)]::arr(Tab)]
@@ -306,8 +306,6 @@ foreach elm {IntfSRV IntfTrap IntfCon IntfTun lst} {
     set $elm [list]
 }
 set IntfAttr [str2List $IntfAttr]
-set var [list]
-set val [list]
 foreach grp $IntfAttr {
     set lst [string map {r "" / " "} [lindex $grp 0]]
     regsub {^r(\d+)/(\d+)} $grp {r\2/\1} str
@@ -411,6 +409,13 @@ foreach grp $GopAttr {
             }
         } else {
             set LPD $val
+
+            # Prompt if LPD is pointing outside of the simulation domain
+            set val [lindex $lst 0 0]
+            if {$LPD == 1 && $val > $XMax-$val
+                || ($LPD == -1 && $val < $XMax-$val)} {
+                error "wrong incident light direction!"
+            }
         }
     }
 }
